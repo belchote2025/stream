@@ -2,6 +2,8 @@
 
 Una plataforma de streaming moderna y elegante inspirada en Netflix, construida con PHP, MySQL y tecnologías web modernas.
 
+🔗 **Repositorio:** [https://github.com/belchote2025/stream](https://github.com/belchote2025/stream)
+
 ## ✨ Características Principales
 
 ### 🎨 Diseño

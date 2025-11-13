@@ -76,8 +76,7 @@ class Auth {
         
         // Buscar usuario por email
         $stmt = $this->db->prepare("
-            SELECT id, username, email, password, role, status, full_name, avatar_url,
-                   subscription_plan_id, subscription_end_date
+            SELECT id, username, email, password, role, status, full_name, avatar_url
             FROM users 
             WHERE email = ?
         ");
@@ -93,14 +92,6 @@ class Auth {
         // Verificar si la cuenta está activa
         if ($user['status'] !== 'active') {
             throw new Exception("Tu cuenta ha sido suspendida o desactivada. Contacta al soporte para más información.");
-        }
-        
-        // Verificar si la suscripción ha expirado
-        if ($user['role'] === 'premium' && $user['subscription_end_date'] < date('Y-m-d')) {
-            // Degradar a cuenta gratuita
-            $this->downgradeToFree($user['id']);
-            $user['role'] = 'free';
-            $user['subscription_plan_id'] = null;
         }
         
         // Configurar la sesión del usuario
@@ -149,14 +140,22 @@ class Auth {
         }
         
         $stmt = $this->db->prepare("
-            SELECT u.*, p.name as plan_name, p.price as plan_price, p.billing_cycle
+            SELECT u.*
             FROM users u
-            LEFT JOIN subscription_plans p ON u.subscription_plan_id = p.id
             WHERE u.id = ?
         ");
         
         $stmt->execute([$_SESSION['user_id']]);
-        return $stmt->fetch();
+        $user = $stmt->fetch();
+        
+        // Añadir información de plan basada en el rol
+        if ($user) {
+            $user['plan_name'] = $user['role'] === 'premium' ? 'Premium' : ($user['role'] === 'admin' ? 'Admin' : 'Básico');
+            $user['plan_price'] = $user['role'] === 'premium' ? 9.99 : 0;
+            $user['billing_cycle'] = $user['role'] === 'premium' ? 'monthly' : 'free';
+        }
+        
+        return $user;
     }
     
     // Actualizar perfil de usuario
@@ -222,25 +221,16 @@ class Auth {
     
     // Asignar plan de suscripción por defecto (gratuito)
     private function assignDefaultSubscription($userId) {
-        $stmt = $this->db->prepare("
-            UPDATE users 
-            SET subscription_plan_id = (SELECT id FROM subscription_plans WHERE name = 'Básico' LIMIT 1),
-                subscription_start_date = CURDATE(),
-                subscription_end_date = DATE_ADD(CURDATE(), INTERVAL 1 MONTH)
-            WHERE id = ?
-        ");
-        
-        return $stmt->execute([$userId]);
+        // El plan se determina por el rol del usuario
+        // No necesitamos actualizar columnas que no existen
+        return true;
     }
     
     // Degradar a cuenta gratuita
     private function downgradeToFree($userId) {
         $stmt = $this->db->prepare("
             UPDATE users 
-            SET role = 'free',
-                subscription_plan_id = (SELECT id FROM subscription_plans WHERE name = 'Básico' LIMIT 1),
-                subscription_start_date = NULL,
-                subscription_end_date = NULL,
+            SET role = 'user',
                 updated_at = NOW()
             WHERE id = ?
         ");

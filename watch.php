@@ -138,27 +138,155 @@ include __DIR__ . '/includes/header.php';
     background: rgba(229, 9, 20, 0.2);
     border: 1px solid #e50914;
 }
+
+.video-error, .no-video-message {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.error-content, .no-video-content {
+    text-align: center;
+    color: #fff;
+    padding: 2rem;
+    max-width: 500px;
+}
+
+.error-content i, .no-video-content i {
+    font-size: 4rem;
+    color: #e50914;
+    margin-bottom: 1rem;
+}
+
+.error-content h3, .no-video-content h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.error-content p, .no-video-content p {
+    color: #999;
+    margin-bottom: 2rem;
+}
+
+.error-content .btn, .no-video-content .btn {
+    margin: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.error-content .btn-primary {
+    background: #e50914;
+    color: #fff;
+    border: none;
+}
+
+.error-content .btn-primary:hover {
+    background: #f40612;
+}
+
+.no-video-content .btn-outline {
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+}
+
+.no-video-content .btn-outline:hover {
+    border-color: #e50914;
+    color: #e50914;
+}
+
+.video-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    z-index: 5;
+}
+
+.video-loading i {
+    font-size: 3rem;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
 </style>
 
 <div class="watch-page">
     <div class="video-container-full">
-        <video 
-            id="videoPlayer" 
-            controls 
-            autoplay
-            <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
-                data-start-time="<?php echo $savedProgress['progress']; ?>"
-            <?php endif; ?>
-        >
-            <?php if ($episode && $episode['video_url']): ?>
-                <source src="<?php echo htmlspecialchars($episode['video_url']); ?>" type="video/mp4">
-            <?php elseif ($content['video_url']): ?>
-                <source src="<?php echo htmlspecialchars($content['video_url']); ?>" type="video/mp4">
-            <?php elseif ($content['trailer_url']): ?>
-                <source src="<?php echo htmlspecialchars($content['trailer_url']); ?>" type="video/mp4">
-            <?php endif; ?>
-            Tu navegador no soporta el elemento de video.
-        </video>
+        <?php
+        // Determinar la URL del video a reproducir
+        $videoUrl = null;
+        $hasVideo = false;
+        
+        if ($episode && !empty($episode['video_url'])) {
+            $videoUrl = $episode['video_url'];
+            $hasVideo = true;
+        } elseif (!empty($content['video_url'])) {
+            $videoUrl = $content['video_url'];
+            $hasVideo = true;
+        } elseif (!empty($content['trailer_url'])) {
+            $videoUrl = $content['trailer_url'];
+            $hasVideo = true;
+        }
+        ?>
+        
+        <?php if ($hasVideo): ?>
+            <video 
+                id="videoPlayer" 
+                controls 
+                autoplay
+                preload="metadata"
+                playsinline
+                <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
+                    data-start-time="<?php echo $savedProgress['progress']; ?>"
+                <?php endif; ?>
+            >
+                <source src="<?php echo htmlspecialchars($videoUrl); ?>" type="video/mp4">
+                <source src="<?php echo htmlspecialchars($videoUrl); ?>" type="video/webm">
+                <source src="<?php echo htmlspecialchars($videoUrl); ?>" type="video/ogg">
+                Tu navegador no soporta el elemento de video HTML5.
+            </video>
+            <div id="videoError" class="video-error" style="display: none;">
+                <div class="error-content">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error al cargar el video</h3>
+                    <p>No se pudo cargar el video. Por favor, verifica tu conexión a internet o intenta más tarde.</p>
+                    <button class="btn btn-primary" onclick="retryVideo()">
+                        <i class="fas fa-redo"></i> Reintentar
+                    </button>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="no-video-message">
+                <div class="no-video-content">
+                    <i class="fas fa-video-slash"></i>
+                    <h3>Video no disponible</h3>
+                    <p>Este contenido no tiene un video disponible para reproducir.</p>
+                    <?php if (!empty($content['trailer_url'])): ?>
+                        <button class="btn btn-primary" onclick="playTrailer()">
+                            <i class="fas fa-play"></i> Ver Tráiler
+                        </button>
+                    <?php endif; ?>
+                    <a href="/streaming-platform/content-detail.php?id=<?php echo $contentId; ?>" class="btn btn-outline">
+                        <i class="fas fa-arrow-left"></i> Volver a detalles
+                    </a>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
     
     <div class="video-info">
@@ -233,30 +361,112 @@ const video = document.getElementById('videoPlayer');
 const contentId = <?php echo $contentId; ?>;
 const episodeId = <?php echo $episodeId ? $episodeId : 'null'; ?>;
 const duration = <?php echo $episode ? ($episode['duration'] * 60) : ($content['duration'] * 60); ?>;
+const videoUrl = <?php echo $hasVideo ? "'" . htmlspecialchars($videoUrl, ENT_QUOTES) . "'" : 'null'; ?>;
 
-// Restaurar progreso guardado
-<?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
+let saveInterval;
+let hasStartedPlaying = false;
+
+// Solo inicializar si hay video
+<?php if ($hasVideo): ?>
+if (video) {
+    // Mostrar indicador de carga
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.className = 'video-loading';
+    loadingIndicator.innerHTML = '<i class="fas fa-spinner"></i>';
+    video.parentElement.appendChild(loadingIndicator);
+    
+    // Manejo de errores del video
+    video.addEventListener('error', function(e) {
+        console.error('Error en el video:', e);
+        loadingIndicator.style.display = 'none';
+        const errorDiv = document.getElementById('videoError');
+        if (errorDiv) {
+            errorDiv.style.display = 'flex';
+        }
+        video.style.display = 'none';
+    });
+    
+    // Ocultar indicador cuando el video esté listo
     video.addEventListener('loadedmetadata', function() {
-        const startTime = <?php echo $savedProgress['progress']; ?>;
-        if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
-            video.currentTime = startTime;
+        loadingIndicator.style.display = 'none';
+        
+        // Restaurar progreso guardado
+        <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
+            const startTime = <?php echo $savedProgress['progress']; ?>;
+            const progressPercent = Math.round((startTime / video.duration) * 100);
+            
+            if (progressPercent < 90) { // Solo restaurar si no está casi al final
+                if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
+                    video.currentTime = startTime;
+                }
+            }
+        <?php endif; ?>
+    });
+    
+    // Incrementar contador de vistas cuando el video comience
+    video.addEventListener('play', function() {
+        if (!hasStartedPlaying) {
+            hasStartedPlaying = true;
+            incrementViews();
+        }
+        
+        // Guardar progreso cada 10 segundos
+        saveInterval = setInterval(saveProgress, 10000);
+    });
+    
+    video.addEventListener('pause', function() {
+        clearInterval(saveInterval);
+        saveProgress();
+    });
+    
+    // Guardar progreso cuando el video termine
+    video.addEventListener('ended', function() {
+        clearInterval(saveInterval);
+        saveProgress(true); // Marcar como completado
+    });
+    
+    // Manejar teclas de atajos
+    document.addEventListener('keydown', function(e) {
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        switch(e.key) {
+            case ' ': // Espacio para play/pause
+                e.preventDefault();
+                if (video.paused) {
+                    video.play();
+                } else {
+                    video.pause();
+                }
+                break;
+            case 'ArrowLeft': // Retroceder 10 segundos
+                e.preventDefault();
+                video.currentTime = Math.max(0, video.currentTime - 10);
+                break;
+            case 'ArrowRight': // Avanzar 10 segundos
+                e.preventDefault();
+                video.currentTime = Math.min(video.duration, video.currentTime + 10);
+                break;
+            case 'ArrowUp': // Subir volumen
+                e.preventDefault();
+                video.volume = Math.min(1, video.volume + 0.1);
+                break;
+            case 'ArrowDown': // Bajar volumen
+                e.preventDefault();
+                video.volume = Math.max(0, video.volume - 0.1);
+                break;
+            case 'f': // Pantalla completa
+            case 'F':
+                e.preventDefault();
+                toggleFullscreen();
+                break;
         }
     });
-<?php endif; ?>
+}
 
-// Guardar progreso cada 10 segundos
-let saveInterval;
-video.addEventListener('play', function() {
-    saveInterval = setInterval(saveProgress, 10000);
-});
-
-video.addEventListener('pause', function() {
-    clearInterval(saveInterval);
-    saveProgress();
-});
-
-function saveProgress() {
-    if (!video.duration) return;
+function saveProgress(completed = false) {
+    if (!video || !video.duration) return;
     
     fetch('/streaming-platform/api/playback/save.php', {
         method: 'POST',
@@ -267,9 +477,23 @@ function saveProgress() {
             content_id: contentId,
             episode_id: episodeId,
             progress: Math.floor(video.currentTime),
-            duration: Math.floor(video.duration)
+            duration: Math.floor(video.duration),
+            completed: completed
         })
     }).catch(error => console.error('Error guardando progreso:', error));
+}
+
+function incrementViews() {
+    fetch('/streaming-platform/api/content/view.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            content_id: contentId,
+            episode_id: episodeId
+        })
+    }).catch(error => console.error('Error incrementando vistas:', error));
 }
 
 function formatTime(seconds) {
@@ -287,8 +511,49 @@ function playEpisode(epId) {
     window.location.href = `/streaming-platform/watch.php?id=${contentId}&episode_id=${epId}`;
 }
 
+function retryVideo() {
+    const errorDiv = document.getElementById('videoError');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
+    if (video) {
+        video.style.display = 'block';
+        video.load();
+        video.play().catch(e => console.error('Error al reproducir:', e));
+    }
+}
+
+function toggleFullscreen() {
+    const container = document.querySelector('.video-container-full');
+    if (!document.fullscreenElement) {
+        container.requestFullscreen().catch(err => {
+            console.error('Error al entrar en pantalla completa:', err);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function playTrailer() {
+    <?php if (!empty($content['trailer_url'])): ?>
+        window.location.href = '/streaming-platform/watch.php?id=<?php echo $contentId; ?>&trailer=1';
+    <?php endif; ?>
+}
+
 // Guardar al cerrar la página
-window.addEventListener('beforeunload', saveProgress);
+window.addEventListener('beforeunload', function() {
+    if (video) {
+        saveProgress();
+    }
+});
+
+// Manejar cambios de visibilidad de la página
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden && video && !video.paused) {
+        saveProgress();
+    }
+});
+<?php endif; ?>
 </script>
 
 <?php

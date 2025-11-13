@@ -5,7 +5,7 @@ const appState = {
         name: 'Administrador',
         email: 'admin@streamingplus.com',
         role: 'admin',
-        avatar: 'assets/images/avatar.png'
+        avatar: '/streaming-platform/assets/img/default-poster.svg'
     },
     currentSection: 'dashboard',
     currentSubsection: '',
@@ -29,6 +29,31 @@ const elements = {
     contentForm: document.getElementById('contentForm'),
     // Agrega más elementos según sea necesario
 };
+
+// Funciones auxiliares para eventos
+function handleSearch() {
+    const searchInput = document.querySelector('#admin-search') || elements.searchInput;
+    const query = searchInput?.value.trim() || '';
+    if (query.length >= 2) {
+        console.log('Buscando:', query);
+        // Implementar búsqueda aquí si es necesario
+        // Por ahora solo muestra en consola
+    }
+}
+
+function toggleUserMenu() {
+    const userMenu = elements.userMenu || document.querySelector('.user-menu');
+    if (userMenu) {
+        userMenu.classList.toggle('active');
+    }
+}
+
+function toggleNotifications() {
+    const notifications = elements.notifications || document.querySelector('.notifications');
+    if (notifications) {
+        notifications.classList.toggle('active');
+    }
+}
 
 // Inicialización de la aplicación
 function init() {
@@ -68,12 +93,15 @@ function setupEventListeners() {
     });
     
     // Búsqueda
-    if (elements.searchButton) {
-        elements.searchButton.addEventListener('click', handleSearch);
+    const searchButton = document.querySelector('#search-btn') || elements.searchButton;
+    const searchInput = document.querySelector('#admin-search') || elements.searchInput;
+    
+    if (searchButton) {
+        searchButton.addEventListener('click', handleSearch);
     }
     
-    if (elements.searchInput) {
-        elements.searchInput.addEventListener('keypress', (e) => {
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 handleSearch();
             }
@@ -81,20 +109,22 @@ function setupEventListeners() {
     }
     
     // Menú de usuario
-    if (elements.userMenu) {
-        elements.userMenu.addEventListener('click', toggleUserMenu);
+    const userMenu = document.querySelector('.user-menu') || elements.userMenu;
+    if (userMenu) {
+        userMenu.addEventListener('click', toggleUserMenu);
     }
     
     // Notificaciones
-    if (elements.notifications) {
-        elements.notifications.addEventListener('click', toggleNotifications);
+    const notifications = document.querySelector('#notifications') || elements.notifications;
+    if (notifications) {
+        notifications.addEventListener('click', toggleNotifications);
     }
     
     // Modal
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('close-modal') || e.target.classList.contains('close-modal-btn')) {
             closeModal();
-        }
+    }
     });
     
     // Formulario de contenido
@@ -126,8 +156,8 @@ function setupEventListeners() {
             const btn = e.target.closest('.btn-edit');
             const id = btn.dataset.id || e.target.closest('tr')?.dataset.id;
             if (id) {
-                const type = appState.currentSubsection || appState.currentSection;
-                editItem(id, type);
+            const type = appState.currentSubsection || appState.currentSection;
+            editItem(id, type);
             }
         }
         
@@ -138,8 +168,8 @@ function setupEventListeners() {
             const id = btn.dataset.id || row?.dataset.id;
             if (id) {
                 const title = row?.querySelector('td:nth-child(2)')?.textContent || 'este elemento';
-                const type = appState.currentSubsection || appState.currentSection;
-                deleteItem(id, title, type);
+            const type = appState.currentSubsection || appState.currentSection;
+            deleteItem(id, title, type);
             }
         }
         
@@ -166,7 +196,12 @@ function loadUserData() {
         const avatar = userInfo.querySelector('.avatar');
         const name = userInfo.querySelector('span');
         
-        if (avatar) avatar.src = appState.currentUser.avatar || 'assets/images/avatar.png';
+        if (avatar) {
+            avatar.src = appState.currentUser.avatar || '/streaming-platform/assets/img/default-poster.svg';
+            avatar.onerror = function() {
+                this.src = '/streaming-platform/assets/img/default-poster.svg';
+            };
+        }
         if (name) name.textContent = appState.currentUser.name;
     }
 }
@@ -201,7 +236,24 @@ async function loadSection() {
     
     switch (currentSection) {
         case 'dashboard':
-            content = renderDashboard();
+            try {
+                const statsResponse = await apiRequest('/api/admin/stats.php');
+                const stats = statsResponse.success && statsResponse.data ? statsResponse.data : null;
+                
+                // Obtener usuarios recientes
+                const usersResponse = await apiRequest('/api/users/index.php');
+                const allUsers = usersResponse.success && usersResponse.data ? usersResponse.data : [];
+                const recentUsers = allUsers.slice(0, 5);
+                
+                // Obtener contenido reciente
+                const contentResponse = await apiRequest('/api/content/popular.php?limit=4');
+                const recentContent = contentResponse.success && contentResponse.data ? contentResponse.data : [];
+                
+                content = renderDashboard(stats, recentUsers, recentContent);
+            } catch (error) {
+                console.error('Error cargando dashboard:', error);
+                content = renderDashboard(null, [], []);
+            }
             break;
             
         case 'contenido':
@@ -251,8 +303,8 @@ async function loadSection() {
             
         case 'usuarios':
             try {
-                const response = await apiRequest('/streaming-platform/js/index.php');
-                const users = response.data || [];
+                const response = await apiRequest('/api/users/index.php');
+                const users = response.success && response.data ? response.data : [];
                 content = renderUsersList(users);
             } catch (error) {
                 content = renderError('No se pudieron cargar los usuarios: ' + error.message);
@@ -270,6 +322,10 @@ async function loadSection() {
             
         case 'configuracion':
             content = renderSettings();
+            // Configurar pestañas después de renderizar
+            setTimeout(() => {
+                setupSettingsTabs();
+            }, 100);
             break;
             
         default:
@@ -315,90 +371,82 @@ function updateActiveMenu() {
 }
 
 // Renderizar el dashboard
-function renderDashboard() {
-    // Estadísticas
-    const stats = {
-        totalUsers: 1248,
-        totalMovies: 356,
-        totalSeries: 124,
-        totalRevenue: 24589,
-        newUsersThisMonth: 124,
-        newContentThisMonth: 24,
-        activeSubscriptions: 985,
-        monthlyRevenue: 24589
+function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
+    // Valores por defecto si no hay datos
+    const defaultStats = {
+        totalUsers: 0,
+        newUsersThisMonth: 0,
+        usersChangePercent: 0,
+        totalMovies: 0,
+        newMoviesThisMonth: 0,
+        totalSeries: 0,
+        newSeriesThisMonth: 0,
+        newContentThisMonth: 0,
+        monthlyRevenue: 0,
+        revenueChangePercent: 0,
+        totalViews: 0,
+        totalViewsThisMonth: 0
     };
     
-    // Actividades recientes
-    const recentActivities = [
-        {
-            type: 'success',
-            icon: 'plus',
-            title: 'Nueva película añadida',
-            description: 'Duna: Parte Dos',
-            time: 'Hace 2 horas'
-        },
-        {
-            type: 'warning',
-            icon: 'exclamation-triangle',
-            title: 'Problema de carga',
-            description: 'Episodio 3 de La Casa de Papel',
-            time: 'Hace 5 horas'
-        },
-        {
-            type: 'info',
-            icon: 'user-plus',
-            title: 'Nuevo usuario registrado',
-            description: 'usuario123',
-            time: 'Ayer'
-        },
-        {
-            type: 'primary',
-            icon: 'credit-card',
-            title: 'Suscripción premium activada',
-            description: 'maria.garcia@email.com',
-            time: 'Ayer'
-        }
-    ];
+    const finalStats = stats || defaultStats;
     
-    // Usuarios recientes
-    const recentUsers = [
-        {
-            id: 1,
-            name: 'Carlos López',
-            email: 'carlos@email.com',
-            registrationDate: 'Hoy',
-            plan: 'Gratis',
-            status: 'Activo',
-            avatar: 'assets/images/avatar1.jpg'
-        },
-        {
-            id: 2,
-            name: 'Ana Martínez',
-            email: 'ana.mtz@email.com',
-            registrationDate: 'Ayer',
-            plan: 'Premium',
-            status: 'Activo',
-            avatar: 'assets/images/avatar2.jpg'
-        },
-        {
-            id: 3,
-            name: 'Roberto Sánchez',
-            email: 'rsanchez@email.com',
-            registrationDate: 'Hace 2 días',
-            plan: 'Premium',
-            status: 'Inactivo',
-            avatar: 'assets/images/avatar3.jpg'
-        },
-        {
-            id: 4,
-            name: 'Laura García',
-            email: 'laura.g@email.com',
-            registrationDate: 'Hace 3 días',
-            plan: 'Gratis',
-            status: 'Activo',
-            avatar: 'assets/images/avatar4.jpg'
-        }
-    ];
+    // Generar actividades recientes desde el contenido reciente
+    const recentActivities = recentContent.slice(0, 4).map((item, index) => {
+        const createdDate = item.created_at ? new Date(item.created_at) : new Date();
+        const now = new Date();
+        const diff = now - createdDate;
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const days = Math.floor(hours / 24);
+        
+        let timeText = 'Hace ' + hours + ' horas';
+        if (days === 0 && hours === 0) timeText = 'Hace menos de una hora';
+        if (days === 1) timeText = 'Ayer';
+        if (days > 1 && days < 7) timeText = `Hace ${days} días`;
+        if (days >= 7) timeText = createdDate.toLocaleDateString('es-ES');
+        
+        return {
+            type: item.type === 'movie' ? 'success' : 'info',
+            icon: item.type === 'movie' ? 'film' : 'tv',
+            title: item.type === 'movie' ? 'Nueva película añadida' : 'Nueva serie añadida',
+            description: item.title || 'Sin título',
+            time: timeText
+        };
+    });
+    
+    // Formatear usuarios recientes
+    const formattedRecentUsers = recentUsers.map(user => {
+        const createdDate = user.created_at || user.registrationDate ? new Date(user.created_at || user.registrationDate) : new Date();
+        const now = new Date();
+        const diff = now - createdDate;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        
+        let registrationDate = 'Hoy';
+        if (days === 1) registrationDate = 'Ayer';
+        if (days > 1 && days < 7) registrationDate = `Hace ${days} días`;
+        if (days >= 7) registrationDate = createdDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+        
+        return {
+            id: user.id,
+            name: user.full_name || user.username,
+            email: user.email,
+            registrationDate: registrationDate,
+            plan: user.role === 'premium' || user.role === 'admin' ? 'Premium' : 'Gratis',
+            status: user.status === 'active' ? 'Activo' : 'Inactivo',
+            avatar: user.avatar_url || '/streaming-platform/assets/img/default-poster.svg'
+        };
+    });
+    
+    // Calcular cambio porcentual para usuarios
+    const usersChangeClass = finalStats.usersChangePercent >= 0 ? 'positive' : 'negative';
+    const usersChangeText = finalStats.usersChangePercent >= 0 
+        ? `+${finalStats.usersChangePercent}% este mes` 
+        : `${finalStats.usersChangePercent}% este mes`;
+    
+    // Calcular cambio porcentual para ingresos
+    const revenueChangeClass = finalStats.revenueChangePercent >= 0 ? 'positive' : 'negative';
+    const revenueChangeText = finalStats.revenueChangePercent >= 0 
+        ? `+${finalStats.revenueChangePercent}% este mes` 
+        : `${finalStats.revenueChangePercent}% este mes`;
     
     // Generar HTML del dashboard
     return `
@@ -407,46 +455,58 @@ function renderDashboard() {
         <!-- Resumen -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-icon">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-info">
                     <h3>Usuarios Totales</h3>
-                    <p class="stat-number">${stats.totalUsers.toLocaleString()}</p>
-                    <p class="stat-change positive">+${stats.newUsersThisMonth} este mes</p>
+                    <p class="stat-number">${finalStats.totalUsers.toLocaleString()}</p>
+                    <p class="stat-change ${usersChangeClass}">
+                        <i class="fas fa-arrow-${finalStats.usersChangePercent >= 0 ? 'up' : 'down'}"></i>
+                        ${finalStats.newUsersThisMonth} este mes (${usersChangeText})
+                    </p>
                 </div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
                     <i class="fas fa-film"></i>
                 </div>
                 <div class="stat-info">
                     <h3>Películas</h3>
-                    <p class="stat-number">${stats.totalMovies}</p>
-                    <p class="stat-change positive">+${Math.floor(stats.newContentThisMonth / 2)} este mes</p>
+                    <p class="stat-number">${finalStats.totalMovies.toLocaleString()}</p>
+                    <p class="stat-change ${finalStats.newMoviesThisMonth > 0 ? 'positive' : 'neutral'}">
+                        <i class="fas fa-arrow-up"></i>
+                        +${finalStats.newMoviesThisMonth} este mes
+                    </p>
                 </div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
                     <i class="fas fa-tv"></i>
                 </div>
                 <div class="stat-info">
                     <h3>Series</h3>
-                    <p class="stat-number">${stats.totalSeries}</p>
-                    <p class="stat-change positive">+${Math.ceil(stats.newContentThisMonth / 2)} este mes</p>
+                    <p class="stat-number">${finalStats.totalSeries.toLocaleString()}</p>
+                    <p class="stat-change ${finalStats.newSeriesThisMonth > 0 ? 'positive' : 'neutral'}">
+                        <i class="fas fa-arrow-up"></i>
+                        +${finalStats.newSeriesThisMonth} este mes
+                    </p>
                 </div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
                     <i class="fas fa-dollar-sign"></i>
                 </div>
                 <div class="stat-info">
                     <h3>Ingresos Mensuales</h3>
-                    <p class="stat-number">$${stats.monthlyRevenue.toLocaleString()}</p>
-                    <p class="stat-change positive">+5% este mes</p>
+                    <p class="stat-number">$${finalStats.monthlyRevenue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p class="stat-change ${revenueChangeClass}">
+                        <i class="fas fa-arrow-${finalStats.revenueChangePercent >= 0 ? 'up' : 'down'}"></i>
+                        ${revenueChangeText}
+                    </p>
                 </div>
             </div>
         </div>
@@ -459,17 +519,17 @@ function renderDashboard() {
             </div>
             
             <div class="activity-list">
-                ${recentActivities.map(activity => `
+                ${recentActivities.length > 0 ? recentActivities.map(activity => `
                     <div class="activity-item">
                         <div class="activity-icon ${activity.type}">
                             <i class="fas fa-${activity.icon}"></i>
                         </div>
                         <div class="activity-details">
-                            <p><strong>${activity.title}:</strong> ${activity.description}</p>
+                            <p><strong>${escapeHtml(activity.title)}:</strong> ${escapeHtml(activity.description)}</p>
                             <span class="activity-time">${activity.time}</span>
                         </div>
                     </div>
-                `).join('')}
+                `).join('') : '<div class="activity-item"><p>No hay actividades recientes</p></div>'}
             </div>
         </div>
 
@@ -493,25 +553,25 @@ function renderDashboard() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${recentUsers.map(user => `
+                        ${formattedRecentUsers.length > 0 ? formattedRecentUsers.map(user => `
                             <tr data-id="${user.id}">
                                 <td>
                                     <div class="user-cell">
-                                        <img src="${user.avatar}" alt="${user.name}">
-                                        <span>${user.name}</span>
+                                        <img src="${user.avatar}" alt="${user.name}" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>${escapeHtml(user.name)}</span>
                                     </div>
                                 </td>
-                                <td>${user.email}</td>
+                                <td>${escapeHtml(user.email)}</td>
                                 <td>${user.registrationDate}</td>
                                 <td><span class="badge ${user.plan.toLowerCase() === 'premium' ? 'premium' : 'free'}">${user.plan}</span></td>
                                 <td><span class="status ${user.status.toLowerCase()}">${user.status}</span></td>
                                 <td class="actions">
-                                    <button class="btn btn-sm btn-view" title="Ver"><i class="fas fa-eye"></i></button>
-                                    <button class="btn btn-sm btn-edit" title="Editar"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-delete" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-view" title="Ver" data-id="${user.id}"><i class="fas fa-eye"></i></button>
+                                    <button class="btn btn-sm btn-edit" title="Editar" data-id="${user.id}"><i class="fas fa-edit"></i></button>
+                                    <button class="btn btn-sm btn-delete" title="Eliminar" data-id="${user.id}"><i class="fas fa-trash"></i></button>
                                 </td>
                             </tr>
-                        `).join('')}
+                        `).join('') : '<tr><td colspan="6" class="text-center">No hay usuarios recientes</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -657,24 +717,102 @@ function renderEpisodesList() {
 
 // Renderizar lista de usuarios
 function renderUsersList(users = []) {
+    // Calcular estadísticas
+    const totalUsers = users.length;
+    const activeUsers = users.filter(u => u.status === 'active').length;
+    const premiumUsers = users.filter(u => u.role === 'premium' || u.role === 'admin').length;
+    const newUsersToday = users.filter(u => {
+        const created = new Date(u.created_at);
+        const today = new Date();
+        return created.toDateString() === today.toDateString();
+    }).length;
+    
     return `
         <div class="content-header">
             <h1>Gestión de Usuarios</h1>
+            <div class="header-actions">
+                <button class="btn btn-outline" id="export-users-btn">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
             <button class="btn btn-primary" id="add-user-btn">
                 <i class="fas fa-user-plus"></i> Agregar Usuario
             </button>
+            </div>
         </div>
         
-        <div class="filters">
-            <div class="search-box">
-                <input type="text" id="user-search" placeholder="Buscar usuarios...">
-                <button class="btn"><i class="fas fa-search"></i></button>
+        <!-- Estadísticas de usuarios -->
+        <div class="user-stats">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>${totalUsers.toLocaleString()}</h3>
+                    <p>Usuarios Totales</p>
+                    <span class="trend positive">
+                        <i class="fas fa-arrow-up"></i> +${newUsersToday} hoy
+                    </span>
+                </div>
             </div>
             
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>${activeUsers}</h3>
+                    <p>Usuarios Activos</p>
+                    <span class="trend positive">
+                        <i class="fas fa-check-circle"></i> ${Math.round((activeUsers / totalUsers) * 100) || 0}%
+                    </span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="fas fa-crown"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>${premiumUsers}</h3>
+                    <p>Usuarios Premium</p>
+                    <span class="trend positive">
+                        <i class="fas fa-star"></i> ${Math.round((premiumUsers / totalUsers) * 100) || 0}%
+                    </span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <i class="fas fa-user-clock"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>${totalUsers - activeUsers}</h3>
+                    <p>Usuarios Inactivos</p>
+                    <span class="trend neutral">
+                        <i class="fas fa-info-circle"></i> ${Math.round(((totalUsers - activeUsers) / totalUsers) * 100) || 0}%
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filtros mejorados -->
+        <div class="user-filters">
+            <div class="filter-row">
             <div class="filter-group">
-                <label for="filter-status">Estado:</label>
+                    <label for="user-search">Buscar Usuario</label>
+                    <div class="search-input-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="user-search" placeholder="Nombre, email, username..." class="form-control">
+                        <button class="search-clear" id="user-search-clear" style="display: none;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="filter-status">Estado</label>
                 <select id="filter-status" class="form-control">
-                    <option value="">Todos</option>
+                        <option value="">Todos los estados</option>
                     <option value="active">Activos</option>
                     <option value="inactive">Inactivos</option>
                     <option value="suspended">Suspendidos</option>
@@ -682,63 +820,226 @@ function renderUsersList(users = []) {
             </div>
             
             <div class="filter-group">
-                <label for="filter-plan">Plan:</label>
-                <select id="filter-plan" class="form-control">
-                    <option value="">Todos</option>
-                    <option value="free">Gratis</option>
+                    <label for="filter-role">Rol/Plan</label>
+                    <select id="filter-role" class="form-control">
+                        <option value="">Todos los roles</option>
+                        <option value="admin">Administrador</option>
                     <option value="premium">Premium</option>
+                        <option value="user">Usuario</option>
                 </select>
             </div>
             
-            <button class="btn btn-secondary">
-                <i class="fas fa-filter"></i> Filtrar
+                <div class="filter-group">
+                    <label for="filter-sort">Ordenar por</label>
+                    <select id="filter-sort" class="form-control">
+                        <option value="newest">Más recientes</option>
+                        <option value="oldest">Más antiguos</option>
+                        <option value="name">Nombre A-Z</option>
+                        <option value="email">Email A-Z</option>
+                        <option value="last-login">Último acceso</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <button class="btn btn-primary" id="apply-filters-btn" style="margin-top: 1.75rem;">
+                        <i class="fas fa-filter"></i> Aplicar Filtros
             </button>
+                </div>
+            </div>
         </div>
         
+        <!-- Tabla de usuarios mejorada -->
+        <div class="user-table-container">
+            <div class="table-header">
+                <h3>Lista de Usuarios</h3>
+                <div class="table-actions">
+                    <span class="user-count">${totalUsers} usuario${totalUsers !== 1 ? 's' : ''}</span>
+                    <button class="btn-icon" id="refresh-users-btn" title="Actualizar">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
         <div class="table-responsive">
             <table class="data-table" data-type="users">
                 <thead>
                     <tr>
+                            <th>
+                                <input type="checkbox" id="select-all-users" title="Seleccionar todos">
+                            </th>
                         <th>Usuario</th>
                         <th>Email</th>
+                            <th>Rol</th>
+                            <th>Contraseña</th>
                         <th>Registro</th>
                         <th>Último acceso</th>
-                        <th>Plan</th>
                         <th>Estado</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${users.length > 0 ? users.map(user => `
-                        <tr data-id="${user.id}">
+                        ${users.length > 0 ? users.map((user, index) => {
+                            const createdDate = user.created_at ? new Date(user.created_at) : null;
+                            const lastLoginDate = user.last_login ? new Date(user.last_login) : null;
+                            const isActive = user.status === 'active';
+                            const isPremium = user.role === 'premium' || user.role === 'admin';
+                            
+                            return `
+                                <tr data-id="${user.id}" class="${!isActive ? 'inactive-row' : ''}">
+                                    <td>
+                                        <input type="checkbox" class="user-checkbox" data-id="${user.id}">
+                                    </td>
                             <td>
                                 <div class="user-cell">
-                                    <img src="${user.avatar_url || 'assets/images/avatar.png'}" alt="${user.full_name || user.username}">
-                                    <span>${user.full_name || user.username}</span>
+                                            <img 
+                                                src="${user.avatar_url || '/streaming-platform/assets/img/default-poster.svg'}" 
+                                                alt="${user.full_name || user.username}" 
+                                                class="user-avatar"
+                                                onerror="this.src='/streaming-platform/assets/img/default-poster.svg'"
+                                            >
+                                            <div class="user-info">
+                                                <strong>${escapeHtml(user.full_name || user.username)}</strong>
+                                                <span class="username">@${escapeHtml(user.username)}</span>
+                                            </div>
                                 </div>
                             </td>
-                            <td>${user.email}</td>
-                            <td>${formatDate(user.registrationDate)}</td>
-                            <td>${formatDateTime(user.lastLogin)}</td>
-                            <td><span class="badge ${user.plan}">${user.plan === 'premium' ? 'Premium' : 'Gratis'}</span></td>
-                            <td><span class="status ${user.status}">${formatStatus(user.status)}</span></td>
-                            <td class="actions">
-                                <button class="btn btn-sm btn-view" title="Ver"><i class="fas fa-eye"></i></button>
-                                <button class="btn btn-sm btn-edit" title="Editar"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-sm btn-delete" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                    <td>
+                                        <div class="email-cell">
+                                            <i class="fas fa-envelope"></i>
+                                            <span>${escapeHtml(user.email)}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        ${user.role === 'admin' ? 
+                                            '<span class="badge admin"><i class="fas fa-shield-alt"></i> Admin</span>' :
+                                            isPremium ? 
+                                            '<span class="badge premium"><i class="fas fa-crown"></i> Premium</span>' :
+                                            '<span class="badge free"><i class="fas fa-user"></i> Usuario</span>'
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="password-cell">
+                                            <button class="btn-password-toggle" data-id="${user.id}" data-hash="${user.password_hash || ''}" title="Ver hash de contraseña">
+                                                <i class="fas fa-eye"></i>
+                                                <span class="password-text" style="display: none;">${user.password_hash ? escapeHtml(user.password_hash) : 'N/A'}</span>
+                                            </button>
+                                            <button class="btn-reset-password" data-id="${user.id}" title="Resetear contraseña">
+                                                <i class="fas fa-key"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="date-cell">
+                                            <i class="fas fa-calendar"></i>
+                                            <span>${createdDate ? formatDate(createdDate.toISOString()) : 'N/A'}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="date-cell">
+                                            <i class="fas fa-clock"></i>
+                                            <span>${lastLoginDate ? formatDateTime(lastLoginDate.toISOString()) : 'Nunca'}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="status ${user.status || 'active'}">
+                                            <i class="fas fa-circle"></i>
+                                            ${formatStatus(user.status || 'active')}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn-icon" data-action="view" data-id="${user.id}" title="Ver detalles">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn-icon" data-action="edit" data-id="${user.id}" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn-icon danger" data-action="delete" data-id="${user.id}" title="Eliminar">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                             </td>
                         </tr>
-                    `).join('') : '<tr><td colspan="7" class="text-center">No hay usuarios para mostrar.</td></tr>'}
+                            `;
+                        }).join('') : `
+                            <tr>
+                                <td colspan="9" class="empty-state">
+                                    <div class="empty-content">
+                                        <i class="fas fa-users"></i>
+                                        <h3>No hay usuarios</h3>
+                                        <p>No se encontraron usuarios para mostrar.</p>
+                                        <button class="btn btn-primary" id="add-user-empty-btn">
+                                            <i class="fas fa-user-plus"></i> Agregar Primer Usuario
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `}
                 </tbody>
             </table>
+            </div>
         </div>
         
+        <!-- Paginación mejorada -->
+        <div class="pagination-container">
+            <div class="pagination-info">
+                <span>Mostrando <strong>1-${Math.min(20, totalUsers)}</strong> de <strong>${totalUsers}</strong> usuarios</span>
+            </div>
         <div class="pagination">
-            <button class="btn btn-sm" disabled><i class="fas fa-chevron-left"></i> Anterior</button>
-            <span>Página 1 de 2</span>
-            <button class="btn btn-sm">Siguiente <i class="fas fa-chevron-right"></i></button>
+                <button class="btn btn-outline" id="prev-page-btn" disabled>
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </button>
+                <div class="page-numbers">
+                    <button class="page-btn active">1</button>
+                    ${totalUsers > 20 ? '<button class="page-btn">2</button>' : ''}
+                    ${totalUsers > 40 ? '<button class="page-btn">3</button>' : ''}
+                </div>
+                <button class="btn btn-outline" id="next-page-btn" ${totalUsers <= 20 ? 'disabled' : ''}>
+                    Siguiente <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
         </div>
     `;
+}
+
+// Función helper para escapar HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Función helper para formatear fecha
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+// Función helper para formatear fecha y hora
+function formatDateTime(dateString) {
+    if (!dateString) return 'Nunca';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days === 0) return 'Hoy';
+    if (days === 1) return 'Ayer';
+    if (days < 7) return `Hace ${days} días`;
+    
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+// Función helper para formatear estado
+function formatStatus(status) {
+    const statusMap = {
+        'active': 'Activo',
+        'inactive': 'Inactivo',
+        'suspended': 'Suspendido',
+        'banned': 'Baneado'
+    };
+    return statusMap[status] || status;
 }
 
 // Renderizar suscripciones
@@ -746,6 +1047,94 @@ function renderSubscriptions() {
     return `
         <div class="content-header">
             <h1>Suscripciones</h1>
+            <button class="btn btn-primary" id="add-subscription-btn">
+                <i class="fas fa-plus"></i> Nueva Suscripción
+            </button>
+        </div>
+        
+        <!-- Estadísticas de suscripciones -->
+        <div class="subscription-stats">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>Total Suscriptores</h3>
+                    <p class="stat-number">1,234</p>
+                    <p class="stat-change positive">+12% este mes</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="fas fa-crown"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>Premium</h3>
+                    <p class="stat-number">856</p>
+                    <p class="stat-change positive">+8% este mes</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <i class="fas fa-home"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>Familiar</h3>
+                    <p class="stat-number">234</p>
+                    <p class="stat-change positive">+5% este mes</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>Ingresos Mensuales</h3>
+                    <p class="stat-number">$12,456</p>
+                    <p class="stat-change positive">+18% este mes</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filtros y búsqueda -->
+        <div class="subscription-filters">
+            <div class="filter-group">
+                <input type="text" id="subscription-search" class="form-control" placeholder="Buscar por usuario, email o ID...">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="filter-group">
+                <select id="plan-filter" class="form-control">
+                    <option value="">Todos los planes</option>
+                    <option value="free">Básico</option>
+                    <option value="premium">Premium</option>
+                    <option value="family">Familiar</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <select id="status-filter" class="form-control">
+                    <option value="">Todos los estados</option>
+                    <option value="active">Activas</option>
+                    <option value="cancelled">Canceladas</option>
+                    <option value="expired">Expiradas</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <button class="btn btn-outline" id="export-subscriptions">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
+            </div>
+        </div>
+        
+        <!-- Planes disponibles -->
+        <div class="subscription-section">
+            <div class="section-header">
+                <h2>Planes Disponibles</h2>
+                <button class="btn btn-outline" id="manage-plans-btn">
+                    <i class="fas fa-cog"></i> Gestionar Planes
+                </button>
         </div>
         
         <div class="subscription-plans">
@@ -756,17 +1145,20 @@ function renderSubscriptions() {
                         <span class="amount">$0</span>
                         <span class="period">/mes</span>
                     </div>
-                    <p>Ideal para empezar</p>
+                        <p class="plan-description">Ideal para empezar</p>
                 </div>
                 <div class="plan-features">
                     <ul>
                         <li><i class="fas fa-check"></i> Acceso a contenido básico</li>
                         <li><i class="fas fa-check"></i> Calidad estándar (SD)</li>
                         <li><i class="fas fa-check"></i> Un dispositivo a la vez</li>
-                        <li><i class="fas fa-times"></i> Sin anuncios</li>
-                        <li><i class="fas fa-times"></i> Sin descargas</li>
+                            <li class="disabled"><i class="fas fa-times"></i> Sin anuncios</li>
+                            <li class="disabled"><i class="fas fa-times"></i> Sin descargas</li>
                     </ul>
                 </div>
+                    <div class="plan-stats">
+                        <span><strong>145</strong> usuarios</span>
+                    </div>
                 <div class="plan-actions">
                     <button class="btn btn-outline" disabled>Plan Actual</button>
                 </div>
@@ -780,7 +1172,7 @@ function renderSubscriptions() {
                         <span class="amount">$9.99</span>
                         <span class="period">/mes</span>
                     </div>
-                    <p>La mejor experiencia</p>
+                        <p class="plan-description">La mejor experiencia</p>
                 </div>
                 <div class="plan-features">
                     <ul>
@@ -791,6 +1183,9 @@ function renderSubscriptions() {
                         <li><i class="fas fa-check"></i> Descargas ilimitadas</li>
                     </ul>
                 </div>
+                    <div class="plan-stats">
+                        <span><strong>856</strong> usuarios</span>
+                    </div>
                 <div class="plan-actions">
                     <button class="btn btn-primary">Actualizar a Premium</button>
                 </div>
@@ -803,7 +1198,7 @@ function renderSubscriptions() {
                         <span class="amount">$14.99</span>
                         <span class="period">/mes</span>
                     </div>
-                    <p>Para toda la familia</p>
+                        <p class="plan-description">Para toda la familia</p>
                 </div>
                 <div class="plan-features">
                     <ul>
@@ -814,53 +1209,197 @@ function renderSubscriptions() {
                         <li><i class="fas fa-check"></i> Descargas ilimitadas</li>
                     </ul>
                 </div>
+                    <div class="plan-stats">
+                        <span><strong>234</strong> usuarios</span>
+                    </div>
                 <div class="plan-actions">
                     <button class="btn btn-outline">Seleccionar Plan</button>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <div class="billing-history">
-            <h2>Historial de facturación</h2>
+        <!-- Lista de suscripciones activas -->
+        <div class="subscription-section">
+            <div class="section-header">
+                <h2>Suscripciones Activas</h2>
+                <div class="section-actions">
+                    <button class="btn btn-outline" id="refresh-subscriptions">
+                        <i class="fas fa-sync-alt"></i> Actualizar
+                    </button>
+                </div>
+            </div>
+            
+            <div class="table-container">
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>ID de factura</th>
+                                <th>Usuario</th>
+                                <th>Email</th>
+                                <th>Plan</th>
+                                <th>Fecha Inicio</th>
+                                <th>Próximo Pago</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Juan Pérez</span>
+                                    </div>
+                                </td>
+                                <td>juan.perez@email.com</td>
+                                <td><span class="badge premium">Premium</span></td>
+                                <td>15/10/2023</td>
+                                <td>15/11/2023</td>
+                                <td><span class="status active">Activa</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-icon" title="Ver detalles"><i class="fas fa-eye"></i></button>
+                                        <button class="btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
+                                        <button class="btn-icon danger" title="Cancelar"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>María García</span>
+                                    </div>
+                                </td>
+                                <td>maria.garcia@email.com</td>
+                                <td><span class="badge family">Familiar</span></td>
+                                <td>01/10/2023</td>
+                                <td>01/11/2023</td>
+                                <td><span class="status active">Activa</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-icon" title="Ver detalles"><i class="fas fa-eye"></i></button>
+                                        <button class="btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
+                                        <button class="btn-icon danger" title="Cancelar"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Carlos López</span>
+                                    </div>
+                                </td>
+                                <td>carlos.lopez@email.com</td>
+                                <td><span class="badge premium">Premium</span></td>
+                                <td>20/09/2023</td>
+                                <td>20/10/2023</td>
+                                <td><span class="status active">Activa</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-icon" title="Ver detalles"><i class="fas fa-eye"></i></button>
+                                        <button class="btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
+                                        <button class="btn-icon danger" title="Cancelar"><i class="fas fa-times"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Historial de facturación -->
+        <div class="subscription-section">
+            <div class="section-header">
+                <h2>Historial de Facturación</h2>
+                <div class="section-actions">
+                    <select id="billing-period" class="form-control">
+                        <option value="all">Todos los períodos</option>
+                        <option value="month">Este mes</option>
+                        <option value="quarter">Este trimestre</option>
+                        <option value="year">Este año</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID de Factura</th>
+                                <th>Usuario</th>
                             <th>Fecha</th>
                             <th>Plan</th>
                             <th>Monto</th>
+                                <th>Método de Pago</th>
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>#INV-2023-001</td>
+                                <td><strong>#INV-2023-001</strong></td>
+                                <td>Juan Pérez</td>
                             <td>10/10/2023</td>
                             <td>Premium Mensual</td>
-                            <td>$9.99</td>
+                                <td><strong>$9.99</strong></td>
+                                <td><i class="fab fa-cc-visa"></i> Visa •••• 4242</td>
                             <td><span class="status active">Pagado</span></td>
-                            <td><a href="#" class="btn-link">Ver factura</a></td>
+                                <td>
+                                    <button class="btn-link" title="Ver factura">
+                                        <i class="fas fa-file-invoice"></i> Ver
+                                    </button>
+                                </td>
                         </tr>
                         <tr>
-                            <td>#INV-2023-002</td>
+                                <td><strong>#INV-2023-002</strong></td>
+                                <td>María García</td>
+                                <td>10/10/2023</td>
+                                <td>Familiar Mensual</td>
+                                <td><strong>$14.99</strong></td>
+                                <td><i class="fab fa-cc-paypal"></i> PayPal</td>
+                                <td><span class="status active">Pagado</span></td>
+                                <td>
+                                    <button class="btn-link" title="Ver factura">
+                                        <i class="fas fa-file-invoice"></i> Ver
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>#INV-2023-003</strong></td>
+                                <td>Carlos López</td>
                             <td>10/09/2023</td>
                             <td>Premium Mensual</td>
-                            <td>$9.99</td>
+                                <td><strong>$9.99</strong></td>
+                                <td><i class="fab fa-cc-mastercard"></i> Mastercard •••• 8888</td>
                             <td><span class="status active">Pagado</span></td>
-                            <td><a href="#" class="btn-link">Ver factura</a></td>
+                                <td>
+                                    <button class="btn-link" title="Ver factura">
+                                        <i class="fas fa-file-invoice"></i> Ver
+                                    </button>
+                                </td>
                         </tr>
                         <tr>
-                            <td>#INV-2023-003</td>
-                            <td>10/08/2023</td>
+                                <td><strong>#INV-2023-004</strong></td>
+                                <td>Ana Martínez</td>
+                                <td>09/10/2023</td>
                             <td>Premium Mensual</td>
-                            <td>$9.99</td>
-                            <td><span class="status active">Pagado</span></td>
-                            <td><a href="#" class="btn-link">Ver factura</a></td>
+                                <td><strong>$9.99</strong></td>
+                                <td><i class="fab fa-cc-visa"></i> Visa •••• 1234</td>
+                                <td><span class="status warning">Pendiente</span></td>
+                                <td>
+                                    <button class="btn-link" title="Ver factura">
+                                        <i class="fas fa-file-invoice"></i> Ver
+                                    </button>
+                                </td>
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     `;
@@ -872,112 +1411,134 @@ function renderReports() {
         <div class="content-header">
             <h1>Reportes y Análisis</h1>
             <div class="report-actions">
-                <button class="btn btn-secondary">
-                    <i class="fas fa-download"></i> Exportar PDF
+                <button class="btn btn-outline" id="export-pdf-btn">
+                    <i class="fas fa-file-pdf"></i> Exportar PDF
                 </button>
-                <button class="btn btn-secondary">
+                <button class="btn btn-outline" id="export-excel-btn">
                     <i class="fas fa-file-excel"></i> Exportar Excel
+                </button>
+                <button class="btn btn-primary" id="refresh-reports-btn">
+                    <i class="fas fa-sync-alt"></i> Actualizar
                 </button>
             </div>
         </div>
         
+        <!-- Filtros de reportes -->
         <div class="report-filters">
             <div class="filter-row">
                 <div class="filter-group">
-                    <label for="report-type">Tipo de reporte:</label>
+                    <label for="report-type">Tipo de Reporte</label>
                     <select id="report-type" class="form-control">
                         <option value="general">General</option>
                         <option value="users">Usuarios</option>
                         <option value="content">Contenido</option>
                         <option value="revenue">Ingresos</option>
+                        <option value="subscriptions">Suscripciones</option>
                     </select>
                 </div>
                 
                 <div class="filter-group">
-                    <label for="date-range">Rango de fechas:</label>
+                    <label for="date-range">Rango de Fechas</label>
                     <select id="date-range" class="form-control">
                         <option value="7">Últimos 7 días</option>
                         <option value="30" selected>Últimos 30 días</option>
                         <option value="90">Últimos 90 días</option>
+                        <option value="365">Último año</option>
                         <option value="custom">Personalizado</option>
                     </select>
                 </div>
                 
                 <div class="filter-group date-range-custom" style="display: none;">
-                    <label for="start-date">Desde:</label>
+                    <label for="start-date">Desde</label>
                     <input type="date" id="start-date" class="form-control">
+                </div>
                     
-                    <label for="end-date">Hasta:</label>
+                <div class="filter-group date-range-custom" style="display: none;">
+                    <label for="end-date">Hasta</label>
                     <input type="date" id="end-date" class="form-control">
                 </div>
                 
-                <button class="btn btn-primary">
+                <div class="filter-group">
+                    <button class="btn btn-primary" id="generate-report-btn" style="margin-top: 1.75rem;">
                     <i class="fas fa-chart-bar"></i> Generar Reporte
                 </button>
+                </div>
             </div>
         </div>
         
-        <div class="report-content">
+        <!-- Resumen de métricas -->
             <div class="report-summary">
                 <div class="summary-card">
-                    <div class="summary-icon">
+                <div class="summary-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                         <i class="fas fa-users"></i>
                     </div>
                     <div class="summary-info">
                         <h3>1,248</h3>
-                        <p>Usuarios totales</p>
-                        <span class="trend positive">+12% este mes</span>
+                    <p>Usuarios Totales</p>
+                    <span class="trend positive">
+                        <i class="fas fa-arrow-up"></i> +12% este mes
+                    </span>
                     </div>
                 </div>
                 
                 <div class="summary-card">
-                    <div class="summary-icon">
+                <div class="summary-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
                         <i class="fas fa-play-circle"></i>
                     </div>
                     <div class="summary-info">
                         <h3>24,589</h3>
                         <p>Reproducciones</p>
-                        <span class="trend positive">+8% este mes</span>
+                    <span class="trend positive">
+                        <i class="fas fa-arrow-up"></i> +8% este mes
+                    </span>
                     </div>
                 </div>
                 
                 <div class="summary-card">
-                    <div class="summary-icon">
+                <div class="summary-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
                         <i class="fas fa-dollar-sign"></i>
                     </div>
                     <div class="summary-info">
                         <h3>$24,589</h3>
-                        <p>Ingresos</p>
-                        <span class="trend negative">-3% este mes</span>
+                    <p>Ingresos Totales</p>
+                    <span class="trend negative">
+                        <i class="fas fa-arrow-down"></i> -3% este mes
+                    </span>
                     </div>
                 </div>
                 
                 <div class="summary-card">
-                    <div class="summary-icon">
+                <div class="summary-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
                         <i class="fas fa-film"></i>
                     </div>
                     <div class="summary-info">
                         <h3>356</h3>
                         <p>Películas</p>
-                        <span class="trend positive">+5% este mes</span>
+                    <span class="trend positive">
+                        <i class="fas fa-arrow-up"></i> +5% este mes
+                    </span>
                     </div>
                 </div>
             </div>
             
+        <!-- Gráficos -->
             <div class="report-charts">
                 <div class="chart-container">
                     <div class="chart-header">
-                        <h3>Actividad de usuarios</h3>
+                    <h3>Actividad de Usuarios</h3>
                         <div class="chart-actions">
-                            <button class="btn btn-sm btn-outline active">Día</button>
-                            <button class="btn btn-sm btn-outline">Semana</button>
-                            <button class="btn btn-sm btn-outline">Mes</button>
+                        <button class="btn btn-sm btn-outline active" data-period="day">Día</button>
+                        <button class="btn btn-sm btn-outline" data-period="week">Semana</button>
+                        <button class="btn btn-sm btn-outline" data-period="month">Mes</button>
                         </div>
                     </div>
                     <div class="chart" id="user-activity-chart">
-                        <!-- Gráfico se generará con una biblioteca como Chart.js -->
                         <div class="chart-placeholder">
+                        <div class="placeholder-content">
+                            <i class="fas fa-chart-line"></i>
                             <p>Gráfico de actividad de usuarios</p>
+                            <small>Los datos se cargarán aquí</small>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -985,74 +1546,145 @@ function renderReports() {
                 <div class="chart-row">
                     <div class="chart-container half">
                         <div class="chart-header">
-                            <h3>Contenido más visto</h3>
+                        <h3>Contenido Más Visto</h3>
                         </div>
                         <div class="chart" id="top-content-chart">
                             <div class="chart-placeholder">
-                                <p>Gráfico de contenido más visto</p>
+                            <div class="placeholder-content">
+                                <i class="fas fa-chart-bar"></i>
+                                <p>Top 10 contenido</p>
+                                <small>Los datos se cargarán aquí</small>
+                            </div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="chart-container half">
                         <div class="chart-header">
-                            <h3>Distribución de suscriptores</h3>
+                        <h3>Distribución de Suscriptores</h3>
                         </div>
                         <div class="chart" id="subscription-distribution-chart">
                             <div class="chart-placeholder">
-                                <p>Gráfico de distribución de suscriptores</p>
+                            <div class="placeholder-content">
+                                <i class="fas fa-chart-pie"></i>
+                                <p>Distribución por plan</p>
+                                <small>Los datos se cargarán aquí</small>
+                            </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             
+        <!-- Tablas de reportes -->
             <div class="report-tables">
                 <div class="table-container">
                     <div class="table-header">
-                        <h3>Películas más populares</h3>
-                        <a href="#" class="btn-link">Ver todo</a>
+                    <h3>Películas Más Populares</h3>
+                    <div class="table-actions">
+                        <button class="btn-icon" title="Actualizar">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <a href="#contenido/peliculas" class="btn-link">Ver todo</a>
+                    </div>
                     </div>
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                <th>#</th>
                                     <th>Película</th>
                                     <th>Vistas</th>
                                     <th>Valoración</th>
                                     <th>Ingresos</th>
+                                <th>Tendencia</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td>El Padrino</td>
-                                    <td>12,458</td>
-                                    <td>4.8 <i class="fas fa-star"></i></td>
-                                    <td>$8,720.60</td>
+                                <td><strong>1</strong></td>
+                                <td>
+                                    <div class="content-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>El Padrino</span>
+                                    </div>
+                                </td>
+                                <td><strong>12,458</strong></td>
+                                <td>
+                                    <span class="rating-badge">
+                                        <i class="fas fa-star"></i> 4.8
+                                    </span>
+                                </td>
+                                <td><strong class="revenue">$8,720.60</strong></td>
+                                <td><span class="trend-indicator up"><i class="fas fa-arrow-up"></i></span></td>
                                 </tr>
                                 <tr>
-                                    <td>El Caballero Oscuro</td>
-                                    <td>10,235</td>
-                                    <td>4.9 <i class="fas fa-star"></i></td>
-                                    <td>$7,164.50</td>
+                                <td><strong>2</strong></td>
+                                <td>
+                                    <div class="content-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>El Caballero Oscuro</span>
+                                    </div>
+                                </td>
+                                <td><strong>10,235</strong></td>
+                                <td>
+                                    <span class="rating-badge">
+                                        <i class="fas fa-star"></i> 4.9
+                                    </span>
+                                </td>
+                                <td><strong class="revenue">$7,164.50</strong></td>
+                                <td><span class="trend-indicator up"><i class="fas fa-arrow-up"></i></span></td>
                                 </tr>
                                 <tr>
-                                    <td>El Padrino: Parte II</td>
-                                    <td>9,874</td>
-                                    <td>4.7 <i class="fas fa-star"></i></td>
-                                    <td>$6,911.80</td>
+                                <td><strong>3</strong></td>
+                                <td>
+                                    <div class="content-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>El Padrino: Parte II</span>
+                                    </div>
+                                </td>
+                                <td><strong>9,874</strong></td>
+                                <td>
+                                    <span class="rating-badge">
+                                        <i class="fas fa-star"></i> 4.7
+                                    </span>
+                                </td>
+                                <td><strong class="revenue">$6,911.80</strong></td>
+                                <td><span class="trend-indicator stable"><i class="fas fa-minus"></i></span></td>
                                 </tr>
                                 <tr>
-                                    <td>Cadena Perpetua</td>
-                                    <td>8,963</td>
-                                    <td>4.9 <i class="fas fa-star"></i></td>
-                                    <td>$6,274.10</td>
+                                <td><strong>4</strong></td>
+                                <td>
+                                    <div class="content-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Cadena Perpetua</span>
+                                    </div>
+                                </td>
+                                <td><strong>8,963</strong></td>
+                                <td>
+                                    <span class="rating-badge">
+                                        <i class="fas fa-star"></i> 4.9
+                                    </span>
+                                </td>
+                                <td><strong class="revenue">$6,274.10</strong></td>
+                                <td><span class="trend-indicator up"><i class="fas fa-arrow-up"></i></span></td>
                                 </tr>
                                 <tr>
-                                    <td>Pulp Fiction</td>
-                                    <td>8,452</td>
-                                    <td>4.8 <i class="fas fa-star"></i></td>
-                                    <td>$5,916.40</td>
+                                <td><strong>5</strong></td>
+                                <td>
+                                    <div class="content-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Pulp Fiction</span>
+                                    </div>
+                                </td>
+                                <td><strong>8,452</strong></td>
+                                <td>
+                                    <span class="rating-badge">
+                                        <i class="fas fa-star"></i> 4.8
+                                    </span>
+                                </td>
+                                <td><strong class="revenue">$5,916.40</strong></td>
+                                <td><span class="trend-indicator down"><i class="fas fa-arrow-down"></i></span></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1061,53 +1693,104 @@ function renderReports() {
                 
                 <div class="table-container">
                     <div class="table-header">
-                        <h3>Usuarios más activos</h3>
-                        <a href="#" class="btn-link">Ver todo</a>
+                    <h3>Usuarios Más Activos</h3>
+                    <div class="table-actions">
+                        <button class="btn-icon" title="Actualizar">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <a href="#usuarios" class="btn-link">Ver todo</a>
+                    </div>
                     </div>
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
                                 <tr>
+                                <th>#</th>
                                     <th>Usuario</th>
                                     <th>Plan</th>
                                     <th>Actividad</th>
-                                    <th>Último acceso</th>
+                                <th>Último Acceso</th>
+                                <th>Estado</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td>Carlos López</td>
+                                <td><strong>1</strong></td>
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Carlos López</span>
+                                    </div>
+                                </td>
                                     <td><span class="badge premium">Premium</span></td>
-                                    <td>Alto</td>
+                                <td>
+                                    <span class="activity-badge high">Alto</span>
+                                </td>
                                     <td>Hoy, 14:30</td>
+                                <td><span class="status active">Activo</span></td>
                                 </tr>
                                 <tr>
-                                    <td>Ana Martínez</td>
+                                <td><strong>2</strong></td>
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Ana Martínez</span>
+                                    </div>
+                                </td>
                                     <td><span class="badge premium">Premium</span></td>
-                                    <td>Alto</td>
+                                <td>
+                                    <span class="activity-badge high">Alto</span>
+                                </td>
                                     <td>Hoy, 10:15</td>
+                                <td><span class="status active">Activo</span></td>
                                 </tr>
                                 <tr>
-                                    <td>Laura García</td>
+                                <td><strong>3</strong></td>
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Laura García</span>
+                                    </div>
+                                </td>
                                     <td><span class="badge free">Gratis</span></td>
-                                    <td>Medio</td>
+                                <td>
+                                    <span class="activity-badge medium">Medio</span>
+                                </td>
                                     <td>Ayer, 09:45</td>
+                                <td><span class="status active">Activo</span></td>
                                 </tr>
                                 <tr>
-                                    <td>Miguel Ángel Ramírez</td>
+                                <td><strong>4</strong></td>
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Miguel Ángel Ramírez</span>
+                                    </div>
+                                </td>
                                     <td><span class="badge premium">Premium</span></td>
-                                    <td>Bajo</td>
+                                <td>
+                                    <span class="activity-badge low">Bajo</span>
+                                </td>
                                     <td>Hace 2 días</td>
+                                <td><span class="status inactive">Inactivo</span></td>
                                 </tr>
                                 <tr>
-                                    <td>Roberto Sánchez</td>
+                                <td><strong>5</strong></td>
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                                        <span>Roberto Sánchez</span>
+                                    </div>
+                                </td>
                                     <td><span class="badge premium">Premium</span></td>
-                                    <td>Bajo</td>
+                                <td>
+                                    <span class="activity-badge low">Bajo</span>
+                                </td>
                                     <td>Hace 3 días</td>
+                                <td><span class="status inactive">Inactivo</span></td>
                                 </tr>
                             </tbody>
                         </table>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1196,29 +1879,210 @@ function renderSettings() {
                 </div>
                 
                 <!-- Otras pestañas se cargarán dinámicamente -->
-                <div class="settings-tab" id="profile-tab" style="display: none;">
-                    <!-- Contenido de la pestaña de perfil -->
+                <div class="settings-tab" id="profile-tab">
+                    <h2>Perfil de Usuario</h2>
+                    <p>Gestiona la información de tu perfil de administrador.</p>
+                    <form id="profile-settings-form">
+                        <div class="form-group">
+                            <label for="admin-username">Nombre de Usuario</label>
+                            <input type="text" id="admin-username" class="form-control" value="${appState.currentUser.name || 'Administrador'}" readonly>
+                            <small>El nombre de usuario no se puede cambiar</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-email">Correo Electrónico</label>
+                            <input type="email" id="admin-email" class="form-control" value="${appState.currentUser.email || 'admin@streamingplatform.com'}">
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-avatar">Avatar</label>
+                            <div class="file-upload">
+                                <input type="file" id="admin-avatar" class="form-control" accept="image/*">
+                                <button type="button" class="btn btn-outline">Subir</button>
+                            </div>
+                            <small>Formatos aceptados: JPG, PNG. Tamaño máximo: 2MB</small>
+                        </div>
+                    </form>
                 </div>
                 
-                <div class="settings-tab" id="security-tab" style="display: none;">
-                    <!-- Contenido de la pestaña de seguridad -->
+                <div class="settings-tab" id="security-tab">
+                    <h2>Seguridad</h2>
+                    <p>Gestiona la seguridad de tu cuenta y la plataforma.</p>
+                    <form id="security-settings-form">
+                        <div class="form-group">
+                            <label for="current-password">Contraseña Actual</label>
+                            <input type="password" id="current-password" class="form-control" placeholder="Ingresa tu contraseña actual">
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">Nueva Contraseña</label>
+                            <input type="password" id="new-password" class="form-control" placeholder="Mínimo 8 caracteres">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">Confirmar Nueva Contraseña</label>
+                            <input type="password" id="confirm-password" class="form-control" placeholder="Repite la nueva contraseña">
+                        </div>
+                        <div class="form-group form-check">
+                            <input type="checkbox" id="two-factor" class="form-check-input">
+                            <label class="form-check-label" for="two-factor">Autenticación de dos factores (2FA)</label>
+                            <small class="form-text text-muted">Añade una capa extra de seguridad a tu cuenta.</small>
+                        </div>
+                    </form>
                 </div>
                 
-                <div class="settings-tab" id="notifications-tab" style="display: none;">
-                    <!-- Contenido de la pestaña de notificaciones -->
+                <div class="settings-tab" id="notifications-tab">
+                    <h2>Notificaciones</h2>
+                    <p>Configura qué notificaciones deseas recibir.</p>
+                    <form id="notifications-settings-form">
+                        <div class="form-group form-check">
+                            <input type="checkbox" id="notif-email" class="form-check-input" checked>
+                            <label class="form-check-label" for="notif-email">Notificaciones por Email</label>
+                            <small class="form-text text-muted">Recibe notificaciones importantes por correo electrónico.</small>
+                        </div>
+                        <div class="form-group form-check">
+                            <input type="checkbox" id="notif-new-users" class="form-check-input" checked>
+                            <label class="form-check-label" for="notif-new-users">Nuevos Usuarios</label>
+                            <small class="form-text text-muted">Recibe notificaciones cuando se registren nuevos usuarios.</small>
+                        </div>
+                        <div class="form-group form-check">
+                            <input type="checkbox" id="notif-new-content" class="form-check-input" checked>
+                            <label class="form-check-label" for="notif-new-content">Nuevo Contenido</label>
+                            <small class="form-text text-muted">Recibe notificaciones cuando se agregue nuevo contenido.</small>
+                        </div>
+                        <div class="form-group form-check">
+                            <input type="checkbox" id="notif-errors" class="form-check-input" checked>
+                            <label class="form-check-label" for="notif-errors">Errores del Sistema</label>
+                            <small class="form-text text-muted">Recibe notificaciones sobre errores críticos del sistema.</small>
+                        </div>
+                    </form>
                 </div>
                 
-                <div class="settings-tab" id="billing-tab" style="display: none;">
-                    <!-- Contenido de la pestaña de facturación -->
+                <div class="settings-tab" id="billing-tab">
+                    <h2>Facturación</h2>
+                    <p>Gestiona la información de facturación y suscripciones.</p>
+                    <form id="billing-settings-form">
+                        <div class="form-group">
+                            <label for="billing-email">Email de Facturación</label>
+                            <input type="email" id="billing-email" class="form-control" placeholder="facturacion@ejemplo.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="billing-address">Dirección de Facturación</label>
+                            <textarea id="billing-address" class="form-control" rows="3" placeholder="Ingresa tu dirección completa"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="payment-method">Método de Pago</label>
+                            <select id="payment-method" class="form-control">
+                                <option value="">Selecciona un método</option>
+                                <option value="credit-card">Tarjeta de Crédito</option>
+                                <option value="paypal">PayPal</option>
+                                <option value="bank-transfer">Transferencia Bancaria</option>
+                            </select>
+                        </div>
+                    </form>
                 </div>
                 
-                <div class="settings-tab" id="api-tab" style="display: none;">
-                    <!-- Contenido de la pestaña de API -->
+                <div class="settings-tab" id="api-tab">
+                    <h2>API y Integraciones</h2>
+                    <p>Gestiona las claves API y las integraciones externas.</p>
+                    <form id="api-settings-form">
+                        <div class="form-group">
+                            <label for="api-key">Clave API Principal</label>
+                            <div class="file-upload">
+                                <input type="text" id="api-key" class="form-control" value="sk_live_xxxxxxxxxxxxxxxxxxxxx" readonly>
+                                <button type="button" class="btn btn-outline" onclick="copyApiKey()">
+                                    <i class="fas fa-copy"></i> Copiar
+                                </button>
+                </div>
+                            <small>Usa esta clave para autenticar peticiones a la API</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="api-secret">Secreto API</label>
+                            <div class="file-upload">
+                                <input type="password" id="api-secret" class="form-control" value="••••••••••••••••••••" readonly>
+                                <button type="button" class="btn btn-outline" onclick="regenerateApiSecret()">
+                                    <i class="fas fa-sync"></i> Regenerar
+                                </button>
+                            </div>
+                            <small>Mantén este secreto seguro y no lo compartas</small>
+                        </div>
+                        <div class="form-group form-check">
+                            <input type="checkbox" id="api-enabled" class="form-check-input" checked>
+                            <label class="form-check-label" for="api-enabled">API Pública Habilitada</label>
+                            <small class="form-text text-muted">Permite acceso público a la API (solo lectura).</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="webhook-url">URL de Webhook</label>
+                            <input type="url" id="webhook-url" class="form-control" placeholder="https://ejemplo.com/webhook">
+                            <small>URL para recibir notificaciones de eventos</small>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     `;
 }
+
+// Función para configurar las pestañas de configuración
+function setupSettingsTabs() {
+    const tabItems = document.querySelectorAll('.settings-menu li');
+    if (tabItems.length === 0) return;
+    
+    // Remover listeners anteriores si existen
+    tabItems.forEach(item => {
+        const newItem = item.cloneNode(true);
+        item.parentNode.replaceChild(newItem, item);
+    });
+    
+    // Añadir nuevos listeners
+    const newTabItems = document.querySelectorAll('.settings-menu li');
+    newTabItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const tabId = item.getAttribute('data-tab');
+            
+            // Actualizar menú activo
+            const activeMenuItem = document.querySelector('.settings-menu li.active');
+            if (activeMenuItem) {
+                activeMenuItem.classList.remove('active');
+            }
+            item.classList.add('active');
+            
+            // Ocultar todas las pestañas
+            const allTabs = document.querySelectorAll('.settings-tab');
+            allTabs.forEach(tab => {
+                tab.classList.remove('active');
+                tab.style.display = 'none';
+            });
+            
+            // Mostrar la pestaña seleccionada
+            const selectedTab = document.getElementById(`${tabId}-tab`);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+                selectedTab.style.display = 'block';
+            }
+        });
+    });
+    
+    // Asegurar que la primera pestaña esté visible
+    const firstTab = document.querySelector('.settings-tab.active') || document.querySelector('.settings-tab');
+    if (firstTab) {
+        firstTab.style.display = 'block';
+    }
+}
+
+// Función para copiar API key
+window.copyApiKey = function() {
+    const apiKeyInput = document.getElementById('api-key');
+    if (apiKeyInput) {
+        apiKeyInput.select();
+        document.execCommand('copy');
+        showNotification('Clave API copiada al portapapeles', 'success');
+    }
+};
+
+// Función para regenerar API secret
+window.regenerateApiSecret = function() {
+    if (confirm('¿Estás seguro de que quieres regenerar el secreto API? Esto invalidará el secreto actual.')) {
+        showNotification('Secreto API regenerado correctamente', 'success');
+        // Aquí iría la lógica real para regenerar el secreto
+    }
+};
 
 /**
  * Muestra el modal para agregar o editar contenido.
@@ -1265,7 +2129,7 @@ function showContentModal(itemData = null) {
     const modal = document.getElementById('contentModal');
     if (modal) {
         modal.classList.add('active');
-        document.body.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
     }
 }
 
@@ -1430,7 +2294,21 @@ async function apiRequest(endpoint, options = {}) {
     try {
         // Asegurar que el endpoint tenga la ruta base correcta
         const baseUrl = '/streaming-platform';
-        const fullEndpoint = endpoint.startsWith('http') ? endpoint : baseUrl + endpoint;
+        
+        // Si el endpoint ya incluye la ruta base, no duplicarla
+        let fullEndpoint;
+        if (endpoint.startsWith('http')) {
+            fullEndpoint = endpoint;
+        } else if (endpoint.startsWith('/streaming-platform')) {
+            // Ya tiene la ruta base, usarla tal cual
+            fullEndpoint = endpoint;
+        } else if (endpoint.startsWith('/')) {
+            // Ruta absoluta, añadir base
+            fullEndpoint = baseUrl + endpoint;
+        } else {
+            // Ruta relativa, añadir base y slash
+            fullEndpoint = baseUrl + '/' + endpoint;
+        }
         
         // Añadir headers por defecto
         const defaultHeaders = {
@@ -1540,20 +2418,7 @@ function formatStatus(status) {
 // Inicializar componentes dinámicos
 function initDynamicComponents() {
     // Tabs de configuración
-    const tabItems = document.querySelectorAll('.settings-menu li');
-    tabItems.forEach(item => {
-        item.addEventListener('click', () => {
-            const tabId = item.getAttribute('data-tab');
-            
-            // Actualizar pestaña activa
-            document.querySelector('.settings-menu li.active').classList.remove('active');
-            item.classList.add('active');
-            
-            // Mostrar contenido de la pestaña
-            document.querySelector('.settings-tab.active').classList.remove('active');
-            document.getElementById(`${tabId}-tab`).classList.add('active');
-        });
-    });
+    setupSettingsTabs();
     
     // Selector de rango de fechas personalizado
     const dateRangeSelect = document.getElementById('date-range');
@@ -1670,6 +2535,69 @@ function renderError(message) {
 document.addEventListener('DOMContentLoaded', init);
 
 // Manejar navegación con el botón de retroceso/avanzar
+// Toggle para ver/ocultar hash de contraseña
+function togglePasswordView(button) {
+    const passwordText = button.querySelector('.password-text');
+    const icon = button.querySelector('i');
+    
+    if (passwordText && (passwordText.style.display === 'none' || !passwordText.style.display)) {
+        passwordText.style.display = 'inline';
+        if (icon) {
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        }
+        button.classList.add('active');
+    } else if (passwordText) {
+        passwordText.style.display = 'none';
+        if (icon) {
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+        button.classList.remove('active');
+    }
+}
+
+// Resetear contraseña de usuario
+async function resetUserPassword(userId) {
+    if (!userId) return;
+    
+    const newPassword = prompt('Ingresa la nueva contraseña (mínimo 8 caracteres):');
+    if (!newPassword) return;
+    
+    if (newPassword.length < 8) {
+        alert('La contraseña debe tener al menos 8 caracteres.');
+        return;
+    }
+    
+    const confirmPassword = prompt('Confirma la nueva contraseña:');
+    if (newPassword !== confirmPassword) {
+        alert('Las contraseñas no coinciden.');
+        return;
+    }
+    
+    try {
+        const response = await apiRequest(`/api/users/index.php?id=${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                password: newPassword
+            })
+        });
+        
+        if (response.success) {
+            alert('Contraseña actualizada correctamente.');
+            // Recargar la lista de usuarios
+            if (appState.currentSection === 'usuarios') {
+                loadSection();
+            }
+        } else {
+            alert('Error al actualizar la contraseña: ' + (response.error || 'Error desconocido'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al actualizar la contraseña. Por favor, intenta de nuevo.');
+    }
+}
+
 window.addEventListener('popstate', () => {
     const section = window.location.hash.substring(1) || 'dashboard';
     navigateTo(section);

@@ -150,7 +150,7 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                         <span class="badge">0</span>
                     </div>
                     <div class="user-info">
-                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Admin" class="avatar">
+                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Admin" class="avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                         <span><?php echo htmlspecialchars($currentUser['username']); ?></span>
                         <i class="fas fa-chevron-down"></i>
                     </div>

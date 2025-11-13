@@ -27,32 +27,57 @@
     }
 
     // ============================================
-    // SEARCH FUNCTIONALITY
+    // SEARCH FUNCTIONALITY MEJORADA
     // ============================================
     function initSearch() {
         const searchContainer = document.getElementById('searchContainer');
         const searchInput = document.getElementById('searchInput');
-        const searchIcon = document.getElementById('searchIcon');
+        const searchToggle = document.getElementById('searchToggle');
+        const searchClear = document.getElementById('searchClear');
+        const autocompleteResults = document.getElementById('autocompleteResults');
         
-        if (!searchContainer || !searchInput || !searchIcon) return;
+        if (!searchContainer || !searchInput) return;
 
         // Toggle search on icon click
-        searchIcon.addEventListener('click', () => {
-            searchContainer.classList.toggle('active');
-            if (searchContainer.classList.contains('active')) {
+        if (searchToggle) {
+            searchToggle.addEventListener('click', () => {
+                searchContainer.classList.toggle('active');
+                if (searchContainer.classList.contains('active')) {
+                    searchInput.focus();
+                } else {
+                    closeSearch();
+                }
+            });
+        }
+
+        // Clear search
+        if (searchClear) {
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
                 searchInput.focus();
-            }
-        });
+                closeAutocomplete();
+            });
+        }
+
+        // Show/hide clear button
+        if (searchInput && searchClear) {
+            searchInput.addEventListener('input', () => {
+                if (searchInput.value.length > 0) {
+                    searchClear.style.display = 'flex';
+                } else {
+                    searchClear.style.display = 'none';
+                }
+            });
+        }
 
         // Close search on outside click
         document.addEventListener('click', (e) => {
             if (!searchContainer.contains(e.target) && searchContainer.classList.contains('active')) {
-                searchContainer.classList.remove('active');
-                searchInput.value = '';
+                closeSearch();
             }
         });
 
-        // Handle search input
+        // Handle search input with autocomplete
         let searchTimeout;
         searchInput.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
@@ -61,7 +86,9 @@
             if (query.length >= 2) {
                 searchTimeout = setTimeout(() => {
                     performSearch(query);
-                }, 500);
+                }, 300);
+            } else {
+                closeAutocomplete();
             }
         });
 
@@ -73,13 +100,125 @@
                 if (query) {
                     window.location.href = `/streaming-platform/search.php?q=${encodeURIComponent(query)}`;
                 }
+            } else if (e.key === 'Escape') {
+                closeSearch();
+            }
+        });
+
+        // Handle arrow keys in autocomplete
+        let selectedIndex = -1;
+        searchInput.addEventListener('keydown', (e) => {
+            const results = autocompleteResults?.querySelectorAll('.result-item');
+            if (!results || results.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, results.length - 1);
+                updateSelection(results, selectedIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(results, selectedIndex);
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                results[selectedIndex].click();
             }
         });
     }
 
-    function performSearch(query) {
-        // Aquí puedes implementar búsqueda en tiempo real
-        console.log('Buscando:', query);
+    function updateSelection(results, index) {
+        results.forEach((item, i) => {
+            item.classList.toggle('selected', i === index);
+        });
+    }
+
+    async function performSearch(query) {
+        const autocompleteResults = document.getElementById('autocompleteResults');
+        if (!autocompleteResults) return;
+
+        try {
+            const response = await fetch(`/streaming-platform/api/search.php?q=${encodeURIComponent(query)}&limit=5`);
+            const data = await response.json();
+            
+            if (data.success && data.data && data.data.length > 0) {
+                displayAutocompleteResults(data.data);
+            } else {
+                displayNoResults();
+            }
+        } catch (error) {
+            console.error('Error en búsqueda:', error);
+            displayNoResults();
+        }
+    }
+
+    function displayAutocompleteResults(results) {
+        const autocompleteResults = document.getElementById('autocompleteResults');
+        if (!autocompleteResults) return;
+
+        autocompleteResults.innerHTML = results.map(item => {
+            const type = item.type === 'movie' ? 'Película' : 'Serie';
+            const year = item.release_year || '';
+            const poster = item.poster_url || '/streaming-platform/assets/img/default-poster.svg';
+            
+            return `
+                <div class="result-item" onclick="window.location.href='/streaming-platform/content-detail.php?id=${item.id}'">
+                    <img src="${poster}" alt="${item.title}" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                    <div class="result-info">
+                        <div class="result-title">${escapeHtml(item.title)}</div>
+                        <div class="result-meta">
+                            <span class="result-type">${type}</span>
+                            ${year ? `<span>•</span><span>${year}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        autocompleteResults.classList.add('active');
+    }
+
+    function displayNoResults() {
+        const autocompleteResults = document.getElementById('autocompleteResults');
+        if (!autocompleteResults) return;
+
+        autocompleteResults.innerHTML = `
+            <div class="no-results">
+                <i class="fas fa-search"></i>
+                <p>No se encontraron resultados</p>
+            </div>
+        `;
+        autocompleteResults.classList.add('active');
+    }
+
+    function closeAutocomplete() {
+        const autocompleteResults = document.getElementById('autocompleteResults');
+        if (autocompleteResults) {
+            autocompleteResults.classList.remove('active');
+            autocompleteResults.innerHTML = '';
+        }
+    }
+
+    function closeSearch() {
+        const searchContainer = document.getElementById('searchContainer');
+        const searchInput = document.getElementById('searchInput');
+        const searchClear = document.getElementById('searchClear');
+        
+        if (searchContainer) {
+            searchContainer.classList.remove('active');
+        }
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        if (searchClear) {
+            searchClear.style.display = 'none';
+        }
+        closeAutocomplete();
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     // ============================================
@@ -306,13 +445,16 @@
         if (mobileMenuToggle && navbarNav) {
             mobileMenuToggle.addEventListener('click', function() {
                 navbarNav.classList.toggle('active');
+                this.classList.toggle('active');
                 const icon = this.querySelector('i');
                 if (navbarNav.classList.contains('active')) {
                     icon.classList.remove('fa-bars');
                     icon.classList.add('fa-times');
+                    document.body.style.overflow = 'hidden';
                 } else {
                     icon.classList.remove('fa-times');
                     icon.classList.add('fa-bars');
+                    document.body.style.overflow = '';
                 }
             });
             
@@ -320,11 +462,13 @@
             navbarNav.querySelectorAll('.nav-link').forEach(link => {
                 link.addEventListener('click', () => {
                     navbarNav.classList.remove('active');
+                    mobileMenuToggle.classList.remove('active');
                     const icon = mobileMenuToggle.querySelector('i');
                     if (icon) {
                         icon.classList.remove('fa-times');
                         icon.classList.add('fa-bars');
                     }
+                    document.body.style.overflow = '';
                 });
             });
             
@@ -332,12 +476,46 @@
             document.addEventListener('click', (e) => {
                 if (!navbarNav.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
                     navbarNav.classList.remove('active');
+                    mobileMenuToggle.classList.remove('active');
                     const icon = mobileMenuToggle.querySelector('i');
                     if (icon) {
                         icon.classList.remove('fa-times');
                         icon.classList.add('fa-bars');
                     }
+                    document.body.style.overflow = '';
                 }
+            });
+        }
+    }
+
+    // ============================================
+    // USER MENU DROPDOWN
+    // ============================================
+    function setupUserMenu() {
+        const userMenu = document.getElementById('userMenu');
+        if (!userMenu) return;
+        
+        const userMenuToggle = userMenu.querySelector('.user-menu-toggle');
+        const userDropdown = document.getElementById('userDropdown');
+        
+        if (userMenuToggle && userDropdown) {
+            userMenuToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userMenu.classList.toggle('active');
+            });
+            
+            // Cerrar menú al hacer clic fuera
+            document.addEventListener('click', (e) => {
+                if (!userMenu.contains(e.target)) {
+                    userMenu.classList.remove('active');
+                }
+            });
+            
+            // Cerrar al hacer clic en un item
+            userDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    userMenu.classList.remove('active');
+                });
             });
         }
     }
@@ -352,6 +530,7 @@
         initContentCards();
         initHeroCarousel();
         setupMobileMenu();
+        setupUserMenu();
     }
 
     // Wait for DOM to be ready

@@ -1,0 +1,389 @@
+/* Estilos base para la galería */
+:root {
+    --primary-color: #e50914;
+    --background-dark: #141414;
+    --text-primary: #ffffff;
+    --text-secondary: #e5e5e5;
+    --transition-speed: 0.3s;
+}
+
+.content-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    background-color: var(--background-dark);
+}
+
+.content-card {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+    aspect-ratio: 2/3;
+    cursor: pointer;
+    background: #2f2f2f;
+}
+
+.content-poster {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.content-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.content-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 30%, transparent 50%);
+    opacity: 0;
+    transition: opacity var(--transition-speed) ease;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    box-sizing: border-box;
+}
+
+.content-card:hover {
+    transform: scale(1.1) translateY(-10px);
+    z-index: 10;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+.content-card:hover .content-overlay {
+    opacity: 1;
+}
+
+.content-card:hover .content-poster img {
+    transform: scale(1.1);
+}
+
+.content-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    transform: translateY(10px);
+    transition: transform var(--transition-speed) ease;
+    opacity: 0;
+}
+
+.content-card:hover .content-actions {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.btn-play, .btn-add {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.7);
+    background: rgba(0,0,0,0.6);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.btn-play:hover, .btn-add:hover {
+    transform: scale(1.1);
+    background: rgba(255,255,255,0.9);
+    color: #000;
+    border-color: transparent;
+}
+
+.btn-play {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.content-info {
+    color: white;
+    transform: translateY(20px);
+    transition: transform var(--transition-speed) ease;
+    opacity: 0;
+}
+
+.content-card:hover .content-info {
+    transform: translateY(0);
+    opacity: 1;
+    transition-delay: 0.1s;
+}
+
+.content-info h3 {
+    margin: 0 0 8px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: #ccc;
+    margin-bottom: 10px;
+}
+
+.rating {
+    color: #46d369;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 12px;
+}
+
+.genres span {
+    background: rgba(255,255,255,0.1);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: #ddd;
+}
+
+.description {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+    color: #d2d2d2;
+}
+
+.content-details {
+    padding: 10px 0;
+    color: white;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px;
+    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+    transition: all var(--transition-speed) ease;
+}
+
+.content-card:hover .content-details {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.content-details h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.content-details .year {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+/* Efecto de carga */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.content-card {
+    animation: fadeIn 0.5s ease-out forwards;
+    opacity: 0;
+}
+
+/* Efecto de carga escalonada para las tarjetas */
+.content-card {
+    animation: fadeIn 0.5s ease-out forwards;
+    opacity: 0;
+    animation-fill-mode: both;
+}
+
+@for $i from 1 through 20 {
+    .content-card:nth-child(#{$i}) {
+        animation-delay: #{$i * 0.1}s;
+    }
+}
+
+/* Estilos responsivos */
+@media (max-width: 1200px) {
+    .content-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+}
+
+@media (max-width: 992px) {
+    .content-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 15px;
+        padding: 15px;
+    }
+    
+    .content-info h3 {
+        font-size: 1rem;
+    }
+    
+    .description {
+        -webkit-line-clamp: 2;
+    }
+}
+
+@media (max-width: 768px) {
+    .content-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 12px;
+    }
+    
+    .content-overlay {
+        padding: 10px;
+    }
+    
+    .btn-play, .btn-add {
+        width: 30px;
+        height: 30px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 576px) {
+    .content-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 10px;
+        padding: 10px;
+    }
+    
+    .content-info h3 {
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+    }
+    
+    .meta {
+        font-size: 0.7rem;
+    }
+    
+    .genres span {
+        font-size: 0.6rem;
+        padding: 2px 5px;
+    }
+    
+    .description {
+        display: none;
+    }
+}
+
+/* Efecto de carga esqueleto */
+.skeleton {
+    background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeleton-poster {
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+}
+
+/* Clases de tipo de contenido */
+.content-type {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    z-index: 2;
+}
+
+/* Efecto de hover mejorado */
+.content-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.7) 100%);
+    opacity: 0;
+    transition: opacity var(--transition-speed) ease;
+    z-index: 1;
+}
+
+.content-card:hover::before {
+    opacity: 1;
+}
+
+/* Mejoras de accesibilidad */
+.content-card:focus {
+    outline: 3px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Estilos para el indicador de edad */
+.age-rating {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    z-index: 2;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Estilos para el indicador de nuevo episodio */
+.new-episode {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: var(--primary-color);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    z-index: 2;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { opacity: 0.7; }
+}

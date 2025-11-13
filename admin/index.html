@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - StreamingPlus</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Barra lateral -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h2>Streaming<span>Admin</span></h2>
+            </div>
+            <nav class="admin-nav">
+                <ul>
+                    <li class="active">
+                        <a href="#dashboard">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#contenido">
+                            <i class="fas fa-film"></i>
+                            <span>Contenido</span>
+                        </a>
+                        <ul class="submenu">
+                            <li><a href="#peliculas">Películas</a></li>
+                            <li><a href="#series">Series</a></li>
+                            <li><a href="#episodios">Episodios</a></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#usuarios">
+                            <i class="fas fa-users"></i>
+                            <span>Usuarios</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#suscripciones">
+                            <i class="fas fa-credit-card"></i>
+                            <span>Suscripciones</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#reportes">
+                            <i class="fas fa-chart-bar"></i>
+                            <span>Reportes</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#configuracion">
+                            <i class="fas fa-cog"></i>
+                            <span>Configuración</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="logout">
+                <a href="../index.html">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Cerrar Sesión</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Contenido principal -->
+        <main class="main-content">
+            <!-- Barra superior -->
+            <header class="top-bar">
+                <div class="search-bar">
+                    <input type="text" placeholder="Buscar en el panel...">
+                    <button><i class="fas fa-search"></i></button>
+                </div>
+                <div class="user-menu">
+                    <div class="notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge">3</span>
+                    </div>
+                    <div class="user-info">
+                        <img src="../assets/images/avatar.png" alt="Admin" class="avatar">
+                        <span>Administrador</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Contenido del dashboard -->
+            <div class="dashboard">
+                <h1>Panel de Control</h1>
+                
+                <!-- Resumen -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Usuarios Totales</h3>
+                            <p class="stat-number">1,248</p>
+                            <p class="stat-change positive">+12% este mes</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-film"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Películas</h3>
+                            <p class="stat-number">356</p>
+                            <p class="stat-change positive">+8 este mes</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-tv"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Series</h3>
+                            <p class="stat-number">124</p>
+                            <p class="stat-change positive">+5 este mes</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Ingresos</h3>
+                            <p class="stat-number">$24,589</p>
+                            <p class="stat-change negative">-3% este mes</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Últimas actividades -->
+                <div class="recent-activity">
+                    <div class="section-header">
+                        <h2>Actividad Reciente</h2>
+                        <a href="#" class="view-all">Ver todo</a>
+                    </div>
+                    
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon success">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <div class="activity-details">
+                                <p>Nueva película añadida: <strong>Duna: Parte Dos</strong></p>
+                                <span class="activity-time">Hace 2 horas</span>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="activity-details">
+                                <p>Problema de carga con el episodio 3 de <strong>La Casa de Papel</strong></p>
+                                <span class="activity-time">Hace 5 horas</span>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon info">
+                                <i class="fas fa-user-plus"></i>
+                            </div>
+                            <div class="activity-details">
+                                <p>Nuevo usuario registrado: <strong>usuario123</strong></p>
+                                <span class="activity-time">Ayer</span>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon primary">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            <div class="activity-details">
+                                <p>Suscripción premium activada para <strong>maria.garcia@email.com</strong></p>
+                                <span class="activity-time">Ayer</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Últimos usuarios registrados -->
+                <div class="recent-users">
+                    <div class="section-header">
+                        <h2>Últimos Usuarios</h2>
+                        <a href="#usuarios" class="view-all">Ver todos</a>
+                    </div>
+                    
+                    <div class="users-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Email</th>
+                                    <th>Registro</th>
+                                    <th>Plan</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="user-cell">
+                                            <img src="../assets/images/avatar1.jpg" alt="Usuario">
+                                            <span>Carlos López</span>
+                                        </div>
+                                    </td>
+                                    <td>carlos@email.com</td>
+                                    <td>Hoy</td>
+                                    <td><span class="badge free">Gratis</span></td>
+                                    <td><span class="status active">Activo</span></td>
+                                    <td class="actions">
+                                        <button class="btn btn-sm btn-view"><i class="fas fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="user-cell">
+                                            <img src="../assets/images/avatar2.jpg" alt="Usuario">
+                                            <span>Ana Martínez</span>
+                                        </div>
+                                    </td>
+                                    <td>ana.mtz@email.com</td>
+                                    <td>Ayer</td>
+                                    <td><span class="badge premium">Premium</span></td>
+                                    <td><span class="status active">Activo</span></td>
+                                    <td class="actions">
+                                        <button class="btn btn-sm btn-view"><i class="fas fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="user-cell">
+                                            <img src="../assets/images/avatar3.jpg" alt="Usuario">
+                                            <span>Roberto Sánchez</span>
+                                        </div>
+                                    </td>
+                                    <td>rsanchez@email.com</td>
+                                    <td>Hace 2 días</td>
+                                    <td><span class="badge premium">Premium</span></td>
+                                    <td><span class="status inactive">Inactivo</span></td>
+                                    <td class="actions">
+                                        <button class="btn btn-sm btn-view"><i class="fas fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="user-cell">
+                                            <img src="../assets/images/avatar4.jpg" alt="Usuario">
+                                            <span>Laura García</span>
+                                        </div>
+                                    </td>
+                                    <td>laura.g@email.com</td>
+                                    <td>Hace 3 días</td>
+                                    <td><span class="badge free">Gratis</span></td>
+                                    <td><span class="status active">Activo</span></td>
+                                    <td class="actions">
+                                        <button class="btn btn-sm btn-view"><i class="fas fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-edit"><i class="fas fa-edit"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modal para agregar/editar contenido -->
+        <div class="modal" id="contentModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Agregar Nueva Película</h2>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="contentForm">
+                        <div class="form-group">
+                            <label for="title">Título</label>
+                            <input type="text" id="title" name="title" required>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="year">Año</label>
+                                <input type="number" id="year" name="year" min="1900" max="2030" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="duration">Duración (min)</label>
+                                <input type="number" id="duration" name="duration" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="category">Categoría</label>
+                            <select id="category" name="category" required>
+                                <option value="">Selecciona una categoría</option>
+                                <option value="accion">Acción</option>
+                                <option value="comedia">Comedia</option>
+                                <option value="drama">Drama</option>
+                                <option value="terror">Terror</option>
+                                <option value="ciencia_ficcion">Ciencia Ficción</option>
+                                <option value="animacion">Animación</option>
+                                <option value="documental">Documental</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="description">Descripción</label>
+                            <textarea id="description" name="description" rows="4" required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="poster">Póster (URL)</label>
+                            <input type="url" id="poster" name="poster" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="trailer">Tráiler (URL de YouTube)</label>
+                            <input type="url" id="trailer" name="trailer" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="premium" name="premium">
+                                <span class="checkmark"></span>
+                                Contenido Premium
+                            </label>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary close-modal-btn">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/admin.js"></script>
+</body>
+</html>

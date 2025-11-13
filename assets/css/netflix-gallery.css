@@ -1,0 +1,417 @@
+/* Netflix Gallery Styles */
+:root {
+    --primary: #e50914;
+    --primary-hover: #f40612;
+    --background: #141414;
+    --background-light: #1f1f1f;
+    --text-primary: #ffffff;
+    --text-secondary: #e5e5e5;
+    --text-muted: #999999;
+    --transition-speed: 0.3s;
+    --content-width: 95%;
+    --content-max-width: 1600px;
+}
+
+/* Base Styles */
+body {
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    line-height: 1.4;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+/* Hero Section */
+.hero {
+    position: relative;
+    width: 100%;
+    height: 56.25vw; /* 16:9 Aspect Ratio */
+    max-height: 90vh;
+    min-height: 400px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.hero-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center center;
+    z-index: 1;
+    transition: opacity 1s ease-in-out;
+}
+
+.hero-backdrop::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 7.4rem;
+    background-image: linear-gradient(180deg, transparent, rgba(20, 20, 20, 0.6) 40%, rgba(20, 20, 20, 0.8) 70%, #141414 95%);
+    z-index: 2;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0 4%;
+    padding-bottom: 8%;
+    box-sizing: border-box;
+}
+
+.hero-title {
+    font-size: 4vw;
+    font-weight: 800;
+    margin: 0 0 1rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    max-width: 50%;
+}
+
+.hero-description {
+    font-size: 1.2vw;
+    line-height: 1.4;
+    max-width: 50%;
+    margin: 0 0 1.5rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-speed) ease;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background-color: var(--text-primary);
+    color: #000;
+}
+
+.btn-primary:hover {
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.btn-secondary {
+    background-color: rgba(109, 109, 110, 0.7);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+    background-color: rgba(109, 109, 110, 0.4);
+}
+
+.btn i {
+    margin-right: 0.5rem;
+}
+
+/* Content Rows */
+.content-rows {
+    padding: 0 4%;
+    position: relative;
+    z-index: 4;
+    margin-top: -5rem;
+}
+
+.row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.row-title {
+    font-size: 1.4vw;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+}
+
+.row-link {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color var(--transition-speed) ease;
+}
+
+.row-link:hover {
+    color: var(--primary);
+}
+
+.row-container {
+    position: relative;
+    margin-bottom: 3rem;
+}
+
+.row-content {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+    padding: 1rem 0;
+    gap: 0.3rem;
+}
+
+.row-content::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+
+/* Content Card */
+.content-card {
+    flex: 0 0 auto;
+    width: 16.66%; /* 6 items per row */
+    min-width: 200px;
+    position: relative;
+    border-radius: 4px;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+    background: var(--background-light);
+}
+
+.content-card:hover {
+    transform: scale(1.1);
+    z-index: 10;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+.content-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+    aspect-ratio: 2/3;
+}
+
+.content-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem;
+    background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.content-card:hover .content-info {
+    opacity: 1;
+}
+
+.content-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+}
+
+.content-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.content-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.action-btn {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+/* Navigation Arrows */
+.row-nav {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 4%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease, background 0.3s ease;
+    background: rgba(20, 20, 20, 0.5);
+}
+
+.row-nav:hover {
+    opacity: 1;
+    background: rgba(20, 20, 20, 0.8);
+}
+
+.row-container:hover .row-nav {
+    opacity: 1;
+}
+
+.row-nav.prev {
+    left: 0;
+}
+
+.row-nav.next {
+    right: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .content-card {
+        width: 20%; /* 5 items per row */
+    }
+}
+
+@media (max-width: 992px) {
+    .content-card {
+        width: 25%; /* 4 items per row */
+    }
+    
+    .hero-title {
+        max-width: 70%;
+    }
+    
+    .hero-description {
+        max-width: 70%;
+        font-size: 1.6vw;
+    }
+}
+
+@media (max-width: 768px) {
+    .content-card {
+        width: 33.33%; /* 3 items per row */
+    }
+    
+    .hero {
+        height: 70vh;
+    }
+    
+    .hero-title {
+        font-size: 5vw;
+        max-width: 80%;
+    }
+    
+    .hero-description {
+        font-size: 2vw;
+        max-width: 80%;
+    }
+    
+    .btn {
+        padding: 0.4rem 1rem;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .content-card {
+        width: 50%; /* 2 items per row */
+    }
+    
+    .hero {
+        height: 80vh;
+    }
+    
+    .hero-title {
+        font-size: 6vw;
+        max-width: 100%;
+    }
+    
+    .hero-description {
+        font-size: 2.5vw;
+        max-width: 100%;
+    }
+    
+    .hero-actions {
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .row-title {
+        font-size: 1.2rem;
+    }
+}
+
+/* Loading Animation */
+@keyframes shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+}
+
+.loading-shimmer {
+    background: linear-gradient(90deg, #2a2a2a 8%, #333 18%, #2a2a2a 33%);
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite linear;
+    border-radius: 4px;
+}
+
+/* Modal */
+.modal-content {
+    background-color: var(--background);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.close {
+    color: var(--text-primary);
+    opacity: 0.8;
+}
+
+.close:hover {
+    color: var(--primary);
+    opacity: 1;
+}

@@ -1,0 +1,68 @@
+# Archivos de configuración sensibles
+includes/config.local.php
+.env
+.env.local
+
+# Archivos de sesión
+sessions/
+*.session
+
+# Logs
+*.log
+logs/
+error_log
+
+# Archivos temporales
+*.tmp
+*.temp
+*.cache
+*.bak
+*.swp
+*.swo
+*~
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archivos de IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# Archivos de XAMPP
+xampp/
+
+# Archivos de uploads (opcional - descomenta si no quieres subir archivos subidos)
+# uploads/*
+# videos/*
+# assets/videos/*
+
+# Archivos de instalación
+database/.installed
+
+# Archivos de debug
+debug_*.php
+test_*.php
+check_*.php
+
+# Archivos de backup
+*.sql.bak
+*.php.bak
+
+# Node modules (si usas npm)
+node_modules/
+package-lock.json
+
+# Composer (si usas composer)
+vendor/
+composer.lock
+
+# Archivos de wget
+wget-log
+

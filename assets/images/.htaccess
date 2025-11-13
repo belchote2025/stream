@@ -1,0 +1,9 @@
+# Redirigir peticiones .jpg a .svg si no existen
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Si se solicita auth-bg.jpg y no existe, usar auth-bg.svg
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^auth-bg\.jpg$ auth-bg.svg [L]
+</IfModule>
+

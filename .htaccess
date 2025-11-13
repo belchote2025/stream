@@ -1,0 +1,17 @@
+# Habilitar rewrite engine
+RewriteEngine On
+
+# Redirigir requests a los endpoints de API
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# API Content endpoints
+RewriteRule ^api/content/featured$ api/content/featured.php [L]
+RewriteRule ^api/content/popular$ api/content/popular.php [L]
+RewriteRule ^api/content/recent$ api/content/recent.php [L]
+RewriteRule ^api/content/([0-9]+)$ api/content/index.php?id=$1 [L]
+
+# Permitir acceso a archivos estáticos
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+

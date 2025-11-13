@@ -1,0 +1,12 @@
+# Habilitar rewrite engine
+RewriteEngine On
+
+# Redirigir requests a los endpoints de content
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# API Content endpoints
+RewriteRule ^content/featured$ content/featured.php [L]
+RewriteRule ^content/popular$ content/popular.php [L]
+RewriteRule ^content/recent$ content/recent.php [L]
+RewriteRule ^content/([0-9]+)$ content/index.php [L]

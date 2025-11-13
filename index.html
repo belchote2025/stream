@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streaming Platform</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- Barra de navegación -->
+    <nav class="navbar">
+        <div class="logo">Streaming<span>Plus</span></div>
+        <div class="nav-links">
+            <a href="#" class="active">Inicio</a>
+            <a href="#peliculas">Películas</a>
+            <a href="#series">Series</a>
+            <a href="#mi-lista">Mi Lista</a>
+        </div>
+        <div class="nav-right">
+            <div class="search-container">
+                <input type="text" placeholder="Buscar...">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="user-menu">
+                <img src="assets/images/avatar.png" alt="Perfil" class="avatar">
+                <div class="dropdown">
+                    <a href="#">Mi perfil</a>
+                    <a href="#">Configuración</a>
+                    <a href="#" id="logout">Cerrar sesión</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section con Carousel -->
+    <section class="hero">
+        <div class="carousel">
+            <div class="carousel-inner">
+                <!-- Los elementos del carrusel se cargarán dinámicamente con JavaScript -->
+            </div>
+            <button class="carousel-control prev">❮</button>
+            <button class="carousel-control next">❯</button>
+        </div>
+    </section>
+
+    <!-- Sección de Contenido -->
+    <section class="content-section">
+        <h2>Películas Populares</h2>
+        <div class="content-grid" id="popular-movies">
+            <!-- Contenido cargado dinámicamente -->
+        </div>
+    </section>
+
+    <section class="content-section">
+        <h2>Series Populares</h2>
+        <div class="content-grid" id="popular-series">
+            <!-- Contenido cargado dinámicamente -->
+        </div>
+    </section>
+
+    <!-- Pie de página -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>StreamingPlus</h3>
+                <p>Disfruta de las mejores películas y series en un solo lugar.</p>
+            </div>
+            <div class="footer-section">
+                <h3>Enlaces rápidos</h3>
+                <ul>
+                    <li><a href="#">Términos de uso</a></li>
+                    <li><a href="#">Política de privacidad</a></li>
+                    <li><a href="#">Ayuda</a></li>
+                    <li><a href="#">Contáctanos</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Redes sociales</h3>
+                <div class="social-links">
+                    <a href="#"><i class="fab fa-facebook"></i></a>
+                    <a href="#"><i class="fab fa-twitter"></i></a>
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 StreamingPlus. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Reproductor de video -->
+    <div class="video-player">
+        <div class="video-header">
+            <h3 class="video-title"></h3>
+            <button class="close-video" title="Cerrar (Esc)">&times;</button>
+        </div>
+        <div class="video-container">
+            <div id="videoContainer" class="video-wrapper">
+                <div class="video-iframe-container">
+                    <div id="player"></div>
+                    <video id="torrent-player" controls style="display: none; width: 100%; height: 100%;"></video>
+                </div>
+                
+                <!-- Controles personalizados -->
+                <div class="video-controls">
+                    <!-- Barra de progreso con vista previa -->
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress"></div>
+                            <div class="buffer"></div>
+                            <div class="hover-time">
+                                <span class="hover-time-text">0:00</span>
+                                <div class="hover-thumbnail"></div>
+                            </div>
+                        </div>
+                        <div class="time-display">
+                            <span class="current-time">0:00</span> / 
+                            <span class="duration">0:00</span>
+                        </div>
+                    </div>
+                    
+                    <div class="controls-bottom">
+                        <div class="left-controls">
+                            <!-- Controles de reproducción -->
+                            <button class="control-btn play-pause" title="Reproducir/Pausa (Espacio)">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            
+                            <!-- Controles de volumen -->
+                            <button class="control-btn volume" title="Silenciar/Activar sonido (M)">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                            <div class="volume-slider-container">
+                                <input type="range" class="volume-slider" min="0" max="1" step="0.1" value="1">
+                            </div>
+                            
+                            <!-- Tiempo transcurrido -->
+                            <span class="time-elapsed">0:00 / 0:00</span>
+                            
+                            <!-- Controles de velocidad -->
+                            <div class="speed-control control-dropdown">
+                                <button class="control-btn" title="Velocidad de reproducción">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    <span class="speed-value">1x</span>
+                                </button>
+                                <div class="speed-options dropdown-menu">
+                                    <button data-speed="0.5">0.5x</button>
+                                    <button data-speed="0.75">0.75x</button>
+                                    <button data-speed="1" class="active">Normal (1x)</button>
+                                    <button data-speed="1.25">1.25x</button>
+                                    <button data-speed="1.5">1.5x</button>
+                                    <button data-speed="2">2x</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Controles de calidad -->
+                            <div class="quality-control control-dropdown">
+                                <button class="control-btn" title="Calidad del video">
+                                    <i class="fas fa-tv"></i>
+                                    <span class="quality-value">Auto</span>
+                                </button>
+                                <div class="quality-options dropdown-menu">
+                                    <button data-quality="auto" class="active">Auto</button>
+                                    <button data-quality="1080">1080p</button>
+                                    <button data-quality="720">720p</button>
+                                    <button data-quality="480">480p</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="right-controls">
+                            <!-- Subtítulos -->
+                            <div class="subtitles-control control-dropdown">
+                                <button class="control-btn" title="Subtítulos (C)">
+                                    <i class="fas fa-closed-captioning"></i>
+                                </button>
+                                <div class="subtitles-options dropdown-menu">
+                                    <button data-subtitle="none" class="active">Sin subtítulos</button>
+                                    <button data-subtitle="es">Español</button>
+                                    <button data-subtitle="en">English</button>
+                                    <button data-subtitle="fr">Français</button>
+                                    <button data-subtitle="pt">Português</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Compartir -->
+                            <div class="share-control control-dropdown">
+                                <button class="control-btn" title="Compartir">
+                                    <i class="fas fa-share-alt"></i>
+                                </button>
+                                <div class="share-options dropdown-menu">
+                                    <button class="share-option" data-share="facebook"><i class="fab fa-facebook"></i> Facebook</button>
+                                    <button class="share-option" data-share="twitter"><i class="fab fa-twitter"></i> Twitter</button>
+                                    <button class="share-option" data-share="whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+                                    <button class="share-option" data-share="link"><i class="fas fa-link"></i> Copiar enlace</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Configuración -->
+                            <div class="settings-control control-dropdown">
+                                <button class="control-btn" title="Configuración">
+                                    <i class="fas fa-cog"></i>
+                                </button>
+                                <div class="settings-menu dropdown-menu">
+                                    <button class="theme-toggle" title="Cambiar tema">
+                                        <i class="fas fa-moon"></i> Tema oscuro
+                                    </button>
+                                    <button class="keyboard-shortcuts-btn" title="Ver atajos de teclado">
+                                        <i class="fas fa-keyboard"></i> Atajos de teclado
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Modo teatro -->
+                            <button class="control-btn theater-mode-btn" title="Modo teatro (T)">
+                                <i class="fas fa-film"></i>
+                            </button>
+                            
+                            <!-- Pantalla completa -->
+                            <button class="control-btn fullscreen" title="Pantalla completa (F)">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Indicador de carga -->
+                <div class="loading-indicator">
+                    <div class="spinner"></div>
+                    <p>Cargando contenido...</p>
+                </div>
+                
+                <!-- Mensaje de error -->
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>No se pudo cargar el video. Intenta de nuevo más tarde.</p>
+                    <button class="btn retry-btn">Reintentar</button>
+                </div>
+            </div>
+            
+            <!-- Panel de atajos de teclado -->
+            <div class="keyboard-shortcuts-panel">
+                <h4>Atajos de teclado</h4>
+                <div class="shortcuts-grid">
+                    <div class="shortcut-item">
+                        <kbd>Espacio</kbd>
+                        <span>Reproducir/Pausa</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>F</kbd>
+                        <span>Pantalla completa</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>T</kbd>
+                        <span>Modo teatro</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>M</kbd>
+                        <span>Silenciar/Activar sonido</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Flecha Izq/Der</kbd>
+                        <span>Retroceder/Adelantar 5s</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Flecha Arriba/Abajo</kbd>
+                        <span>Subir/Bajar volumen</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>0-9</kbd>
+                        <span>Saltar al X0% del video</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>C</kbd>
+                        <span>Subtítulos</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>L</kbd>
+                        <span>Adelantar 10s</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>J</kbd>
+                        <span>Retroceder 10s</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>> o .</kbd>
+                        <span>Siguiente frame</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>< o ,</kbd>
+                        <span>Frame anterior</span>
+                    </div>
+                </div>
+                <button class="close-shortcuts">Cerrar</button>
+            </div>
+            
+            <!-- Recomendaciones -->
+            <div class="recommendations">
+                <div class="recommendations-header">
+                    <h4>Continuar viendo</h4>
+                    <div class="recommendations-nav">
+                        <button class="rec-prev"><i class="fas fa-chevron-left"></i></button>
+                        <button class="rec-next"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="recommendations-list">
+                    <!-- Las recomendaciones se cargarán dinámicamente -->
+                </div>
+            </div>
+            
+            <!-- Mini reproductor -->
+            <div class="mini-player">
+                <div class="mini-preview">
+                    <img src="" alt="Miniatura del video" class="mini-thumbnail">
+                    <div class="mini-controls">
+                        <button class="mini-play"><i class="fas fa-play"></i></button>
+                    </div>
+                </div>
+                <div class="mini-info">
+                    <div class="mini-title">Título del video</div>
+                    <div class="mini-time">0:00 / 0:00</div>
+                </div>
+                <button class="mini-close"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <!-- Notificación de teclas -->
+            <div class="keyboard-shortcut-notification">
+                <span class="shortcut-keys"></span>
+                <span class="shortcut-action"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebTorrent for P2P streaming -->
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

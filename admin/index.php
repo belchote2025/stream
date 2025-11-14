@@ -395,6 +395,75 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                 </div>
             </div>
         </div>
+
+        <!-- Modal para agregar/editar usuarios -->
+        <div class="modal" id="userModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="user-modal-title">Agregar Nuevo Usuario</h2>
+                    <button class="close-modal-user">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="userForm">
+                        <input type="hidden" id="user-id" name="id" value="">
+                        
+                        <div class="form-group">
+                            <label for="username">Nombre de Usuario *</label>
+                            <input type="text" id="username" name="username" required minlength="3" maxlength="50">
+                            <small class="form-text">Mínimo 3 caracteres, solo letras, números y guiones bajos</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email *</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="full_name">Nombre Completo</label>
+                            <input type="text" id="full_name" name="full_name" maxlength="100">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="password">Contraseña <span id="password-required" style="display:none;">*</span></label>
+                                <input type="password" id="password" name="password" minlength="8" autocomplete="new-password">
+                                <small class="form-text" id="password-help">Mínimo 8 caracteres (requerida solo para nuevos usuarios)</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="password_confirm">Confirmar Contraseña</label>
+                                <input type="password" id="password_confirm" name="password_confirm" minlength="8" autocomplete="new-password">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="role">Rol *</label>
+                                <select id="role" name="role" required>
+                                    <option value="user">Usuario</option>
+                                    <option value="premium">Premium</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="status">Estado *</label>
+                                <select id="status" name="status" required>
+                                    <option value="active">Activo</option>
+                                    <option value="inactive">Inactivo</option>
+                                    <option value="suspended">Suspendido</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary close-modal-user-btn">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Usuario</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="/streaming-platform/js/admin.js"></script>

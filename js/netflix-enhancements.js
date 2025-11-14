@@ -474,7 +474,23 @@
             
             // Cerrar menú al hacer clic fuera
             document.addEventListener('click', (e) => {
-                if (!navbarNav.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
+                if (navbarNav.classList.contains('active')) {
+                    if (!navbarNav.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
+                        navbarNav.classList.remove('active');
+                        mobileMenuToggle.classList.remove('active');
+                        const icon = mobileMenuToggle.querySelector('i');
+                        if (icon) {
+                            icon.classList.remove('fa-times');
+                            icon.classList.add('fa-bars');
+                        }
+                        document.body.style.overflow = '';
+                    }
+                }
+            });
+            
+            // Cerrar menú con tecla Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && navbarNav.classList.contains('active')) {
                     navbarNav.classList.remove('active');
                     mobileMenuToggle.classList.remove('active');
                     const icon = mobileMenuToggle.querySelector('i');

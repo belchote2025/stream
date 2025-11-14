@@ -7,7 +7,7 @@ define('DB_NAME', 'streaming_platform');
 
 // Configuración de la aplicación
 define('SITE_URL', 'http://localhost/streaming-platform');
-define('SITE_NAME', 'StreamingPlus');
+define('SITE_NAME', 'UrresTv');
 
 // Configuración de seguridad
 define('HASH_ALGO', PASSWORD_BCRYPT);
@@ -67,7 +67,31 @@ function getDbConnection() {
 
 // Función para redireccionar
 function redirect($path) {
-    header("Location: " . SITE_URL . $path);
+    // Si el path ya es una URL completa, usarla directamente
+    if (filter_var($path, FILTER_VALIDATE_URL)) {
+        header("Location: " . $path);
+        exit();
+    }
+    
+    // Si el path ya incluye SITE_URL, evitar duplicación
+    if (strpos($path, SITE_URL) === 0) {
+        header("Location: " . $path);
+        exit();
+    }
+    
+    // Si el path ya comienza con /streaming-platform, extraer solo la parte relativa
+    if (strpos($path, '/streaming-platform') === 0) {
+        $path = substr($path, strlen('/streaming-platform'));
+    }
+    
+    // Asegurar que el path comience con /
+    if (substr($path, 0, 1) !== '/') {
+        $path = '/' . $path;
+    }
+    
+    // Construir la URL final
+    $finalUrl = rtrim(SITE_URL, '/') . $path;
+    header("Location: " . $finalUrl);
     exit();
 }
 

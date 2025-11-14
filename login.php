@@ -58,9 +58,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     );
                 }
                 
-                // Redirigir a la página solicitada o a la página de inicio
-                $redirectUrl = isset($_SESSION['redirect_url']) ? $_SESSION['redirect_url'] : '/';
-                unset($_SESSION['redirect_url']);
+                // Redirigir según el rol del usuario
+                $redirectUrl = '/';
+                
+                // Si hay una URL de redirección guardada, usarla
+                if (isset($_SESSION['redirect_url'])) {
+                    $redirectUrl = $_SESSION['redirect_url'];
+                    unset($_SESSION['redirect_url']);
+                } elseif (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin') {
+                    // Si es admin, redirigir al panel de administración
+                    $redirectUrl = '/admin/';
+                }
                 
                 redirect($redirectUrl);
             }

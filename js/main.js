@@ -132,7 +132,7 @@ async function loadCarousel() {
         const content = result.data;
 
         if (!content || content.length === 0) {
-            elements.carouselInner.innerHTML = '<div class="carousel-item active" style="background-image: url(\'assets/images/placeholder-hero.jpg\');"><div class="carousel-content"><h1>Bienvenido a StreamingPlus</h1><p>Tu plataforma de streaming favorita. Contenido nuevo próximamente.</p></div></div>';
+            elements.carouselInner.innerHTML = '<div class="carousel-item active" style="background-image: url(\'assets/images/placeholder-hero.jpg\');"><div class="carousel-content"><h1>Bienvenido a UrresTv</h1><p>Tu plataforma de streaming favorita. Contenido nuevo próximamente.</p></div></div>';
             return;
         }
 
@@ -1332,7 +1332,7 @@ async function playContent(id, type, videoData = null) {
     }
 
     if (videoTitle) videoTitle.textContent = content.title || 'Video';
-    document.title = `${content.title || 'Video'} - StreamingPlus`;
+    document.title = `${content.title || 'Video'} - UrresTv`;
 
     if (content.torrent_magnet) {
         showLoading('Conectando a la red P2P...');

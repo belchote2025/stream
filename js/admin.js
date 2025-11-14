@@ -3,7 +3,7 @@ const appState = {
     currentUser: {
         id: 1,
         name: 'Administrador',
-        email: 'admin@streamingplus.com',
+        email: 'admin@urrestv.com',
         role: 'admin',
         avatar: '/streaming-platform/assets/img/default-poster.svg'
     },
@@ -120,11 +120,18 @@ function setupEventListeners() {
         notifications.addEventListener('click', toggleNotifications);
     }
     
-    // Modal
+    // Modal de contenido
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('close-modal') || e.target.classList.contains('close-modal-btn')) {
             closeModal();
-    }
+        }
+    });
+    
+    // Modal de usuarios
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('close-modal-user') || e.target.classList.contains('close-modal-user-btn')) {
+            closeUserModal();
+        }
     });
     
     // Formulario de contenido
@@ -133,7 +140,21 @@ function setupEventListeners() {
         contentForm.addEventListener('submit', handleContentSubmit);
     }
     
-    // Cerrar modal al hacer clic fuera
+    // Formulario de usuarios
+    const userForm = document.getElementById('userForm');
+    if (userForm) {
+        userForm.addEventListener('submit', handleUserSubmit);
+    }
+    
+    // Botón para agregar usuario
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('#add-user-btn')) {
+            e.preventDefault();
+            showUserModal();
+        }
+    });
+    
+    // Cerrar modal de contenido al hacer clic fuera
     window.addEventListener('click', (e) => {
         const modal = document.getElementById('contentModal');
         if (e.target === modal) {
@@ -141,23 +162,39 @@ function setupEventListeners() {
         }
     });
     
+    // Cerrar modal de usuarios al hacer clic fuera
+    window.addEventListener('click', (e) => {
+        const userModal = document.getElementById('userModal');
+        if (e.target === userModal) {
+            closeUserModal();
+        }
+    });
+    
     // Botones de acción en tablas
     document.addEventListener('click', (e) => {
-        // Botón de editar
+        // Botón de ver
         if (e.target.closest('.btn-view')) {
             const row = e.target.closest('tr');
             const id = row.dataset.id;
-            const type = appState.currentSubsection || appState.currentSection;
+            // Intentar obtener el tipo de la tabla o del contexto
+            const table = row.closest('table');
+            const tableType = table?.dataset.type;
+            // Si la tabla tiene data-type, usarlo; si no, usar el contexto
+            const type = tableType || appState.currentSubsection || appState.currentSection;
             viewItem(id, type);
         }
 
         // Botón de editar
         if (e.target.closest('.btn-edit')) {
             const btn = e.target.closest('.btn-edit');
-            const id = btn.dataset.id || e.target.closest('tr')?.dataset.id;
+            const row = e.target.closest('tr');
+            const id = btn.dataset.id || row?.dataset.id;
             if (id) {
-            const type = appState.currentSubsection || appState.currentSection;
-            editItem(id, type);
+                // Intentar obtener el tipo de la tabla o del contexto
+                const table = row?.closest('table');
+                const tableType = table?.dataset.type;
+                const type = tableType || appState.currentSubsection || appState.currentSection;
+                editItem(id, type);
             }
         }
         
@@ -168,8 +205,11 @@ function setupEventListeners() {
             const id = btn.dataset.id || row?.dataset.id;
             if (id) {
                 const title = row?.querySelector('td:nth-child(2)')?.textContent || 'este elemento';
-            const type = appState.currentSubsection || appState.currentSection;
-            deleteItem(id, title, type);
+                // Intentar obtener el tipo de la tabla o del contexto
+                const table = row?.closest('table');
+                const tableType = table?.dataset.type;
+                const type = tableType || appState.currentSubsection || appState.currentSection;
+                deleteItem(id, title, type);
             }
         }
         
@@ -541,7 +581,7 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
             </div>
             
             <div class="table-responsive">
-                <table class="data-table">
+                <table class="data-table" data-type="users">
                     <thead>
                         <tr>
                             <th>Usuario</th>
@@ -1828,7 +1868,7 @@ function renderSettings() {
                     <form id="general-settings-form">
                         <div class="form-group">
                             <label for="site-title">Título del Sitio</label>
-                            <input type="text" id="site-title" class="form-control" value="StreamingPlus">
+                            <input type="text" id="site-title" class="form-control" value="UrresTv">
                         </div>
                         
                         <div class="form-group">
@@ -2138,36 +2178,124 @@ function showContentModal(itemData = null) {
  * @param {object|null} userData - Los datos del usuario a editar.
  */
 function showUserModal(userData = null) {
-    // Esta función es un placeholder. Necesitarías un modal y formulario diferente para usuarios.
-    // Por ahora, reutilizaremos el modal de contenido como ejemplo.
     appState.editingItemId = userData ? userData.id : null;
-    elements.modalTitle.textContent = userData ? `Editar Usuario ${userData.username}` : 'Agregar Nuevo Usuario';
     
-    // Aquí deberías mostrar un formulario específico para usuarios.
-    alert('Funcionalidad para agregar/editar usuarios necesita un modal y formulario dedicados.');
+    const modal = document.getElementById('userModal');
+    const modalTitle = document.getElementById('user-modal-title');
+    const form = document.getElementById('userForm');
+    const passwordInput = document.getElementById('password');
+    const passwordConfirmInput = document.getElementById('password_confirm');
+    const passwordRequired = document.getElementById('password-required');
+    const passwordHelp = document.getElementById('password-help');
+    
+    if (!modal || !form) {
+        console.error('Modal de usuario o formulario no encontrado');
+        return;
+    }
+    
+    // Establecer título
+    if (modalTitle) {
+        modalTitle.textContent = userData ? `Editar Usuario: ${userData.username || userData.email}` : 'Agregar Nuevo Usuario';
+    }
+    
+    // Resetear formulario
+    form.reset();
+    
+    if (userData) {
+        // Modo edición: rellenar con datos existentes
+        const fields = ['id', 'username', 'email', 'full_name', 'role', 'status'];
+        fields.forEach(key => {
+            const input = form.elements[key];
+            if (input && userData[key] !== undefined && userData[key] !== null) {
+                input.value = userData[key];
+            }
+        });
+        
+        // Contraseña no requerida en edición (solo si se quiere cambiar)
+        if (passwordInput) {
+            passwordInput.removeAttribute('required');
+            passwordInput.placeholder = 'Dejar vacío para mantener la contraseña actual';
+        }
+        if (passwordConfirmInput) {
+            passwordConfirmInput.removeAttribute('required');
+        }
+        if (passwordRequired) {
+            passwordRequired.style.display = 'none';
+        }
+        if (passwordHelp) {
+            passwordHelp.textContent = 'Dejar vacío para mantener la contraseña actual (mínimo 8 caracteres si se cambia)';
+        }
+    } else {
+        // Modo creación: contraseña requerida
+        if (passwordInput) {
+            passwordInput.setAttribute('required', 'required');
+            passwordInput.placeholder = '';
+        }
+        if (passwordConfirmInput) {
+            passwordConfirmInput.setAttribute('required', 'required');
+        }
+        if (passwordRequired) {
+            passwordRequired.style.display = 'inline';
+        }
+        if (passwordHelp) {
+            passwordHelp.textContent = 'Mínimo 8 caracteres (requerida para nuevos usuarios)';
+        }
+    }
+    
+    // Mostrar modal
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
 }
 
 // Función para editar un item
 async function editItem(id, type) {
     try {
-        const endpoint = type === 'peliculas' || type === 'series' 
-            ? `/api/content/index.php?id=${id}`
-            : `/api/${type}/${id}`;
+        // Mapear tipos a endpoints correctos (igual que viewItem)
+        const endpointMap = {
+            'dashboard': '/api/content/index.php',
+            'contenido': '/api/content/index.php',
+            'peliculas': '/api/content/index.php',
+            'movies': '/api/content/index.php',
+            'series': '/api/content/index.php',
+            'usuarios': '/api/users/index.php',
+            'users': '/api/users/index.php',
+            'user': '/api/users/index.php'
+        };
+        
+        // Determinar el endpoint correcto
+        let endpoint = endpointMap[type] || '/api/content/index.php';
+        
+        // Si el endpoint requiere ID en la URL, agregarlo
+        if (endpoint.includes('index.php')) {
+            endpoint = `${endpoint}?id=${id}`;
+        } else {
+            endpoint = `${endpoint}/${id}`;
+        }
         
         const response = await apiRequest(endpoint);
-        if (response && response.data) {
-            // Ajustar datos para el formulario
-            const itemData = {
-                ...response.data,
-                is_featured: response.data.is_featured ? true : false,
-                is_trending: response.data.is_trending ? true : false,
-                is_premium: response.data.is_premium ? true : false
-            };
-            showContentModal(itemData);
+        
+        // Verificar si la respuesta tiene el formato esperado
+        if (response && (response.data || response.success)) {
+            const itemData = response.data || response;
+            
+            // Si es un usuario, mostrar modal de usuario
+            if (type === 'users' || type === 'usuarios' || type === 'user') {
+                showUserModal(itemData);
+            } else {
+                // Si es contenido, ajustar datos para el formulario
+                const contentData = {
+                    ...itemData,
+                    is_featured: itemData.is_featured ? true : false,
+                    is_trending: itemData.is_trending ? true : false,
+                    is_premium: itemData.is_premium ? true : false
+                };
+                showContentModal(contentData);
+            }
         } else {
             showNotification('No se pudo obtener la información del elemento.', 'error');
         }
     } catch (error) {
+        console.error('Error en editItem:', error);
         showNotification(`Error al cargar el elemento: ${error.message}`, 'error');
     }
 }
@@ -2175,13 +2303,43 @@ async function editItem(id, type) {
 // Función para ver un item
 async function viewItem(id, type) {
     try {
-        const item = await apiRequest(`/api/${type}/${id}`);
+        // Mapear tipos a endpoints correctos
+        const endpointMap = {
+            'dashboard': '/api/content/index.php',
+            'contenido': '/api/content/index.php',
+            'peliculas': '/api/content/index.php',
+            'movies': '/api/content/index.php',
+            'series': '/api/content/index.php',
+            'usuarios': '/api/users/index.php',
+            'users': '/api/users/index.php',
+            'user': '/api/users/index.php'
+        };
+        
+        // Determinar el endpoint correcto
+        let endpoint = endpointMap[type] || '/api/content/index.php';
+        
+        // Si el endpoint requiere ID en la URL, agregarlo
+        if (endpoint.includes('index.php')) {
+            endpoint = `${endpoint}?id=${id}`;
+        } else {
+            endpoint = `${endpoint}/${id}`;
+        }
+        
+        const item = await apiRequest(endpoint);
         if (item && item.data) {
             // Por ahora, mostramos una alerta. Idealmente, esto abriría un modal de vista detallada.
             const details = Object.entries(item.data)
-                .map(([key, value]) => `${key}: ${value}`)
+                .filter(([key]) => !['password', 'reset_token'].includes(key))
+                .map(([key, value]) => {
+                    if (typeof value === 'object' && value !== null) {
+                        value = JSON.stringify(value);
+                    }
+                    return `${key}: ${value}`;
+                })
                 .join('\n');
-            alert(`Detalles de ${item.data.title}:\n\n${details}`);
+            
+            const title = item.data.title || item.data.username || item.data.email || `Elemento #${id}`;
+            alert(`Detalles de ${title}:\n\n${details}`);
         } else {
             showNotification('No se pudo obtener la información del elemento.', 'error');
         }
@@ -2211,9 +2369,19 @@ async function deleteItem(id, title, type) {
     }
 }
 
-// Cerrar modal
+// Cerrar modal de contenido
 function closeModal() {
     const modal = document.getElementById('contentModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+    document.body.style.overflow = '';
+    appState.editingItemId = null; // Limpiar el ID de edición
+}
+
+// Cerrar modal de usuarios
+function closeUserModal() {
+    const modal = document.getElementById('userModal');
     if (modal) {
         modal.classList.remove('active');
     }
@@ -2284,6 +2452,85 @@ async function handleContentSubmit(e) {
     }
 }
 
+// Manejar envío del formulario de usuarios
+async function handleUserSubmit(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Validaciones
+    if (!data.username || data.username.trim().length < 3) {
+        showNotification('El nombre de usuario debe tener al menos 3 caracteres.', 'error');
+        return;
+    }
+    
+    if (!data.email || !data.email.includes('@')) {
+        showNotification('Por favor, ingresa un email válido.', 'error');
+        return;
+    }
+    
+    // Validar contraseña
+    const isEditing = !!appState.editingItemId;
+    if (!isEditing && (!data.password || data.password.length < 8)) {
+        showNotification('La contraseña debe tener al menos 8 caracteres.', 'error');
+        return;
+    }
+    
+    if (data.password && data.password.length < 8) {
+        showNotification('La contraseña debe tener al menos 8 caracteres.', 'error');
+        return;
+    }
+    
+    if (data.password && data.password !== data.password_confirm) {
+        showNotification('Las contraseñas no coinciden.', 'error');
+        return;
+    }
+    
+    // Preparar datos para la API
+    const apiData = {
+        username: data.username.trim(),
+        email: data.email.trim(),
+        full_name: data.full_name ? data.full_name.trim() : '',
+        role: data.role || 'user',
+        status: data.status || 'active'
+    };
+    
+    // Solo incluir contraseña si se proporcionó
+    if (data.password && data.password.trim()) {
+        apiData.password = data.password;
+    }
+    
+    let url = '/api/users/index.php';
+    let method = 'POST';
+    
+    if (appState.editingItemId) {
+        url = `/api/users/index.php?id=${appState.editingItemId}`;
+        method = 'PUT';
+        apiData.id = parseInt(appState.editingItemId);
+    }
+    
+    try {
+        const response = await apiRequest(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(apiData)
+        });
+        
+        if (response.success || response.status === 'success') {
+            showNotification(response.message || (isEditing ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.'), 'success');
+            closeUserModal();
+            loadSection(); // Recargar la sección para reflejar los cambios
+        } else {
+            throw new Error(response.error || 'Error desconocido');
+        }
+    } catch (error) {
+        showNotification(`Error al guardar usuario: ${error.message}`, 'error');
+        console.error('Error al guardar usuario:', error);
+    }
+}
+
 /**
  * Wrapper para peticiones fetch a la API
  * @param {string} endpoint - El endpoint de la API (ej. '/api/movies/')
@@ -2321,8 +2568,38 @@ async function apiRequest(endpoint, options = {}) {
         const response = await fetch(fullEndpoint, options);
         
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Respuesta no válida del servidor' }));
-            throw new Error(errorData.error || `Error HTTP ${response.status}`);
+            // Intentar obtener el mensaje de error del servidor
+            let errorMessage = `Error HTTP ${response.status}`;
+            const contentType = response.headers.get('content-type');
+            
+            // Clonar la respuesta para poder leerla múltiples veces si es necesario
+            const clonedResponse = response.clone();
+            
+            try {
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                } else {
+                    // Si no es JSON, intentar leer como texto
+                    const text = await clonedResponse.text();
+                    if (text && text.trim()) {
+                        // Intentar parsear como JSON si parece ser JSON
+                        try {
+                            const parsed = JSON.parse(text);
+                            errorMessage = parsed.error || parsed.message || errorMessage;
+                        } catch {
+                            // Si no es JSON válido, usar el texto (limitado a 200 caracteres)
+                            errorMessage = text.length > 200 ? `Error ${response.status}` : text;
+                        }
+                    } else {
+                        errorMessage = `Error HTTP ${response.status}: ${response.statusText}`;
+                    }
+                }
+            } catch (e) {
+                // Si todo falla, usar el mensaje por defecto
+                errorMessage = `Error HTTP ${response.status}: ${response.statusText || 'Error desconocido'}`;
+            }
+            throw new Error(errorMessage);
         }
 
         // Si la respuesta es 204 No Content (como en un DELETE exitoso), no hay JSON que parsear
@@ -2330,7 +2607,19 @@ async function apiRequest(endpoint, options = {}) {
             return { success: true };
         }
 
-        return await response.json();
+        // Verificar que la respuesta tenga contenido antes de parsear
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            try {
+                return await response.json();
+            } catch (jsonError) {
+                throw new Error('La respuesta del servidor no es un JSON válido');
+            }
+        } else {
+            // Si no es JSON, devolver el texto
+            const text = await response.text();
+            return { success: true, message: text };
+        }
     } catch (error) {
         console.error('Error en la petición API:', error);
         throw error;

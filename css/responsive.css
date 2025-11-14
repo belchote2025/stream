@@ -30,28 +30,38 @@
     
     .navbar-left {
         gap: 1rem;
+        position: relative;
     }
     
     .navbar-nav {
-        position: fixed;
-        top: 60px;
+        position: absolute;
+        top: 100%;
         left: 0;
         right: 0;
         background: rgba(20, 20, 20, 0.98);
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         flex-direction: column;
-        padding: 1rem 0;
-        transform: translateX(-100%);
-        transition: transform var(--transition-normal);
-        box-shadow: var(--shadow-lg);
+        padding: 0.5rem 0;
+        transform: translateY(-20px);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, visibility 0.3s ease;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
         z-index: 999;
-        max-height: calc(100vh - 60px);
-        overflow-y: auto;
+        max-height: 0;
+        overflow: hidden;
         gap: 0;
+        opacity: 0;
+        visibility: hidden;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0 0 12px 12px;
     }
     
     .navbar-nav.active {
-        transform: translateX(0);
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
+        max-height: 400px;
+        overflow-y: auto;
     }
     
     .navbar-nav .nav-item {
@@ -62,15 +72,27 @@
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        padding: 1rem 1.5rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0.875rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         width: 100%;
-        font-size: 1rem;
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+    }
+    
+    .navbar-nav .nav-link:hover {
+        background: rgba(229, 9, 20, 0.1);
+        padding-left: 2rem;
+        color: var(--netflix-red);
+    }
+    
+    .navbar-nav .nav-link:last-child {
+        border-bottom: none;
     }
     
     .navbar-nav .nav-link i {
         width: 20px;
         text-align: center;
+        font-size: 1rem;
     }
     
     .mobile-menu-toggle {
@@ -78,10 +100,23 @@
         align-items: center;
         justify-content: center;
         z-index: 1001;
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
     }
     
     .mobile-menu-toggle.active {
         color: var(--netflix-red);
+    }
+    
+    .mobile-menu-toggle i {
+        font-size: 1.5rem;
+        transition: transform 0.3s ease;
+    }
+    
+    .mobile-menu-toggle.active i {
+        transform: rotate(90deg);
     }
     
     .nav-right {
@@ -187,7 +222,7 @@
     }
     
     .navbar-nav {
-        top: 52px;
+        top: 100%;
     }
     
     .navbar-brand {

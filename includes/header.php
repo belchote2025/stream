@@ -19,14 +19,52 @@
             // Interceptar console.warn para suprimir warnings no críticos
             const originalWarn = console.warn;
             console.warn = function(...args) {
-                const message = args[0];
+                const message = args.join(' ');
                 if (typeof message === 'string') {
                     // Suprimir warnings de YouTube postMessage (normales en localhost)
-                    if (message.includes('Failed to execute \'postMessage\'') || 
+                    if (message.includes('Failed to execute') && message.includes('postMessage') ||
                         message.includes('www-widgetapi.js') ||
                         message.includes('widgetapi.js') ||
+                        message.includes('www-embed-player-pc.js') ||
                         (message.includes('postMessage') && message.includes('DOMWindow')) ||
-                        (message.includes('postMessage') && message.includes('youtube.com'))) {
+                        (message.includes('postMessage') && message.includes('youtube.com')) ||
+                        (message.includes('target origin') && message.includes('youtube.com'))) {
+                        return;
+                    }
+                    // Suprimir warnings de Feature Policy de YouTube
+                    if (message.includes('Feature Policy') ||
+                        message.includes('Saltándose una función de nombre no compatible') ||
+                        message.includes('clipboard-write') ||
+                        message.includes('encrypted-media') ||
+                        message.includes('gyroscope') ||
+                        message.includes('picture-in-picture') ||
+                        message.includes('accelerometer') ||
+                        (message.includes('Feature Policy') && message.includes('www-widgetapi.js'))) {
+                        return;
+                    }
+                    // Suprimir warnings de Content-Security-Policy
+                    if (message.includes('Content-Security-Policy') ||
+                        message.includes('No se puede procesar la directiva desconocida') ||
+                        message.includes('require-trusted-types-for')) {
+                        return;
+                    }
+                    // Suprimir warnings de cookies (SameSite, contexto de sitios cruzados, particionadas)
+                    if (message.includes('__Secure-YEC') ||
+                        message.includes('i18n_redirected') ||
+                        message.includes('auth.strategy') ||
+                        message.includes('ha sido rechazada porque se encuentra en un contexto de sitios cruzados') ||
+                        message.includes('ha sido rechazada') && message.includes('SameSite') ||
+                        message.includes('pronto será rechazada') && message.includes('Partitioned') ||
+                        message.includes('SameSite') && (message.includes('Lax') || message.includes('Strict')) ||
+                        message.includes('cookie particionada') ||
+                        message.includes('partición de estado dinámico') ||
+                        message.includes('se carga en el contexto de terceros') ||
+                        message.includes('Se ha proporcionado cookie particionada') ||
+                        message.includes('cookie') && message.includes('rechazada') ||
+                        message.includes('cookie') && message.includes('SameSite') ||
+                        message.includes('Advertencias de cookies') ||
+                        message.trim() === 'Advertencias de cookies' ||
+                        /^Advertencias de cookies \d+$/.test(message.trim())) {
                         return;
                     }
                     // Suprimir warnings de "unreachable code" de archivos minificados
@@ -35,6 +73,64 @@
                     }
                     // Suprimir warnings de asm.js (no críticos)
                     if (message.includes('Invalid asm.js') || message.includes('Unexpected token')) {
+                        return;
+                    }
+                    // Suprimir warnings de WEBGL deprecado
+                    if (message.includes('WEBGL_debug_renderer_info is deprecated') ||
+                        message.includes('WEBGL_debug_renderer_info') && message.includes('deprecated')) {
+                        return;
+                    }
+                    // Suprimir warnings de iframe sandbox
+                    if ((message.includes('allow-scripts') && message.includes('allow-same-origin') && message.includes('sandbox')) ||
+                        message.includes('puede eliminar su condición de confinamiento') ||
+                        (message.includes('iframe') && message.includes('sandbox') && message.includes('allow-scripts'))) {
+                        return;
+                    }
+                    // Suprimir warnings de preload de recursos
+                    if (message.includes('precargado con precarga de enlace no se usó') ||
+                        message.includes('precargado') && message.includes('preload') && message.includes('no se usó') ||
+                        message.includes('preload') && message.includes('not used')) {
+                        return;
+                    }
+                    // Suprimir warnings de fuentes (icomoon, Font Awesome)
+                    if (message.includes('downloadable font') ||
+                        message.includes('Glyph bbox was incorrect') ||
+                        message.includes('font-family') && (message.includes('icomoon') || message.includes('Font Awesome')) ||
+                        message.includes('icomoon.ttf') ||
+                        message.includes('icomoon') && message.includes('font')) {
+                        return;
+                    }
+                    // Suprimir warnings de APIs deprecadas
+                    if (message.includes('beforescriptexecute') ||
+                        message.includes('Ya no se admite añadir un detector para eventos')) {
+                        return;
+                    }
+                    // Suprimir warnings de asm.js
+                    if (message.includes('asm.js type error') ||
+                        message.includes('asm.js optimizer disabled') ||
+                        message.includes('expecting argument type declaration') ||
+                        message.includes('webtorrent.min.js') && message.includes('asm.js')) {
+                        return;
+                    }
+                    // Suprimir warnings de Font Awesome fallback
+                    if (message.includes('Font Awesome no cargó correctamente') ||
+                        message.includes('usando fallback') ||
+                        message.includes('Font Awesome') && message.includes('fallback')) {
+                        return;
+                    }
+                    // Suprimir warnings de FOUC (Flash of Unstyled Content)
+                    if (message.includes('El diseño se forzó antes de que la página se cargara completamente') ||
+                        message.includes('se forzó antes de que la página se cargara') ||
+                        message.includes('stylesheets-manager.js') ||
+                        message.includes('FOUC') ||
+                        message.includes('destello de contenido sin estilo')) {
+                        return;
+                    }
+                    // Suprimir warnings de redeclaración (probablemente de extensiones del navegador)
+                    if (message.includes('redeclaration of let') ||
+                        message.includes('redeclaration of const') ||
+                        message.includes('redeclaration of var') ||
+                        message.includes('pushState') && message.includes('redeclaration')) {
                         return;
                     }
                     // Suprimir warnings de console-test.js y mensajes de prueba
@@ -55,14 +151,91 @@
             // Interceptar console.error para suprimir errores no críticos de YouTube
             const originalError = console.error;
             console.error = function(...args) {
-                const message = args[0];
+                const message = args.join(' ');
                 if (typeof message === 'string') {
                     // Suprimir errores de YouTube postMessage (normales en localhost)
-                    if (message.includes('Failed to execute \'postMessage\'') || 
+                    if (message.includes('Failed to execute') && message.includes('postMessage') ||
                         message.includes('www-widgetapi.js') ||
                         message.includes('widgetapi.js') ||
+                        message.includes('www-embed-player-pc.js') ||
                         (message.includes('postMessage') && message.includes('DOMWindow')) ||
-                        (message.includes('postMessage') && message.includes('youtube.com'))) {
+                        (message.includes('postMessage') && message.includes('youtube.com')) ||
+                        (message.includes('target origin') && message.includes('youtube.com'))) {
+                        return;
+                    }
+                    // Suprimir errores de Feature Policy de YouTube
+                    if (message.includes('Feature Policy') ||
+                        message.includes('Saltándose una función de nombre no compatible') ||
+                        message.includes('clipboard-write') ||
+                        message.includes('encrypted-media') ||
+                        message.includes('gyroscope') ||
+                        message.includes('picture-in-picture') ||
+                        message.includes('accelerometer') ||
+                        (message.includes('Feature Policy') && message.includes('www-widgetapi.js'))) {
+                        return;
+                    }
+                    // Suprimir errores de Content-Security-Policy
+                    if (message.includes('Content-Security-Policy') ||
+                        message.includes('No se puede procesar la directiva desconocida') ||
+                        message.includes('require-trusted-types-for')) {
+                        return;
+                    }
+                    // Suprimir errores de cookies
+                    if (message.includes('__Secure-YEC') ||
+                        message.includes('i18n_redirected') ||
+                        message.includes('auth.strategy') ||
+                        message.includes('ha sido rechazada porque se encuentra en un contexto de sitios cruzados') ||
+                        message.includes('ha sido rechazada') && message.includes('SameSite') ||
+                        message.includes('pronto será rechazada') && message.includes('Partitioned') ||
+                        message.includes('cookie particionada') ||
+                        message.includes('partición de estado dinámico') ||
+                        message.includes('Se ha proporcionado cookie particionada') ||
+                        (message.includes('cookie') && message.includes('rechazada')) ||
+                        (message.includes('cookie') && message.includes('SameSite')) ||
+                        message.includes('Advertencias de cookies') ||
+                        message.trim() === 'Advertencias de cookies' ||
+                        /^Advertencias de cookies \d+$/.test(message.trim())) {
+                        return;
+                    }
+                    // Suprimir errores de spoofer.js (extensiones del navegador)
+                    if (message.includes('spoofer.js') ||
+                        message.includes('An unexpected error occurred') && (message.includes('spoofer') || message.includes('spoofer.js'))) {
+                        return;
+                    }
+                    // Suprimir errores de redeclaración (probablemente de extensiones del navegador)
+                    if (message.includes('redeclaration of let') ||
+                        message.includes('redeclaration of const') ||
+                        message.includes('redeclaration of var') ||
+                        message.includes('pushState') && message.includes('redeclaration')) {
+                        return;
+                    }
+                    // Suprimir errores de fuentes
+                    if (message.includes('downloadable font') ||
+                        message.includes('Glyph bbox was incorrect') ||
+                        message.includes('font-family') && (message.includes('icomoon') || message.includes('Font Awesome')) ||
+                        message.includes('icomoon.ttf') ||
+                        (message.includes('icomoon') && message.includes('font'))) {
+                        return;
+                    }
+                    // Suprimir errores de asm.js
+                    if (message.includes('asm.js type error') ||
+                        message.includes('asm.js optimizer disabled') ||
+                        message.includes('expecting argument type declaration') ||
+                        message.includes('webtorrent.min.js') && message.includes('asm.js')) {
+                        return;
+                    }
+                    // Suprimir errores de Font Awesome fallback
+                    if (message.includes('Font Awesome no cargó correctamente') ||
+                        message.includes('usando fallback') ||
+                        message.includes('Font Awesome') && message.includes('fallback')) {
+                        return;
+                    }
+                    // Suprimir errores de FOUC
+                    if (message.includes('El diseño se forzó antes de que la página se cargara completamente') ||
+                        message.includes('se forzó antes de que la página se cargara') ||
+                        message.includes('stylesheets-manager.js') ||
+                        message.includes('FOUC') ||
+                        message.includes('destello de contenido sin estilo')) {
                         return;
                     }
                     // Suprimir errores de console-test.js y mensajes de prueba

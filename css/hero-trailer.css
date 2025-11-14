@@ -1,0 +1,109 @@
+/* ============================================
+   ESTILOS PARA CARRUSEL CON TRAILERS
+   ============================================ */
+
+.hero-video-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.hero-video-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+}
+
+.hero-youtube-player {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+}
+
+.hero-slide.active .hero-youtube-player {
+    opacity: 1;
+}
+
+.hero-trailer-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    min-width: 100%;
+    min-height: 100%;
+    width: auto;
+    height: auto;
+    transform: translate(-50%, -50%);
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+    z-index: 1;
+}
+
+.hero-slide.active .hero-trailer-video {
+    opacity: 1;
+}
+
+/* Overlay para mejor legibilidad del texto */
+.hero-video-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0, 0, 0, 0.3) 40%,
+        rgba(0, 0, 0, 0.6) 70%,
+        rgba(0, 0, 0, 0.8) 100%
+    );
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Asegurar que el backdrop esté detrás del video */
+.hero-backdrop {
+    z-index: 0;
+}
+
+/* Controles de video ocultos por defecto */
+.hero-trailer-video::-webkit-media-controls {
+    display: none !important;
+}
+
+.hero-trailer-video::-webkit-media-controls-enclosure {
+    display: none !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .hero-trailer-video {
+        object-fit: cover;
+    }
+    
+    .hero-youtube-player {
+        /* Ajustar para móviles */
+    }
+}
+
+/* Pausar video cuando no está activo */
+.hero-slide:not(.active) .hero-trailer-video {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.hero-slide:not(.active) .hero-youtube-player {
+    opacity: 0;
+    pointer-events: none;
+}
+

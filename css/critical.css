@@ -1,0 +1,71 @@
+/* ============================================
+   ESTILOS CRÍTICOS - Cargar primero para evitar FOUC
+   ============================================ */
+
+/* Reset básico */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: #141414;
+    color: #ffffff;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Navbar básico para evitar FOUC */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 0 4%;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.7);
+}
+
+/* Hero básico */
+.hero {
+    position: relative;
+    width: 100%;
+    height: 80vh;
+    min-height: 500px;
+    max-height: 900px;
+    overflow: hidden;
+    margin-top: 70px;
+    background: #000;
+}
+
+/* Ocultar contenido hasta que se carguen los estilos completos */
+/* Nota: La visibilidad se controla con estilos inline en el head */
+
+body.styles-loaded {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Asegurar que el contenido sea visible */
+html body {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+

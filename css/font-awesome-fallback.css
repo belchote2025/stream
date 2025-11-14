@@ -1,0 +1,40 @@
+/* ============================================
+   FALLBACK PARA FONT AWESOME
+   ============================================ */
+
+/* Si Font Awesome falla, mostrar texto alternativo */
+body.fa-fallback .fas::before,
+body.fa-fallback .far::before,
+body.fa-fallback .fab::before,
+body.fa-fallback .fal::before,
+body.fa-fallback .fad::before {
+    content: attr(data-fallback);
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+/* Ocultar iconos rotos */
+body.fa-fallback i[class*="fa-"]:not([data-fallback]) {
+    display: none;
+}
+
+/* Fallback para iconos comunes */
+body.fa-fallback .fa-home::before { content: "🏠"; }
+body.fa-fallback .fa-film::before { content: "🎬"; }
+body.fa-fallback .fa-tv::before { content: "📺"; }
+body.fa-fallback .fa-th-large::before { content: "☰"; }
+body.fa-fallback .fa-search::before { content: "🔍"; }
+body.fa-fallback .fa-user::before { content: "👤"; }
+body.fa-fallback .fa-play::before { content: "▶"; }
+body.fa-fallback .fa-pause::before { content: "⏸"; }
+body.fa-fallback .fa-volume-up::before { content: "🔊"; }
+body.fa-fallback .fa-volume-mute::before { content: "🔇"; }
+body.fa-fallback .fa-expand::before { content: "⛶"; }
+body.fa-fallback .fa-compress::before { content: "⛶"; }
+body.fa-fallback .fa-times::before { content: "✕"; }
+body.fa-fallback .fa-chevron-left::before { content: "‹"; }
+body.fa-fallback .fa-chevron-right::before { content: "›"; }
+body.fa-fallback .fa-info-circle::before { content: "ℹ"; }
+body.fa-fallback .fa-bars::before { content: "☰"; }
+

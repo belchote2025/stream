@@ -36,10 +36,8 @@ try {
             c.is_trending,
             c.is_premium,
             c.views,
-            COUNT(DISTINCT v.id) as view_count,
             GROUP_CONCAT(DISTINCT g.name ORDER BY g.name SEPARATOR ', ') as genres
         FROM content c
-        LEFT JOIN views v ON c.id = v.content_id
         LEFT JOIN content_genres cg ON c.id = cg.content_id
         LEFT JOIN genres g ON cg.genre_id = g.id
         WHERE 1=1
@@ -55,7 +53,7 @@ try {
     
     $query .= "
         GROUP BY c.id
-        ORDER BY view_count DESC, c.views DESC, c.rating DESC
+        ORDER BY c.views DESC, c.rating DESC, c.release_year DESC, COALESCE(c.added_date, c.created_at) DESC
         LIMIT :limit
     ";
     
@@ -92,7 +90,6 @@ try {
             'is_trending' => (bool)$row['is_trending'],
             'is_premium' => (bool)$row['is_premium'],
             'views' => (int)$row['views'],
-            'view_count' => (int)$row['view_count'],
             'genres' => $row['genres'] ? explode(', ', $row['genres']) : []
         ];
     }

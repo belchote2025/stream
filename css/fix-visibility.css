@@ -1,0 +1,38 @@
+/* ============================================
+   FIX: Hacer visible todo el contenido
+   ============================================ */
+
+/* Forzar visibilidad del contenido */
+.content-rows,
+main.content-rows,
+.fade-in {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+    transform: translateY(0) !important;
+}
+
+/* Asegurar que el body sea visible */
+body {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Asegurar que todos los elementos dentro de content-rows sean visibles */
+.content-rows * {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Hero slides visibles */
+.hero-slide {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.hero-slide.active {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+}
+

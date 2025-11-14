@@ -1,0 +1,354 @@
+/* ============================================
+   MEJORAS DEL NAVBAR - DISEÑO MODERNO
+   ============================================ */
+
+/* Navbar con efecto glassmorphism */
+.navbar {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.85) 0%,
+        rgba(0, 0, 0, 0.7) 50%,
+        rgba(0, 0, 0, 0.5) 100%
+    ) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.navbar.scrolled {
+    background: rgba(20, 20, 20, 0.98) !important;
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    box-shadow: 
+        0 4px 20px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Logo mejorado con efecto hover */
+.navbar-brand {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 0.5rem 0;
+}
+
+.navbar-brand::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--netflix-red), var(--netflix-red-hover));
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.navbar-brand:hover::before {
+    width: 100%;
+}
+
+.navbar-brand:hover {
+    transform: translateY(-2px);
+    text-shadow: 0 2px 10px rgba(229, 9, 20, 0.5);
+}
+
+/* Enlaces de navegación mejorados */
+.nav-link {
+    position: relative;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.nav-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+    );
+    transition: left 0.5s ease;
+}
+
+.nav-link:hover::before {
+    left: 100%;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) scaleX(0);
+    width: 80%;
+    height: 2px;
+    background: var(--netflix-red);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 2px;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+    transform: translateX(-50%) scaleX(1);
+}
+
+.nav-link:hover {
+    color: var(--netflix-white);
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateY(-2px);
+}
+
+.nav-link.active {
+    color: var(--netflix-white);
+    background: rgba(229, 9, 20, 0.1);
+    font-weight: 600;
+}
+
+.nav-link.active::after {
+    transform: translateX(-50%) scaleX(1);
+    background: var(--netflix-red);
+    box-shadow: 0 0 10px rgba(229, 9, 20, 0.5);
+}
+
+/* Búsqueda mejorada */
+.search-container {
+    position: relative;
+}
+
+.search-toggle {
+    position: relative;
+    z-index: 2;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-toggle:hover {
+    background: rgba(229, 9, 20, 0.2);
+    transform: scale(1.1) rotate(90deg);
+    box-shadow: 0 4px 12px rgba(229, 9, 20, 0.3);
+}
+
+.search-container.active .search-toggle {
+    background: var(--netflix-red);
+    color: var(--netflix-white);
+    transform: scale(1.1);
+}
+
+.search-input-wrapper {
+    position: relative;
+}
+
+.search-container input {
+    background: rgba(0, 0, 0, 0.8) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.3),
+        inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-container input:focus {
+    border-color: var(--netflix-red) !important;
+    box-shadow: 
+        0 4px 20px rgba(229, 9, 20, 0.3),
+        0 0 0 3px rgba(229, 9, 20, 0.1),
+        inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.95) !important;
+}
+
+/* Menú de usuario mejorado */
+.user-menu-toggle {
+    position: relative;
+    border-radius: 50%;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.user-menu-toggle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, var(--netflix-red), var(--netflix-red-hover));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.user-menu-toggle:hover::before {
+    opacity: 0.3;
+}
+
+.user-menu-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);
+}
+
+.user-menu-toggle .avatar {
+    position: relative;
+    z-index: 1;
+    border: 2px solid transparent;
+    transition: border-color 0.3s ease;
+}
+
+.user-menu-toggle:hover .avatar {
+    border-color: var(--netflix-red);
+}
+
+/* Dropdown mejorado */
+.user-dropdown {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: rgba(20, 20, 20, 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    overflow: hidden;
+    animation: slideDownFade 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideDownFade {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.dropdown-item {
+    position: relative;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+    margin: 0.25rem 0.5rem;
+}
+
+.dropdown-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%) scaleX(0);
+    width: 3px;
+    height: 60%;
+    background: var(--netflix-red);
+    border-radius: 0 2px 2px 0;
+    transition: transform 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    transform: translateX(4px);
+    padding-left: 1.75rem;
+}
+
+.dropdown-item:hover::before {
+    transform: translateY(-50%) scaleX(1);
+}
+
+.dropdown-item.logout {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+}
+
+.dropdown-item.logout:hover {
+    background: rgba(229, 9, 20, 0.15) !important;
+    color: var(--netflix-red-hover) !important;
+}
+
+/* Efectos de partículas sutiles en hover */
+.nav-link,
+.search-toggle,
+.user-menu-toggle {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Animación de carga para navbar */
+@keyframes navbarLoad {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.navbar {
+    animation: navbarLoad 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mejora de accesibilidad */
+.nav-link:focus,
+.search-toggle:focus,
+.user-menu-toggle:focus {
+    outline: 2px solid var(--netflix-red);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Indicador de scroll mejorado */
+.navbar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--netflix-red), var(--netflix-red-hover));
+    transition: width 0.3s ease;
+}
+
+.navbar.scrolled::after {
+    width: 100%;
+}
+
+/* Responsive mejorado */
+@media (max-width: 992px) {
+    .navbar {
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+    }
+    
+    .nav-link {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+    }
+    
+    .nav-link:hover {
+        transform: translateX(4px);
+    }
+}
+
+/* Efecto de brillo sutil */
+.navbar-brand span {
+    background: linear-gradient(135deg, var(--netflix-white), rgba(255, 255, 255, 0.8));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+

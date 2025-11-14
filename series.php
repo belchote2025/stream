@@ -5,20 +5,20 @@ require_once __DIR__ . '/includes/gallery-functions.php';
 require_once __DIR__ . '/includes/image-helper.php';
 
 // Establecer el título de la página
-$pageTitle = 'Películas - ' . SITE_NAME;
+$pageTitle = 'Series - ' . SITE_NAME;
 
 // Obtener conexión a la base de datos
 $db = getDbConnection();
 
-// Obtener películas
-$movies = getRecentlyAdded($db, 'movie', 50);
+// Obtener series recientes
+$recentSeries = getRecentlyAdded($db, 'series', 50);
 
 // Incluir encabezado
 include __DIR__ . '/includes/header.php';
 ?>
 
 <style>
-.movies-page {
+.series-page {
     padding-top: 100px;
     min-height: 100vh;
     background: linear-gradient(180deg, #141414 0%, #1a1a1a 100%);
@@ -35,14 +35,14 @@ include __DIR__ . '/includes/header.php';
     margin-bottom: 1rem;
 }
 
-.movies-grid {
+.series-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 1.5rem;
     padding: 2rem 4%;
 }
 
-.movie-card {
+.series-card {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     overflow: hidden;
@@ -52,25 +52,25 @@ include __DIR__ . '/includes/header.php';
     position: relative;
 }
 
-.movie-card:hover {
+.series-card:hover {
     background: rgba(255, 255, 255, 0.1);
     border-color: #e50914;
     transform: translateY(-5px) scale(1.02);
     box-shadow: 0 10px 30px rgba(229, 9, 20, 0.3);
 }
 
-.movie-poster {
+.series-poster {
     width: 100%;
     height: 300px;
     object-fit: cover;
     display: block;
 }
 
-.movie-info {
+.series-info {
     padding: 1rem;
 }
 
-.movie-title {
+.series-title {
     font-size: 1rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
@@ -81,7 +81,7 @@ include __DIR__ . '/includes/header.php';
     overflow: hidden;
 }
 
-.movie-meta {
+.series-meta {
     color: #999;
     font-size: 0.85rem;
     display: flex;
@@ -90,7 +90,7 @@ include __DIR__ . '/includes/header.php';
     flex-wrap: wrap;
 }
 
-.movie-badge {
+.series-badge {
     position: absolute;
     top: 10px;
     right: 10px;
@@ -102,7 +102,7 @@ include __DIR__ . '/includes/header.php';
     font-weight: 600;
 }
 
-.movie-badge.premium {
+.series-badge.premium {
     background: rgba(255, 193, 7, 0.9);
     color: #000;
 }
@@ -120,37 +120,44 @@ include __DIR__ . '/includes/header.php';
 }
 </style>
 
-<div class="movies-page">
+<div class="series-page">
     <div class="page-header">
-        <h1 class="page-title">Películas</h1>
-        <p class="page-subtitle" style="color: #999; font-size: 1.1rem;">Explora nuestra colección de películas</p>
+        <h1 class="page-title">Series</h1>
+        <p class="page-subtitle" style="color: #999; font-size: 1.1rem;">Explora nuestra colección de series</p>
     </div>
     
-    <div class="movies-grid">
-        <?php if (!empty($movies)): ?>
-            <?php foreach ($movies as $movie): 
-                $posterUrl = getImageUrl($movie['poster_url'] ?? $movie['backdrop_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
-                $isPremium = isset($movie['is_premium']) && $movie['is_premium'];
-                $year = $movie['year'] ?? $movie['release_year'] ?? '';
-                $duration = $movie['duration'] ?? '';
-                $rating = isset($movie['rating']) && $movie['rating'] > 0 ? number_format($movie['rating'], 1) : '';
+    <div class="series-grid">
+        <?php if (!empty($recentSeries)): ?>
+            <?php foreach ($recentSeries as $series): 
+                $posterUrl = getImageUrl($series['poster_url'] ?? $series['backdrop_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
+                $isPremium = isset($series['is_premium']) && $series['is_premium'];
+                $year = $series['year'] ?? $series['release_year'] ?? '';
+                $rating = isset($series['rating']) && $series['rating'] > 0 ? number_format($series['rating'], 1) : '';
+                
+                // Obtener número de temporadas
+                $seasonsQuery = "SELECT COUNT(DISTINCT season_number) as seasons FROM episodes WHERE series_id = :id";
+                $seasonsStmt = $db->prepare($seasonsQuery);
+                $seasonsStmt->bindValue(':id', $series['id'], PDO::PARAM_INT);
+                $seasonsStmt->execute();
+                $seasonsData = $seasonsStmt->fetch(PDO::FETCH_ASSOC);
+                $seasons = $seasonsData['seasons'] ?? 0;
             ?>
-                <div class="movie-card" onclick="window.location.href='/streaming-platform/content.php?id=<?php echo $movie['id']; ?>'">
+                <div class="series-card" onclick="window.location.href='/streaming-platform/content.php?id=<?php echo $series['id']; ?>'">
                     <?php if ($isPremium): ?>
-                        <span class="movie-badge premium">
+                        <span class="series-badge premium">
                             <i class="fas fa-crown"></i> PREMIUM
                         </span>
                     <?php endif; ?>
-                    <img src="<?php echo htmlspecialchars($posterUrl); ?>" alt="<?php echo htmlspecialchars($movie['title']); ?>" class="movie-poster" loading="lazy">
-                    <div class="movie-info">
-                        <div class="movie-title"><?php echo htmlspecialchars($movie['title']); ?></div>
-                        <div class="movie-meta">
+                    <img src="<?php echo htmlspecialchars($posterUrl); ?>" alt="<?php echo htmlspecialchars($series['title']); ?>" class="series-poster" loading="lazy">
+                    <div class="series-info">
+                        <div class="series-title"><?php echo htmlspecialchars($series['title']); ?></div>
+                        <div class="series-meta">
                             <?php if ($year): ?>
                                 <span><?php echo $year; ?></span>
                             <?php endif; ?>
-                            <?php if ($duration): ?>
+                            <?php if ($seasons > 0): ?>
                                 <span>•</span>
-                                <span><?php echo $duration; ?> min</span>
+                                <span><?php echo $seasons; ?> Temporada<?php echo $seasons > 1 ? 's' : ''; ?></span>
                             <?php endif; ?>
                             <?php if ($rating): ?>
                                 <span>•</span>
@@ -162,8 +169,8 @@ include __DIR__ . '/includes/header.php';
             <?php endforeach; ?>
         <?php else: ?>
             <div class="empty-state" style="grid-column: 1 / -1;">
-                <i class="fas fa-film"></i>
-                <h3>No hay películas disponibles</h3>
+                <i class="fas fa-tv"></i>
+                <h3>No hay series disponibles</h3>
                 <p>Próximamente agregaremos más contenido</p>
             </div>
         <?php endif; ?>

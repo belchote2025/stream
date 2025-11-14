@@ -67,11 +67,21 @@
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
     
+    <!-- WebTorrent for P2P streaming (solo si se necesita) -->
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    
     <!-- Scripts personalizados -->
+    <script src="/streaming-platform/js/performance-optimizer.js"></script>
+    <script src="/streaming-platform/js/hero-optimizer.js"></script>
+    <script src="/streaming-platform/js/hero-trailer-player.js"></script>
     <script src="/streaming-platform/assets/js/netflix-gallery.js"></script>
     <script src="/streaming-platform/js/netflix-enhancements.js"></script>
     <script src="/streaming-platform/js/animations.js"></script>
     <script src="/streaming-platform/js/notifications.js"></script>
+    <script src="/streaming-platform/js/main.js"></script>
+    
+    <!-- Script de prueba de consola (comentado - puede activarse si se necesita) -->
+    <!-- <script src="/streaming-platform/js/console-test.js"></script> -->
     
     <script>
         // Inicializar tooltips de Bootstrap

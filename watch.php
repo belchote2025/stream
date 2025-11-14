@@ -84,6 +84,7 @@ include __DIR__ . '/includes/header.php';
     left: 0;
     width: 100%;
     height: 100%;
+    object-fit: contain;
 }
 
 .video-info {
@@ -222,6 +223,123 @@ include __DIR__ . '/includes/header.php';
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN PARA REPRODUCTOR
+   ============================================ */
+@media (max-width: 768px) {
+    .watch-page {
+        padding-top: 56px;
+    }
+    
+    .video-container-full {
+        padding-bottom: 56.25%;
+    }
+    
+    .video-container-full video {
+        object-fit: contain;
+    }
+    
+    .video-info {
+        padding: 1.5rem 1rem;
+    }
+    
+    .video-title-section h1 {
+        font-size: 1.5rem;
+    }
+    
+    .video-meta {
+        font-size: 0.85rem;
+        flex-wrap: wrap;
+    }
+    
+    .episode-selector {
+        padding: 1rem;
+    }
+    
+    .episode-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .error-content,
+    .no-video-content {
+        padding: 1.5rem;
+        max-width: 90%;
+    }
+    
+    .error-content i,
+    .no-video-content i {
+        font-size: 3rem;
+    }
+    
+    .error-content h3,
+    .no-video-content h3 {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .watch-page {
+        padding-top: 52px;
+    }
+    
+    .video-container-full {
+        padding-bottom: 56.25%;
+    }
+    
+    .video-container-full video {
+        object-fit: contain;
+    }
+    
+    .video-info {
+        padding: 1rem 0.75rem;
+    }
+    
+    .video-title-section h1 {
+        font-size: 1.25rem;
+    }
+    
+    .episode-item {
+        padding: 0.75rem;
+    }
+    
+    .error-content,
+    .no-video-content {
+        padding: 1rem;
+        max-width: 95%;
+    }
+    
+    .error-content i,
+    .no-video-content i {
+        font-size: 2.5rem;
+    }
+    
+    .error-content h3,
+    .no-video-content h3 {
+        font-size: 1.1rem;
+    }
+    
+    .error-content p,
+    .no-video-content p {
+        font-size: 0.9rem;
+    }
+}
+
+/* Orientación horizontal en móviles */
+@media (max-width: 992px) and (orientation: landscape) {
+    .video-container-full {
+        padding-bottom: 56.25%;
+        max-height: 100vh;
+    }
+    
+    .watch-page {
+        padding-top: 0;
+    }
+    
+    .video-info {
+        padding: 1rem 2%;
+    }
 }
 </style>
 

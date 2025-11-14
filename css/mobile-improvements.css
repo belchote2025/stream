@@ -34,7 +34,7 @@
     }
     
     .content-card img {
-        will-change: transform;
+        /* will-change removido - usar solo durante hover con JavaScript */
     }
 }
 
@@ -213,16 +213,8 @@
 
 /* Mejorar performance en móviles */
 @media (max-width: 768px) {
-    .content-card,
-    .hero-backdrop {
-        will-change: transform;
-    }
-    
-    .fade-in,
-    .slide-in-left,
-    .slide-in-right {
-        will-change: opacity, transform;
-    }
+    /* will-change removido - usar solo cuando sea necesario con JavaScript */
+    /* .content-card:hover y animaciones activas pueden usar will-change dinámicamente */
 }
 
 /* Mejorar accesibilidad en móviles */

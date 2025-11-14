@@ -5,11 +5,132 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' . SITE_NAME : SITE_NAME; ?></title>
     
+    <!-- Suprimir warnings y errores no críticos -->
+    <script>
+        (function() {
+            'use strict';
+            
+            // Verificar si ya se ha inicializado para evitar duplicados
+            if (window.__consoleSuppressionInitialized) {
+                return;
+            }
+            window.__consoleSuppressionInitialized = true;
+            
+            // Interceptar console.warn para suprimir warnings no críticos
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                const message = args[0];
+                if (typeof message === 'string') {
+                    // Suprimir warnings de YouTube postMessage (normales en localhost)
+                    if (message.includes('Failed to execute \'postMessage\'') || 
+                        message.includes('www-widgetapi.js') ||
+                        message.includes('widgetapi.js') ||
+                        (message.includes('postMessage') && message.includes('DOMWindow')) ||
+                        (message.includes('postMessage') && message.includes('youtube.com'))) {
+                        return;
+                    }
+                    // Suprimir warnings de "unreachable code" de archivos minificados
+                    if (message.includes('unreachable code after return statement')) {
+                        return;
+                    }
+                    // Suprimir warnings de asm.js (no críticos)
+                    if (message.includes('Invalid asm.js') || message.includes('Unexpected token')) {
+                        return;
+                    }
+                    // Suprimir warnings de console-test.js y mensajes de prueba
+                    if (message.includes('console-test.js') || 
+                        message.includes('Console.warn está disponible') ||
+                        message.includes('Console.info está disponible') ||
+                        message.includes('Console.error está disponible') ||
+                        message.includes('Console.log está disponible') ||
+                        message.includes('Consola funcionando correctamente') ||
+                        message.includes('Todos los métodos de consola funcionan')) {
+                        return;
+                    }
+                }
+                // Mostrar todos los demás warnings normalmente
+                originalWarn.apply(console, args);
+            };
+            
+            // Interceptar console.error para suprimir errores no críticos de YouTube
+            const originalError = console.error;
+            console.error = function(...args) {
+                const message = args[0];
+                if (typeof message === 'string') {
+                    // Suprimir errores de YouTube postMessage (normales en localhost)
+                    if (message.includes('Failed to execute \'postMessage\'') || 
+                        message.includes('www-widgetapi.js') ||
+                        message.includes('widgetapi.js') ||
+                        (message.includes('postMessage') && message.includes('DOMWindow')) ||
+                        (message.includes('postMessage') && message.includes('youtube.com'))) {
+                        return;
+                    }
+                    // Suprimir errores de console-test.js y mensajes de prueba
+                    if (message.includes('console-test.js') || 
+                        message.includes('Console.error está disponible') ||
+                        message.includes('Test de objeto') ||
+                        message.includes('Test de array') ||
+                        message.includes('Múltiples argumentos')) {
+                        return;
+                    }
+                }
+                // Mostrar todos los demás errores normalmente
+                originalError.apply(console, args);
+            };
+        })();
+    </script>
+    
+    <!-- Estilos críticos inline para evitar FOUC -->
+    <style id="critical-styles">
+        *{margin:0;padding:0;box-sizing:border-box}
+        html{scroll-behavior:smooth;background:#141414}
+        html:not(.styles-ready){overflow:hidden}
+        body{background-color:#141414!important;color:#fff!important;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif!important;font-size:16px!important;line-height:1.6!important;overflow-x:hidden!important}
+        html.styles-ready{overflow:auto}
+        .navbar{position:fixed!important;top:0!important;left:0!important;right:0!important;z-index:1000!important;padding:0 4%!important;height:70px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;background:rgba(0,0,0,0.7)!important}
+        .hero{position:relative!important;width:100%!important;height:80vh!important;min-height:500px!important;max-height:900px!important;overflow:hidden!important;margin-top:70px!important;background:#000!important}
+    </style>
+    
+    <!-- Preload de recursos críticos -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    
+    <!-- CSS crítico cargado síncronamente -->
+    <link rel="stylesheet" href="/streaming-platform/css/critical.css">
+    
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Font Awesome - versión estable sin errores de glifos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" integrity="sha512-MV7K8+y+gLIBoVD59lQIYicR65iaqukzvf/nwasF0nqhPay5w/9lJmVM2hMDcnK1OnMGCdVK+iQrJ7lzPJQd1w==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    
+    <!-- Preload de estilos no críticos -->
+    <link rel="preload" href="/streaming-platform/css/styles.css" as="style">
+    
+    <!-- Fallback para Font Awesome si falla -->
+    <script>
+        // Detectar si Font Awesome falla y usar fallback
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                const testIcon = document.createElement('i');
+                testIcon.className = 'fas fa-check';
+                testIcon.style.position = 'absolute';
+                testIcon.style.visibility = 'hidden';
+                document.body.appendChild(testIcon);
+                
+                const computedStyle = window.getComputedStyle(testIcon, ':before');
+                const fontFamily = computedStyle.getPropertyValue('font-family');
+                
+                if (!fontFamily || !fontFamily.includes('Font Awesome')) {
+                    console.warn('Font Awesome no cargó correctamente, usando fallback');
+                    // Agregar fallback visual
+                    document.body.classList.add('fa-fallback');
+                }
+                
+                document.body.removeChild(testIcon);
+            }, 1000);
+        });
+    </script>
     
     <!-- Estilos personalizados -->
     <link rel="stylesheet" href="/streaming-platform/assets/css/netflix-gallery.css">
@@ -20,6 +141,31 @@
     <link rel="stylesheet" href="/streaming-platform/css/animations.css">
     <link rel="stylesheet" href="/streaming-platform/css/responsive.css">
     <link rel="stylesheet" href="/streaming-platform/css/mobile-improvements.css">
+    <link rel="stylesheet" href="/streaming-platform/css/hero-optimizations.css">
+    <link rel="stylesheet" href="/streaming-platform/css/navbar-enhancements.css">
+    <link rel="stylesheet" href="/streaming-platform/css/hero-trailer.css">
+    <link rel="stylesheet" href="/streaming-platform/css/font-awesome-fallback.css">
+    <link rel="stylesheet" href="/streaming-platform/css/fix-visibility.css">
+    
+    <script>
+        // Marcar que los estilos están cargados - versión simplificada
+        (function() {
+            function markStylesReady() {
+                document.documentElement.classList.add('styles-ready');
+            }
+            
+            // Marcar inmediatamente si el DOM ya está listo
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                markStylesReady();
+            } else {
+                // Esperar a que el DOM esté listo
+                document.addEventListener('DOMContentLoaded', markStylesReady);
+            }
+            
+            // Fallback de seguridad
+            setTimeout(markStylesReady, 100);
+        })();
+    </script>
 </head>
 <body>
     <!-- Barra de navegación estilo Netflix -->

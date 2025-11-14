@@ -4,15 +4,14 @@
  */
 
 /**
- * Obtiene el contenido para la galería
+ * Obtiene las últimas novedades con trailers para el carrusel
  * 
  * @param PDO $db Conexión a la base de datos
- * @param array $filters Filtros de búsqueda
- * @return array Contenido formateado
+ * @param int $limit Límite de resultados
+ * @return array Contenido con trailers
  */
-function getGalleryContent($db, $filters = []) {
+function getLatestWithTrailers($db, $limit = 5) {
     try {
-        // Consulta base
         $query = "
             SELECT 
                 c.id, 
@@ -22,258 +21,33 @@ function getGalleryContent($db, $filters = []) {
                 c.duration,
                 c.rating,
                 c.poster_url,
+                c.backdrop_url,
                 c.description,
-                GROUP_CONCAT(DISTINCT g.name ORDER BY g.name SEPARATOR ',') as genres
+                c.trailer_url,
+                c.video_url,
+                c.added_date
             FROM content c
-            LEFT JOIN content_genres cg ON c.id = cg.content_id
-            LEFT JOIN genres g ON cg.genre_id = g.id
-            WHERE 1=1
+            WHERE c.trailer_url IS NOT NULL 
+            AND c.trailer_url != ''
+            AND c.trailer_url != 'null'
+            ORDER BY c.added_date DESC, c.release_year DESC
+            LIMIT :limit
         ";
         
-        $params = [];
-        
-        // Aplicar filtros
-        if (!empty($filters['type'])) {
-            $query .= " AND c.type = :type";
-            $params[':type'] = $filters['type'];
-        }
-        
-        if (!empty($filters['genre'])) {
-            $query .= " AND g.id = :genre_id";
-            $params[':genre_id'] = (int)$filters['genre'];
-        }
-        
-        if (!empty($filters['search'])) {
-            $query .= " AND (c.title LIKE :search OR c.description LIKE :search)";
-            $params[':search'] = '%' . $filters['search'] . '%';
-        }
-        
-        if (!empty($filters['year'])) {
-            $query .= " AND c.release_year = :year";
-            $params[':year'] = (int)$filters['year'];
-        }
-        
-        if (!empty($filters['min_rating'])) {
-            $query .= " AND c.rating >= :min_rating";
-            $params[':min_rating'] = (float)$filters['min_rating'];
-        }
-        
-        // Agrupar por contenido
-        $query .= " GROUP BY c.id";
-        
-        // Ordenar
-        $orderBy = $filters['order_by'] ?? 'c.release_date';
-        $orderDir = isset($filters['order_dir']) && strtoupper($filters['order_dir']) === 'ASC' ? 'ASC' : 'DESC';
-        $query .= " ORDER BY $orderBy $orderDir";
-        
-        // Limitar resultados (paginación)
-        if (isset($filters['limit'])) {
-            $query .= " LIMIT :limit";
-            $params[':limit'] = (int)$filters['limit'];
-            
-            if (isset($filters['offset'])) {
-                $query .= " OFFSET :offset";
-                $params[':offset'] = (int)$filters['offset'];
-            }
-        }
-        
         $stmt = $db->prepare($query);
-        
-        // Vincular parámetros
-        foreach ($params as $key => $value) {
-            $paramType = is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR;
-            $stmt->bindValue($key, $value, $paramType);
-        }
-        
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Formatear resultados
-        $formattedResults = [];
-        
-        foreach ($results as $row) {
-            // Convertir géneros de cadena a array
-            $genres = !empty($row['genres']) ? explode(',', $row['genres']) : [];
-            
-            $formattedResults[] = [
-                'id' => (int)$row['id'],
-                'title' => $row['title'],
-                'type' => $row['type'], // 'movie' o 'series'
-                'year' => (int)$row['year'],
-                'duration' => (int)$row['duration'],
-                'rating' => $row['rating'] ? (float)$row['rating'] : null,
-                'poster_url' => $row['poster_url'] ?: '/streaming-platform/assets/img/default-poster.svg',
-                'poster' => $row['poster_url'] ?: '/streaming-platform/assets/img/default-poster.svg',
-                'backdrop_url' => isset($row['backdrop_url']) ? $row['backdrop_url'] : null,
-                'description' => $row['description'],
-                'genres' => $genres,
-                'url' => "/content/" . $row['type'] . "/" . $row['id']
-            ];
-        }
-        
-        return $formattedResults;
-        
-    } catch (PDOException $e) {
-        error_log("Error en getGalleryContent: " . $e->getMessage());
-        return [];
-    }
-}
-
-/**
- * Renderiza la galería de contenido
- * 
- * @param array $content Array de contenido
- * @param bool $showFilters Mostrar filtros
- * @return string HTML de la galería
- */
-function renderGallery($content, $showFilters = true) {
-    ob_start();
-    ?>
-    <div class="content-gallery-container">
-        <?php if ($showFilters): ?>
-        <div class="gallery-filters mb-4">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <div class="search-box">
-                        <input type="text" class="form-control" id="searchContent" placeholder="Buscar películas y series...">
-                        <button class="btn btn-search"><i class="fas fa-search"></i></button>
-                    </div>
-                </div>
-                <div class="col-md-6 text-end">
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-secondary active" data-filter="all">Todo</button>
-                        <button type="button" class="btn btn-outline-secondary" data-filter="movie">Películas</button>
-                        <button type="button" class="btn btn-outline-secondary" data-filter="series">Series</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-        
-        <div class="content-gallery">
-            <?php if (empty($content)): ?>
-                <div class="col-12 text-center py-5">
-                    <div class="empty-state">
-                        <i class="fas fa-film fa-3x mb-3"></i>
-                        <h4>No se encontró contenido</h4>
-                        <p class="text-muted">Intenta con otros filtros de búsqueda</p>
-                    </div>
-                </div>
-            <?php else: ?>
-                <?php foreach ($content as $item): ?>
-                    <div class="content-card" data-id="<?php echo $item['id']; ?>" data-type="<?php echo $item['type']; ?>">
-                        <div class="content-type"><?php echo $item['type'] === 'movie' ? 'Película' : 'Serie'; ?></div>
-                        
-                        <div class="content-poster">
-                            <img 
-                                src="<?php echo htmlspecialchars($item['poster']); ?>" 
-                                alt="<?php echo htmlspecialchars($item['title']); ?>"
-                                loading="lazy"
-                                onerror="this.onerror=null; this.src='/streaming-platform/assets/img/default-poster.svg'"
-                            >
-                            
-                            <div class="content-overlay">
-                                <div class="content-actions">
-                                    <button class="btn-play" data-id="<?php echo $item['id']; ?>" title="Reproducir">
-                                        <i class="fas fa-play"></i>
-                                    </button>
-                                    <button class="btn-add" data-id="<?php echo $item['id']; ?>" title="Añadir a mi lista">
-                                        <i class="fas fa-plus"></i>
-                                    </button>
-                                </div>
-                                
-                                <div class="content-info">
-                                    <h3><?php echo htmlspecialchars($item['title']); ?></h3>
-                                    
-                                    <div class="meta">
-                                        <span class="year"><?php echo $item['year']; ?></span>
-                                        <?php if ($item['duration']): ?>
-                                            <span class="duration">
-                                                <?php 
-                                                    if ($item['type'] === 'movie') {
-                                                        echo floor($item['duration'] / 60) . 'h ' . ($item['duration'] % 60) . 'm';
-                                                    } else {
-                                                        echo $item['duration'] . ' min';
-                                                    }
-                                                ?>
-                                            </span>
-                                        <?php endif; ?>
-                                        <?php if ($item['rating']): ?>
-                                            <span class="rating">
-                                                ⭐ <?php echo number_format($item['rating'], 1); ?>/10
-                                            </span>
-                                        <?php endif; ?>
-                                    </div>
-                                    
-                                    <?php if (!empty($item['genres'])): ?>
-                                        <div class="genres">
-                                            <?php foreach (array_slice($item['genres'], 0, 3) as $genre): ?>
-                                                <span><?php echo htmlspecialchars($genre); ?></span>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                    
-                                    <?php if (!empty($item['description'])): ?>
-                                        <p class="description">
-                                            <?php echo mb_strimwidth(htmlspecialchars($item['description']), 0, 150, '...'); ?>
-                                        </p>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="content-details">
-                            <h4><?php echo htmlspecialchars($item['title']); ?></h4>
-                            <span class="year"><?php echo $item['year']; ?></span>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-        
-        <!-- Paginación -->
-        <?php if (isset($filters['total_pages']) && $filters['total_pages'] > 1): ?>
-            <nav aria-label="Paginación de la galería" class="mt-4">
-                <ul class="pagination justify-content-center">
-                    <li class="page-item <?php echo $filters['page'] <= 1 ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="?page=<?php echo $filters['page'] - 1; ?>">Anterior</a>
-                    </li>
-                    
-                    <?php for ($i = 1; $i <= $filters['total_pages']; $i++): ?>
-                        <li class="page-item <?php echo $i == $filters['page'] ? 'active' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
-                        </li>
-                    <?php endfor; ?>
-                    
-                    <li class="page-item <?php echo $filters['page'] >= $filters['total_pages'] ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="?page=<?php echo $filters['page'] + 1; ?>">Siguiente</a>
-                    </li>
-                </ul>
-            </nav>
-        <?php endif; ?>
-    </div>
-    <?php
-    return ob_get_clean();
-}
-
-/**
- * Obtiene los géneros para los filtros
- * 
- * @param PDO $db Conexión a la base de datos
- * @return array Lista de géneros
- */
-function getGenresForFilter($db) {
-    try {
-        $stmt = $db->query("SELECT id, name FROM genres ORDER BY name");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
     } catch (PDOException $e) {
-        error_log("Error en getGenresForFilter: " . $e->getMessage());
+        error_log("Error en getLatestWithTrailers: " . $e->getMessage());
         return [];
     }
 }
 
 /**
- * Obtiene el contenido destacado para el carrusel principal
+ * Obtiene el contenido destacado
  * 
  * @param PDO $db Conexión a la base de datos
  * @param int $limit Límite de resultados
@@ -327,8 +101,11 @@ function getRecentlyAdded($db, $type = null, $limit = 10) {
                 c.title, 
                 c.type, 
                 c.release_year as year,
+                c.duration,
+                c.rating,
                 c.poster_url,
-                c.added_date
+                c.backdrop_url,
+                c.description
             FROM content c
             WHERE 1=1
         ";
@@ -341,16 +118,16 @@ function getRecentlyAdded($db, $type = null, $limit = 10) {
         }
         
         $query .= " ORDER BY c.added_date DESC LIMIT :limit";
-        $params[':limit'] = (int)$limit;
         
         $stmt = $db->prepare($query);
         
         foreach ($params as $key => $value) {
-            $paramType = is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR;
-            $stmt->bindValue($key, $value, $paramType);
+            $stmt->bindValue($key, $value, PDO::PARAM_STR);
         }
         
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
+        
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
         
     } catch (PDOException $e) {
@@ -375,10 +152,13 @@ function getMostViewed($db, $type = null, $limit = 10) {
                 c.title, 
                 c.type, 
                 c.release_year as year,
+                c.duration,
+                c.rating,
                 c.poster_url,
-                COUNT(v.id) as view_count
+                c.backdrop_url,
+                c.description,
+                c.views
             FROM content c
-            LEFT JOIN views v ON c.id = v.content_id
             WHERE 1=1
         ";
         
@@ -389,17 +169,17 @@ function getMostViewed($db, $type = null, $limit = 10) {
             $params[':type'] = $type;
         }
         
-        $query .= " GROUP BY c.id ORDER BY view_count DESC, c.title LIMIT :limit";
-        $params[':limit'] = (int)$limit;
+        $query .= " ORDER BY c.views DESC LIMIT :limit";
         
         $stmt = $db->prepare($query);
         
         foreach ($params as $key => $value) {
-            $paramType = is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR;
-            $stmt->bindValue($key, $value, $paramType);
+            $stmt->bindValue($key, $value, PDO::PARAM_STR);
         }
         
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
+        
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
         
     } catch (PDOException $e) {
@@ -409,90 +189,231 @@ function getMostViewed($db, $type = null, $limit = 10) {
 }
 
 /**
- * Crea una tarjeta de contenido estilo Netflix
+ * Crea una tarjeta de contenido HTML estilo Netflix
  * 
- * @param array $item Datos del contenido
+ * @param array $item Array con los datos del contenido
  * @return string HTML de la tarjeta
  */
 function createContentCard($item) {
-    // Usar helper para obtener URL de imagen
     require_once __DIR__ . '/image-helper.php';
     
-    $posterUrl = getImageUrl($item['poster_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
-    $title = htmlspecialchars($item['title']);
-    $year = !empty($item['release_year']) ? $item['release_year'] : (isset($item['year']) ? $item['year'] : '');
-    $type = $item['type'] ?? 'movie';
-    $id = $item['id'] ?? 0;
+    // Asegurar que todos los campos necesarios existan
+    $id = isset($item['id']) ? (int)$item['id'] : 0;
+    $title = isset($item['title']) ? htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') : 'Sin título';
+    $type = isset($item['type']) ? htmlspecialchars($item['type'], ENT_QUOTES, 'UTF-8') : 'movie';
+    $releaseYear = isset($item['release_year']) ? (int)$item['release_year'] : (isset($item['year']) ? (int)$item['year'] : '');
+    $duration = isset($item['duration']) ? htmlspecialchars($item['duration'], ENT_QUOTES, 'UTF-8') : '';
+    $rating = isset($item['rating']) ? number_format((float)$item['rating'], 1) : '';
+    $posterUrl = getImageUrl($item['poster_url'] ?? $item['backdrop_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
+    $isPremium = isset($item['is_premium']) ? (bool)$item['is_premium'] : false;
+    $slug = isset($item['slug']) ? htmlspecialchars($item['slug'], ENT_QUOTES, 'UTF-8') : '';
     
-    $badges = '';
-    if (!empty($item['is_premium'])) {
-        $badges .= '<span class="premium-badge">PREMIUM</span>';
-    }
-    if (!empty($item['torrent_magnet'])) {
-        $badges .= '<span class="torrent-badge" title="Disponible por Torrent"><i class="fas fa-magnet"></i></span>';
-    }
-    
-    $rating = '';
-    if (!empty($item['rating'])) {
-        $rating = '<span>⭐ ' . number_format($item['rating'], 1) . '</span>';
+    // Construir URL de detalle
+    $detailUrl = '/streaming-platform/content.php?id=' . $id;
+    if ($slug) {
+        $detailUrl = '/streaming-platform/content/' . $slug;
     }
     
-    $duration = '';
-    if (!empty($item['duration'])) {
-        if ($type === 'movie') {
-            $hours = floor($item['duration'] / 60);
-            $minutes = $item['duration'] % 60;
-            $duration = $hours > 0 ? "{$hours}h {$minutes}m" : "{$minutes}m";
-        } else {
-            $duration = $item['duration'] . ' min';
+    // Badge premium
+    $premiumBadge = $isPremium ? '<span class="premium-badge">PREMIUM</span>' : '';
+    
+    // Meta información
+    $meta = [];
+    if ($releaseYear) {
+        $meta[] = $releaseYear;
+    }
+    if ($duration) {
+        $meta[] = $type === 'movie' ? $duration . ' min' : $duration;
+    }
+    if ($rating) {
+        $meta[] = '⭐ ' . $rating;
+    }
+    $metaStr = !empty($meta) ? '<div class="content-meta">' . implode(' • ', $meta) . '</div>' : '';
+    
+    // Construir HTML de la tarjeta
+    $html = '<div class="content-card" data-id="' . $id . '" data-type="' . $type . '">';
+    $html .= '<a href="' . htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') . '" class="content-card-link">';
+    $html .= '<img src="' . htmlspecialchars($posterUrl, ENT_QUOTES, 'UTF-8') . '" alt="' . $title . '" loading="lazy">';
+    
+    if ($premiumBadge) {
+        $html .= '<div class="content-badges">' . $premiumBadge . '</div>';
+    }
+    
+    $html .= '<div class="content-info">';
+    $html .= '<h3>' . $title . '</h3>';
+    if ($metaStr) {
+        $html .= $metaStr;
+    }
+    $html .= '<button class="btn btn-sm btn-primary play-btn" data-id="' . $id . '" data-type="' . $type . '" onclick="event.preventDefault(); event.stopPropagation(); if(typeof playContent === \'function\') { playContent(' . $id . ', \'' . $type . '\'); } else { window.location.href=\'/streaming-platform/watch.php?id=' . $id . '\'; }">';
+    $html .= '<i class="fas fa-play"></i> Reproducir';
+    $html .= '</button>';
+    $html .= '</div>'; // .content-info
+    $html .= '</a>'; // .content-card-link
+    $html .= '</div>'; // .content-card
+    
+    return $html;
+}
+
+/**
+ * Obtiene contenido para la galería con filtros
+ * 
+ * @param PDO $db Conexión a la base de datos
+ * @param array $filters Filtros de búsqueda
+ * @return array Contenido filtrado
+ */
+function getGalleryContent($db, $filters = []) {
+    try {
+        $query = "
+            SELECT 
+                c.id, 
+                c.title, 
+                c.type, 
+                c.release_year as year,
+                c.release_date,
+                c.duration,
+                c.rating,
+                c.poster_url,
+                c.backdrop_url,
+                c.description,
+                c.trailer_url,
+                c.video_url,
+                c.is_premium,
+                c.views,
+                c.added_date,
+                GROUP_CONCAT(DISTINCT g.name ORDER BY g.name SEPARATOR ', ') as genres
+            FROM content c
+            LEFT JOIN content_genres cg ON c.id = cg.content_id
+            LEFT JOIN genres g ON cg.genre_id = g.id
+            WHERE 1=1
+        ";
+        
+        $params = [];
+        
+        // Filtro por tipo
+        if (!empty($filters['type'])) {
+            $query .= " AND c.type = :type";
+            $params[':type'] = $filters['type'];
         }
+        
+        // Filtro por género
+        if (!empty($filters['genre'])) {
+            $query .= " AND c.id IN (
+                SELECT content_id FROM content_genres WHERE genre_id = :genre_id
+            )";
+            $params[':genre_id'] = (int)$filters['genre'];
+        }
+        
+        // Búsqueda por texto
+        if (!empty($filters['search'])) {
+            $query .= " AND (c.title LIKE :search OR c.description LIKE :search)";
+            $params[':search'] = '%' . $filters['search'] . '%';
+        }
+        
+        // Filtro por año
+        if (!empty($filters['year'])) {
+            $query .= " AND (YEAR(c.release_date) = :year OR c.release_year = :year)";
+            $params[':year'] = (int)$filters['year'];
+        }
+        
+        // Filtro por rating mínimo
+        if (!empty($filters['min_rating'])) {
+            $query .= " AND c.rating >= :min_rating";
+            $params[':min_rating'] = (float)$filters['min_rating'];
+        }
+        
+        // Agrupar por contenido
+        $query .= " GROUP BY c.id";
+        
+        // Ordenar
+        $orderBy = $filters['order_by'] ?? 'c.release_date';
+        $orderDir = strtoupper($filters['order_dir'] ?? 'DESC');
+        if (!in_array($orderDir, ['ASC', 'DESC'])) {
+            $orderDir = 'DESC';
+        }
+        $query .= " ORDER BY " . $orderBy . " " . $orderDir;
+        
+        // Límite y paginación
+        $limit = (int)($filters['limit'] ?? 24);
+        $page = max(1, (int)($filters['page'] ?? 1));
+        $offset = ($page - 1) * $limit;
+        $query .= " LIMIT :limit OFFSET :offset";
+        
+        $stmt = $db->prepare($query);
+        
+        // Bind de parámetros
+        foreach ($params as $key => $value) {
+            if (strpos($key, ':search') !== false) {
+                $stmt->bindValue($key, $value, PDO::PARAM_STR);
+            } elseif (strpos($key, ':type') !== false) {
+                $stmt->bindValue($key, $value, PDO::PARAM_STR);
+            } else {
+                $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+            }
+        }
+        
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+    } catch (PDOException $e) {
+        error_log("Error en getGalleryContent: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Obtiene géneros para usar en filtros
+ * 
+ * @param PDO $db Conexión a la base de datos
+ * @return array Lista de géneros
+ */
+function getGenresForFilter($db) {
+    try {
+        $query = "
+            SELECT DISTINCT g.id, g.name, COUNT(cg.content_id) as content_count
+            FROM genres g
+            LEFT JOIN content_genres cg ON g.id = cg.genre_id
+            GROUP BY g.id, g.name
+            HAVING content_count > 0
+            ORDER BY g.name ASC
+        ";
+        
+        $stmt = $db->prepare($query);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+    } catch (PDOException $e) {
+        error_log("Error en getGenresForFilter: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Renderiza la galería de contenido
+ * 
+ * @param array $content Array de contenido
+ * @return string HTML de la galería
+ */
+function renderGallery($content) {
+    if (empty($content)) {
+        return '<div class="alert alert-info">No se encontró contenido.</div>';
     }
     
-    ob_start();
-    ?>
-    <div class="content-card" data-id="<?php echo $id; ?>" data-type="<?php echo $type; ?>" onclick="window.location.href='/streaming-platform/content-detail.php?id=<?php echo $id; ?>';" style="cursor: pointer;">
-        <?php if (!empty($badges)): ?>
-            <div class="content-badges">
-                <?php echo $badges; ?>
-            </div>
-        <?php endif; ?>
-        
-        <img 
-            src="<?php echo $posterUrl; ?>" 
-            alt="<?php echo $title; ?>"
-            loading="lazy"
-            onerror="this.onerror=null; this.src='/streaming-platform/assets/img/default-poster.svg'; this.style.background='linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%)';"
-            style="background: linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%);"
-        >
-        
-        <div class="content-info">
-            <h3><?php echo $title; ?></h3>
-            <div class="content-meta">
-                <?php if ($year): ?>
-                    <span><?php echo $year; ?></span>
-                <?php endif; ?>
-                <?php if ($duration): ?>
-                    <?php if ($year): ?><span>•</span><?php endif; ?>
-                    <span><?php echo $duration; ?></span>
-                <?php endif; ?>
-                <?php if ($rating): ?>
-                    <?php if ($year || $duration): ?><span>•</span><?php endif; ?>
-                    <?php echo $rating; ?>
-                <?php endif; ?>
-            </div>
-            <div class="content-actions">
-                <button class="action-btn" data-action="play" data-id="<?php echo $id; ?>" data-type="<?php echo $type; ?>" title="Reproducir" onclick="event.stopPropagation(); window.location.href='/streaming-platform/watch.php?id=<?php echo $id; ?>';">
-                    <i class="fas fa-play"></i>
-                </button>
-                <button class="action-btn" data-action="add" data-id="<?php echo $id; ?>" title="Añadir a Mi lista" onclick="event.stopPropagation(); handleAddToList(<?php echo $id; ?>);">
-                    <i class="fas fa-plus"></i>
-                </button>
-                <button class="action-btn" data-action="info" data-id="<?php echo $id; ?>" title="Más información" onclick="event.stopPropagation(); window.location.href='/streaming-platform/content-detail.php?id=<?php echo $id; ?>';">
-                    <i class="fas fa-info-circle"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-    <?php
-    return ob_get_clean();
+    require_once __DIR__ . '/image-helper.php';
+    
+    $html = '<div class="row g-4">';
+    
+    foreach ($content as $item) {
+        $html .= '<div class="col-6 col-md-4 col-lg-3 col-xl-2">';
+        $html .= createContentCard($item);
+        $html .= '</div>';
+    }
+    
+    $html .= '</div>';
+    
+    return $html;
 }

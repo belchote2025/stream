@@ -9,8 +9,12 @@ $pageTitle = 'Inicio - ' . SITE_NAME;
 // Get database connection
 $db = getDbConnection();
 
-// Get content for the hero section
-$featuredContent = getFeaturedContent($db, 5);
+// Get content for the hero section - últimas novedades con trailers
+$featuredContent = getLatestWithTrailers($db, 5);
+// Si no hay contenido con trailers, usar featured como fallback
+if (empty($featuredContent)) {
+    $featuredContent = getFeaturedContent($db, 5);
+}
 
 // Get recently added content
 $recentMovies = getRecentlyAdded($db, 'movie', 10);
@@ -28,11 +32,32 @@ include __DIR__ . '/includes/header.php';
 <section class="hero">
     <?php if (!empty($featuredContent)): ?>
         <?php foreach ($featuredContent as $index => $content): ?>
-            <div class="hero-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>">
+            <div class="hero-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>" data-trailer="<?php echo htmlspecialchars($content['trailer_url'] ?? ''); ?>">
                 <?php 
                 require_once __DIR__ . '/includes/image-helper.php';
                 $backdropUrl = getImageUrl($content['backdrop_url'] ?? $content['poster_url'] ?? '', '/streaming-platform/assets/img/default-backdrop.svg');
                 ?>
+                <!-- Video trailer -->
+                <div class="hero-video-container">
+                    <?php if (!empty($content['trailer_url'])): ?>
+                        <?php
+                        // Detectar si es YouTube
+                        $trailerUrl = $content['trailer_url'];
+                        $isYouTube = preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $trailerUrl, $matches);
+                        if ($isYouTube && isset($matches[1])) {
+                            $youtubeId = $matches[1];
+                        ?>
+                            <div class="hero-video-wrapper">
+                                <div class="hero-youtube-player" data-video-id="<?php echo htmlspecialchars($youtubeId); ?>" data-index="<?php echo $index; ?>"></div>
+                            </div>
+                        <?php } else { ?>
+                            <video class="hero-trailer-video" muted loop playsinline data-index="<?php echo $index; ?>" preload="metadata">
+                                <source src="<?php echo htmlspecialchars($trailerUrl); ?>" type="video/mp4">
+                            </video>
+                        <?php } ?>
+                    <?php endif; ?>
+                </div>
+                <!-- Fallback backdrop image -->
                 <div class="hero-backdrop" style="background-image: url('<?php echo htmlspecialchars($backdropUrl); ?>');"></div>
             </div>
         <?php endforeach; ?>

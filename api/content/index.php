@@ -10,23 +10,30 @@ require_once __DIR__ . '/../../includes/config.php';
 try {
     $db = getDbConnection();
     
-    // Obtener ID de la URL
-    $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    $uriParts = explode('/', trim($uri, '/'));
-    
-    // Buscar el índice de 'content' y obtener el siguiente elemento
-    $contentIndex = array_search('content', $uriParts);
+    // Obtener ID de la URL o query string
     $contentId = null;
     
-    if ($contentIndex !== false && isset($uriParts[$contentIndex + 1])) {
-        $contentId = (int)$uriParts[$contentIndex + 1];
+    // Primero intentar desde query string
+    if (isset($_GET['id'])) {
+        $contentId = (int)$_GET['id'];
+    } else {
+        // Si no está en query string, intentar desde la URL
+        $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        $uriParts = explode('/', trim($uri, '/'));
+        
+        // Buscar el índice de 'content' y obtener el siguiente elemento
+        $contentIndex = array_search('content', $uriParts);
+        
+        if ($contentIndex !== false && isset($uriParts[$contentIndex + 1])) {
+            $contentId = (int)$uriParts[$contentIndex + 1];
+        }
     }
     
-    if (!$contentId) {
+    if (!$contentId || $contentId <= 0) {
         http_response_code(400);
         echo json_encode([
             'success' => false,
-            'error' => 'ID de contenido no proporcionado'
+            'error' => 'ID de contenido no proporcionado o inválido'
         ]);
         exit;
     }

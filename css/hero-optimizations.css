@@ -1,0 +1,145 @@
+/* ============================================
+   OPTIMIZACIONES DEL HERO BACKDROP
+   ============================================ */
+
+/* Mejoras de rendimiento para hero-backdrop */
+.hero-backdrop {
+    transform: translateZ(0); /* Acelera la renderización con GPU */
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Preload de imágenes para transiciones más suaves */
+.hero-slide {
+    transform: translateZ(0);
+}
+
+/* will-change solo durante transiciones activas */
+.hero-slide.transitioning {
+    will-change: opacity;
+}
+
+.hero-slide.transitioning .hero-backdrop {
+    will-change: opacity, transform;
+}
+
+.hero-slide.active .hero-backdrop {
+    animation: fadeInHero 0.8s ease-in-out;
+}
+
+.hero-slide:not(.active) .hero-backdrop {
+    opacity: 0;
+    transition: opacity 0.6s ease-in-out;
+}
+
+@keyframes fadeInHero {
+    from {
+        opacity: 0;
+        transform: scale(1.05);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Optimización de carga de imágenes */
+.hero-backdrop {
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-attachment: fixed; /* Efecto parallax en desktop */
+}
+
+/* Lazy loading mejorado */
+.hero-slide:not(.active) .hero-backdrop {
+    background-image: none !important;
+}
+
+.hero-slide.active .hero-backdrop,
+.hero-slide.next .hero-backdrop {
+    background-image: var(--hero-bg-image);
+}
+
+/* Mejora de gradiente para mejor legibilidad */
+.hero-backdrop::after {
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(20, 20, 20, 0.2) 20%,
+        rgba(20, 20, 20, 0.5) 50%,
+        rgba(20, 20, 20, 0.8) 80%,
+        var(--netflix-black) 100%
+    );
+    /* will-change removido para reducir consumo de memoria */
+}
+
+/* Efecto de blur sutil para mejorar el texto */
+.hero-backdrop::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(0.5px);
+    -webkit-backdrop-filter: blur(0.5px);
+    z-index: 1;
+}
+
+/* Optimización para móviles */
+@media (max-width: 768px) {
+    .hero-backdrop {
+        background-attachment: scroll; /* Mejor rendimiento en móviles */
+        background-size: cover;
+    }
+    
+    .hero-slide.active .hero-backdrop {
+        animation: fadeInHeroMobile 0.6s ease-in-out;
+    }
+    
+    @keyframes fadeInHeroMobile {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+}
+
+/* Preload de la siguiente imagen */
+.hero-slide.next {
+    pointer-events: none;
+}
+
+.hero-slide.next .hero-backdrop {
+    opacity: 0;
+    transition: none;
+}
+
+/* Mejora de contraste para texto */
+.hero-content {
+    text-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.8),
+        0 4px 8px rgba(0, 0, 0, 0.6),
+        0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Optimización de transiciones */
+.hero-slide {
+    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mejora de rendimiento con contain */
+.hero {
+    contain: layout style paint;
+}
+
+.hero-backdrop {
+    contain: layout style paint;
+}
+

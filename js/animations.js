@@ -17,18 +17,18 @@
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target); // Dejar de observar una vez visible
                 }
             });
         }, observerOptions);
 
         // Observar elementos con clase fade-in
         document.querySelectorAll('.fade-in').forEach(el => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(20px)';
-            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-            observer.observe(el);
+            // Asegurar que el elemento tenga los estilos iniciales
+            if (!el.classList.contains('visible')) {
+                observer.observe(el);
+            }
         });
     }
 
@@ -235,13 +235,34 @@
         initParallax();
         initCardHoverEffects();
         initSearchAutocomplete();
+        
+        // Asegurar que el contenido principal sea visible inmediatamente si está en viewport
+        setTimeout(() => {
+            const contentRows = document.querySelector('.content-rows.fade-in');
+            if (contentRows) {
+                const rect = contentRows.getBoundingClientRect();
+                // Si está visible o cerca del viewport, hacerlo visible inmediatamente
+                if (rect.top < window.innerHeight + 200) {
+                    contentRows.classList.add('visible');
+                }
+            }
+        }, 100);
     }
 
+    // Flag para prevenir múltiples inicializaciones
+    let initialized = false;
+    
+    function safeInit() {
+        if (initialized) return;
+        initialized = true;
+        init();
+    }
+    
     // Wait for DOM
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', safeInit);
     } else {
-        init();
+        safeInit();
     }
 
     // Exponer funciones globales

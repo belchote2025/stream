@@ -181,6 +181,12 @@ function setupEventListeners() {
                 validateFileInput(e.target, 'trailer_file_info', 524288000); // 500MB
             });
         }
+        
+        // Búsqueda de torrents
+        const searchTorrentBtn = document.getElementById('searchTorrentBtn');
+        if (searchTorrentBtn) {
+            searchTorrentBtn.addEventListener('click', handleSearchTorrent);
+        }
     }
     
     // Formulario de usuarios
@@ -2533,22 +2539,23 @@ async function handleContentSubmit(e) {
         const type = appState.currentSubsection || 'peliculas'; // 'peliculas', 'series', etc.
         const contentType = type === 'peliculas' ? 'movie' : 'series';
         
-        // Preparar datos para la API
-        const apiData = {
-            title: data.title,
-            description: data.description,
-            release_year: parseInt(data.release_year),
-            duration: parseInt(data.duration),
-            type: contentType,
-            poster_url: data.poster_url || '',
-            backdrop_url: data.backdrop_url || '',
-            video_url: videoUrl,
-            trailer_url: trailerUrl,
-            age_rating: data.age_rating || null,
-            is_featured: data.is_featured === '1' || data.is_featured === true ? 1 : 0,
-            is_trending: data.is_trending === '1' || data.is_trending === true ? 1 : 0,
-            is_premium: data.is_premium === '1' || data.is_premium === true ? 1 : 0
-        };
+            // Preparar datos para la API
+            const apiData = {
+                title: data.title,
+                description: data.description,
+                release_year: parseInt(data.release_year),
+                duration: parseInt(data.duration),
+                type: contentType,
+                poster_url: data.poster_url || '',
+                backdrop_url: data.backdrop_url || '',
+                video_url: videoUrl,
+                trailer_url: trailerUrl,
+                torrent_magnet: data.torrent_magnet || null,
+                age_rating: data.age_rating || null,
+                is_featured: data.is_featured === '1' || data.is_featured === true ? 1 : 0,
+                is_trending: data.is_trending === '1' || data.is_trending === true ? 1 : 0,
+                is_premium: data.is_premium === '1' || data.is_premium === true ? 1 : 0
+            };
         
         let url = '/api/movies/index.php';
         let method = 'POST';
@@ -3079,3 +3086,107 @@ window.addEventListener('popstate', () => {
     const section = window.location.hash.substring(1) || 'dashboard';
     navigateTo(section);
 });
+
+/**
+ * Buscar enlaces de torrents automáticamente
+ */
+async function handleSearchTorrent() {
+    const titleInput = document.getElementById('title');
+    const yearInput = document.getElementById('release_year');
+    const typeInput = document.getElementById('content-type');
+    const torrentInput = document.getElementById('torrent_magnet');
+    const resultsDiv = document.getElementById('torrent-results');
+    const resultsContent = document.getElementById('torrent-results-content');
+    const searchBtn = document.getElementById('searchTorrentBtn');
+    
+    if (!titleInput || !resultsDiv || !resultsContent) {
+        return;
+    }
+    
+    const title = titleInput.value.trim();
+    if (!title) {
+        showNotification('Por favor, ingresa un título primero', 'warning');
+        return;
+    }
+    
+    const year = yearInput ? yearInput.value : '';
+    const type = typeInput ? typeInput.value : 'movie';
+    
+    // Mostrar estado de carga
+    searchBtn.disabled = true;
+    searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
+    resultsDiv.style.display = 'block';
+    resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem;"><i class="fas fa-spinner fa-spin"></i> Buscando torrents...</p>';
+    
+    try {
+        const url = `/streaming-platform/api/torrent/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`;
+        
+        const response = await fetch(url, {
+            credentials: 'same-origin'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.results && data.results.length > 0) {
+            let html = '<div style="margin-bottom: 0.5rem; font-weight: 600;">Encontrados ' + data.count + ' resultados:</div>';
+            
+            data.results.forEach((torrent, index) => {
+                const qualityBadge = torrent.quality !== 'Unknown' ? `<span style="background: #e50914; color: white; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.75rem; margin-right: 0.5rem;">${torrent.quality}</span>` : '';
+                const seedsInfo = torrent.seeds > 0 ? `<span style="color: #28a745;"><i class="fas fa-arrow-up"></i> ${torrent.seeds}</span>` : '';
+                const sizeInfo = torrent.size ? `<span style="color: #666; margin-left: 0.5rem;"><i class="fas fa-hdd"></i> ${torrent.size}</span>` : '';
+                
+                html += `
+                    <div style="padding: 0.75rem; margin-bottom: 0.5rem; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s;" 
+                         onmouseover="this.style.borderColor='#e50914'; this.style.boxShadow='0 2px 4px rgba(229,9,20,0.2)'"
+                         onmouseout="this.style.borderColor='#ddd'; this.style.boxShadow='none'"
+                         onclick="selectTorrent('${torrent.magnet.replace(/'/g, "\\'")}')">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">${torrent.title}</div>
+                                <div style="font-size: 0.85rem; color: #666;">
+                                    ${qualityBadge}
+                                    ${seedsInfo}
+                                    ${sizeInfo}
+                                    <span style="margin-left: 0.5rem; color: #999;">${torrent.source}</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="event.stopPropagation(); selectTorrent('${torrent.magnet.replace(/'/g, "\\'")}')">
+                                <i class="fas fa-check"></i> Usar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsContent.innerHTML = html;
+        } else {
+            resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem; color: #666;">No se encontraron resultados. Puedes ingresar el enlace magnet manualmente.</p>';
+        }
+    } catch (error) {
+        console.error('Error al buscar torrents:', error);
+        resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem; color: #dc3545;">Error al buscar torrents. Intenta nuevamente o ingresa el enlace manualmente.</p>';
+    } finally {
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = '<i class="fas fa-search"></i> Buscar';
+    }
+}
+
+/**
+ * Seleccionar un torrent de los resultados
+ */
+function selectTorrent(magnetLink) {
+    const torrentInput = document.getElementById('torrent_magnet');
+    const resultsDiv = document.getElementById('torrent-results');
+    
+    if (torrentInput) {
+        torrentInput.value = magnetLink;
+        showNotification('Enlace magnet seleccionado', 'success');
+    }
+    
+    if (resultsDiv) {
+        resultsDiv.style.display = 'none';
+    }
+}
+
+// Hacer la función selectTorrent disponible globalmente
+window.selectTorrent = selectTorrent;

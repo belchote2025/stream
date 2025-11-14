@@ -382,6 +382,20 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                         </div>
                         
                         <div class="form-group">
+                            <label for="torrent_magnet">Enlace Magnet (Torrent)</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                                <input type="text" id="torrent_magnet" name="torrent_magnet" placeholder="magnet:?xt=urn:btih:..." style="flex: 1;">
+                                <button type="button" id="searchTorrentBtn" class="btn btn-secondary" style="white-space: nowrap; padding: 0.75rem 1rem;">
+                                    <i class="fas fa-search"></i> Buscar
+                                </button>
+                            </div>
+                            <small class="form-text">Busca automáticamente enlaces de torrents usando el título y año</small>
+                            <div id="torrent-results" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.05); border-radius: 4px; max-height: 300px; overflow-y: auto;">
+                                <div id="torrent-results-content"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="age_rating">Clasificación</label>
                             <select id="age_rating" name="age_rating">
                                 <option value="">Selecciona...</option>

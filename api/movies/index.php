@@ -132,12 +132,12 @@ function createMovie() {
         // Insertar la película en la tabla content
         $query = "INSERT INTO content (
                     title, slug, description, type, release_year, duration, 
-                    rating, age_rating, poster_url, backdrop_url, trailer_url, torrent_magnet,
-                    is_featured, is_trending, created_at, updated_at
+                    rating, age_rating, poster_url, backdrop_url, video_url, trailer_url, torrent_magnet,
+                    is_featured, is_trending, is_premium, created_at, updated_at
                   ) VALUES (
                     :title, :slug, :description, 'movie', :release_year, :duration, 
-                    :rating, :age_rating, :poster_url, :backdrop_url, :trailer_url, :torrent_magnet,
-                    :is_featured, :is_trending, NOW(), NOW()
+                    :rating, :age_rating, :poster_url, :backdrop_url, :video_url, :trailer_url, :torrent_magnet,
+                    :is_featured, :is_trending, :is_premium, NOW(), NOW()
                   )";
         
         $stmt = $db->prepare($query);
@@ -151,12 +151,14 @@ function createMovie() {
             ':duration' => $data['duration'],
             ':rating' => $data['rating'] ?? null,
             ':age_rating' => $data['age_rating'] ?? null,
-            ':poster_url' => $data['poster_url'],
-            ':backdrop_url' => $data['backdrop_url'],
-            ':trailer_url' => $data['trailer_url'],
+            ':poster_url' => !empty($data['poster_url']) ? $data['poster_url'] : null,
+            ':backdrop_url' => !empty($data['backdrop_url']) ? $data['backdrop_url'] : null,
+            ':video_url' => !empty($data['video_url']) ? $data['video_url'] : null,
+            ':trailer_url' => !empty($data['trailer_url']) ? $data['trailer_url'] : null,
             ':torrent_magnet' => $data['torrent_magnet'] ?? null,
-            ':is_featured' => $data['is_featured'] ?? 0,
-            ':is_trending' => $data['is_trending'] ?? 0
+            ':is_featured' => isset($data['is_featured']) ? (int)$data['is_featured'] : 0,
+            ':is_trending' => isset($data['is_trending']) ? (int)$data['is_trending'] : 0,
+            ':is_premium' => isset($data['is_premium']) ? (int)$data['is_premium'] : 0
         ]);
         
         $movieId = $db->lastInsertId();
@@ -231,10 +233,12 @@ function updateMovie($id) {
                     age_rating = :age_rating,
                     poster_url = :poster_url,
                     backdrop_url = :backdrop_url,
+                    video_url = :video_url,
                     trailer_url = :trailer_url,
                     torrent_magnet = :torrent_magnet,
                     is_featured = :is_featured,
                     is_trending = :is_trending,
+                    is_premium = :is_premium,
                     updated_at = NOW()
                   WHERE id = :id";
         
@@ -250,12 +254,14 @@ function updateMovie($id) {
             ':duration' => $data['duration'],
             ':rating' => $data['rating'] ?? null,
             ':age_rating' => $data['age_rating'] ?? null,
-            ':poster_url' => $data['poster_url'],
-            ':backdrop_url' => $data['backdrop_url'],
-            ':trailer_url' => $data['trailer_url'],
+            ':poster_url' => !empty($data['poster_url']) ? $data['poster_url'] : null,
+            ':backdrop_url' => !empty($data['backdrop_url']) ? $data['backdrop_url'] : null,
+            ':video_url' => !empty($data['video_url']) ? $data['video_url'] : null,
+            ':trailer_url' => !empty($data['trailer_url']) ? $data['trailer_url'] : null,
             ':torrent_magnet' => $data['torrent_magnet'] ?? null,
-            ':is_featured' => $data['is_featured'] ?? 0,
-            ':is_trending' => $data['is_trending'] ?? 0
+            ':is_featured' => isset($data['is_featured']) ? (int)$data['is_featured'] : 0,
+            ':is_trending' => isset($data['is_trending']) ? (int)$data['is_trending'] : 0,
+            ':is_premium' => isset($data['is_premium']) ? (int)$data['is_premium'] : 0
         ]);
         
         // Actualizar géneros si se proporcionan
@@ -344,7 +350,8 @@ function deleteMovie($id) {
 
 // Función para validar los datos de la película
 function validateMovieData($data, $isUpdate = false) {
-    $requiredFields = ['title', 'description', 'release_year', 'duration', 'poster_url', 'backdrop_url', 'trailer_url'];
+    // Campos realmente requeridos
+    $requiredFields = ['title', 'description', 'release_year', 'duration'];
     
     // Verificar campos requeridos
     foreach ($requiredFields as $field) {
@@ -364,15 +371,23 @@ function validateMovieData($data, $isUpdate = false) {
     }
     
     // Validar rating (opcional, debe estar entre 0 y 10)
-    if (isset($data['rating']) && (!is_numeric($data['rating']) || $data['rating'] < 0 || $data['rating'] > 10)) {
+    if (isset($data['rating']) && $data['rating'] !== null && $data['rating'] !== '' && (!is_numeric($data['rating']) || $data['rating'] < 0 || $data['rating'] > 10)) {
         return false;
     }
     
-    // Validar URLs (solo verificación básica)
-    $urlFields = ['poster_url', 'backdrop_url', 'trailer_url'];
+    // Validar URLs (opcionales, permitir URLs relativas y absolutas)
+    $urlFields = ['poster_url', 'backdrop_url', 'trailer_url', 'video_url'];
     foreach ($urlFields as $field) {
-        if (isset($data[$field]) && !filter_var($data[$field], FILTER_VALIDATE_URL)) {
-            return false;
+        if (isset($data[$field]) && !empty($data[$field]) && trim($data[$field]) !== '') {
+            $url = trim($data[$field]);
+            // Permitir URLs absolutas (http/https) o relativas (que empiezan con /)
+            $isAbsoluteUrl = filter_var($url, FILTER_VALIDATE_URL) !== false;
+            $isRelativeUrl = strpos($url, '/') === 0;
+            
+            // Si no es URL válida ni relativa, es inválida
+            if (!$isAbsoluteUrl && !$isRelativeUrl) {
+                return false;
+            }
         }
     }
     

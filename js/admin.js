@@ -69,10 +69,37 @@ function init() {
 
 // Configurar event listeners
 function setupEventListeners() {
-    // Menú de navegación
+    // Menú móvil (hamburguesa)
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    
+    if (menuToggle && sidebar) {
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            if (sidebarOverlay) {
+                sidebarOverlay.classList.toggle('active');
+            }
+        });
+    }
+    
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+        });
+    }
+    
+    // Cerrar menú al hacer clic en un enlace (móviles)
     const navLinks = document.querySelectorAll('.admin-nav a');
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
+            // En móviles, cerrar el menú después de hacer clic
+            if (window.innerWidth <= 992) {
+                if (sidebar) sidebar.classList.remove('active');
+                if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+            }
+            
             e.preventDefault();
             const section = link.getAttribute('href').substring(1);
             navigateTo(section);
@@ -138,6 +165,22 @@ function setupEventListeners() {
     const contentForm = document.getElementById('contentForm');
     if (contentForm) {
         contentForm.addEventListener('submit', handleContentSubmit);
+        
+        // Validación de archivos de video
+        const videoFileInput = document.getElementById('video_file');
+        if (videoFileInput) {
+            videoFileInput.addEventListener('change', function(e) {
+                validateFileInput(e.target, 'video_file_info', 2147483648); // 2GB
+            });
+        }
+        
+        // Validación de archivos de tráiler
+        const trailerFileInput = document.getElementById('trailer_file');
+        if (trailerFileInput) {
+            trailerFileInput.addEventListener('change', function(e) {
+                validateFileInput(e.target, 'trailer_file_info', 524288000); // 500MB
+            });
+        }
     }
     
     // Formulario de usuarios
@@ -2395,44 +2438,129 @@ async function handleContentSubmit(e) {
     
     const form = e.target;
     const formData = new FormData(form);
-    const data = Object.fromEntries(formData.entries());
-
-    // Convertir checkboxes a booleanos (0 o 1)
-    data.is_featured = data.is_featured ? 1 : 0;
-    data.is_trending = data.is_trending ? 1 : 0;
-    data.is_premium = data.is_premium ? 1 : 0;
-
-    // Determinar la URL y el método de la API
-    const type = appState.currentSubsection || 'peliculas'; // 'peliculas', 'series', etc.
-    const contentType = type === 'peliculas' ? 'movie' : 'series';
     
-    // Preparar datos para la API
-    const apiData = {
-        title: data.title,
-        description: data.description,
-        release_year: parseInt(data.release_year),
-        duration: parseInt(data.duration),
-        type: contentType,
-        poster_url: data.poster_url || '',
-        backdrop_url: data.backdrop_url || '',
-        video_url: data.video_url || '',
-        trailer_url: data.trailer_url || '',
-        age_rating: data.age_rating || null,
-        is_featured: data.is_featured === '1' || data.is_featured === true ? 1 : 0,
-        is_trending: data.is_trending === '1' || data.is_trending === true ? 1 : 0,
-        is_premium: data.is_premium === '1' || data.is_premium === true ? 1 : 0
-    };
-    
-    let url = '/api/movies/index.php';
-    let method = 'POST';
-
-    if (appState.editingItemId) {
-        url = `/api/movies/index.php?id=${appState.editingItemId}`;
-        method = 'PUT';
-        apiData.id = parseInt(appState.editingItemId);
+    // Mostrar indicador de carga
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn ? submitBtn.textContent : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Guardando...';
     }
-
+    
     try {
+        // Validar archivos antes de subir
+        const videoFileInput = document.getElementById('video_file');
+        const trailerFileInput = document.getElementById('trailer_file');
+        
+        if (videoFileInput && videoFileInput.files[0]) {
+            if (!validateFileInput(videoFileInput, 'video_file_info', 2147483648)) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
+            }
+        }
+        
+        if (trailerFileInput && trailerFileInput.files[0]) {
+            if (!validateFileInput(trailerFileInput, 'trailer_file_info', 524288000)) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
+            }
+        }
+        
+        // Subir archivos de video si existen
+        let videoUrl = formData.get('video_url') || '';
+        let trailerUrl = formData.get('trailer_url') || '';
+        
+        const videoFile = formData.get('video_file');
+        if (videoFile && videoFile.size > 0) {
+            showNotification('Subiendo video...', 'info');
+            const videoUploadData = new FormData();
+            videoUploadData.append('file', videoFile);
+            
+            const videoUploadResponse = await fetch('/streaming-platform/api/upload/video.php', {
+                method: 'POST',
+                body: videoUploadData,
+                credentials: 'same-origin'
+            });
+            
+            const videoUploadResult = await videoUploadResponse.json();
+            
+            if (videoUploadResult.success && videoUploadResult.data) {
+                videoUrl = videoUploadResult.data.url;
+                showNotification('Video subido correctamente', 'success');
+            } else {
+                throw new Error(videoUploadResult.error || 'Error al subir el video');
+            }
+        }
+        
+        const trailerFile = formData.get('trailer_file');
+        if (trailerFile && trailerFile.size > 0) {
+            showNotification('Subiendo tráiler...', 'info');
+            const trailerUploadData = new FormData();
+            trailerUploadData.append('file', trailerFile);
+            trailerUploadData.append('is_trailer', '1');
+            
+            const trailerUploadResponse = await fetch('/streaming-platform/api/upload/video.php', {
+                method: 'POST',
+                body: trailerUploadData,
+                credentials: 'same-origin'
+            });
+            
+            const trailerUploadResult = await trailerUploadResponse.json();
+            
+            if (trailerUploadResult.success && trailerUploadResult.data) {
+                trailerUrl = trailerUploadResult.data.url;
+                showNotification('Tráiler subido correctamente', 'success');
+            } else {
+                throw new Error(trailerUploadResult.error || 'Error al subir el tráiler');
+            }
+        }
+        
+        // Preparar datos del formulario
+        const data = Object.fromEntries(formData.entries());
+        
+        // Convertir checkboxes a booleanos (0 o 1)
+        data.is_featured = data.is_featured ? 1 : 0;
+        data.is_trending = data.is_trending ? 1 : 0;
+        data.is_premium = data.is_premium ? 1 : 0;
+
+        // Determinar la URL y el método de la API
+        const type = appState.currentSubsection || 'peliculas'; // 'peliculas', 'series', etc.
+        const contentType = type === 'peliculas' ? 'movie' : 'series';
+        
+        // Preparar datos para la API
+        const apiData = {
+            title: data.title,
+            description: data.description,
+            release_year: parseInt(data.release_year),
+            duration: parseInt(data.duration),
+            type: contentType,
+            poster_url: data.poster_url || '',
+            backdrop_url: data.backdrop_url || '',
+            video_url: videoUrl,
+            trailer_url: trailerUrl,
+            age_rating: data.age_rating || null,
+            is_featured: data.is_featured === '1' || data.is_featured === true ? 1 : 0,
+            is_trending: data.is_trending === '1' || data.is_trending === true ? 1 : 0,
+            is_premium: data.is_premium === '1' || data.is_premium === true ? 1 : 0
+        };
+        
+        let url = '/api/movies/index.php';
+        let method = 'POST';
+
+        if (appState.editingItemId) {
+            url = `/api/movies/index.php?id=${appState.editingItemId}`;
+            method = 'PUT';
+            apiData.id = parseInt(appState.editingItemId);
+        }
+
+        showNotification('Guardando contenido...', 'info');
+        
         const response = await apiRequest(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
@@ -2449,6 +2577,12 @@ async function handleContentSubmit(e) {
     } catch (error) {
         showNotification(`Error: ${error.message}`, 'error');
         console.error('Error al guardar:', error);
+    } finally {
+        // Restaurar botón
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
     }
 }
 
@@ -2565,6 +2699,9 @@ async function apiRequest(endpoint, options = {}) {
         
         options.headers = { ...defaultHeaders, ...(options.headers || {}) };
         
+        // Incluir credenciales (cookies de sesión) en las peticiones
+        options.credentials = 'same-origin';
+        
         const response = await fetch(fullEndpoint, options);
         
         if (!response.ok) {
@@ -2648,6 +2785,57 @@ function showNotification(message, type = 'success') {
             notification.remove();
         }, 300);
     }, 3000);
+}
+
+// Validar archivo de entrada y mostrar información
+function validateFileInput(input, infoId, maxSize) {
+    const file = input.files[0];
+    const infoDiv = document.getElementById(infoId);
+    
+    if (!file) {
+        if (infoDiv) infoDiv.style.display = 'none';
+        return true;
+    }
+    
+    // Validar tamaño
+    if (file.size > maxSize) {
+        const maxSizeMB = Math.round(maxSize / (1024 * 1024));
+        showNotification(`El archivo es demasiado grande. Tamaño máximo: ${maxSizeMB}MB`, 'error');
+        input.value = '';
+        if (infoDiv) infoDiv.style.display = 'none';
+        return false;
+    }
+    
+    // Validar tipo
+    const allowedTypes = ['video/mp4', 'video/webm', 'video/avi', 'video/x-msvideo', 'video/x-matroska', 'video/quicktime'];
+    const allowedExtensions = ['mp4', 'webm', 'avi', 'mkv', 'mov'];
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+    
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+        showNotification('Tipo de archivo no permitido. Formatos permitidos: MP4, WebM, AVI, MKV, MOV', 'error');
+        input.value = '';
+        if (infoDiv) infoDiv.style.display = 'none';
+        return false;
+    }
+    
+    // Mostrar información del archivo
+    if (infoDiv) {
+        const fileName = infoDiv.querySelector('.file-name');
+        const fileSize = infoDiv.querySelector('.file-size');
+        
+        if (fileName) {
+            fileName.textContent = `Archivo: ${file.name}`;
+        }
+        
+        if (fileSize) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            fileSize.textContent = `Tamaño: ${sizeMB} MB`;
+        }
+        
+        infoDiv.style.display = 'block';
+    }
+    
+    return true;
 }
 
 // Formatear categoría para mostrar

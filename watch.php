@@ -64,6 +64,8 @@ $pageTitle = 'Reproducir: ' . htmlspecialchars($content['title']) . ' - ' . SITE
 include __DIR__ . '/includes/header.php';
 ?>
 
+<link rel="stylesheet" href="/streaming-platform/css/unified-video-player.css">
+
 <style>
 .watch-page {
     padding-top: 70px;
@@ -76,6 +78,15 @@ include __DIR__ . '/includes/header.php';
     width: 100%;
     padding-bottom: 56.25%; /* 16:9 */
     background: #000;
+    min-height: 300px;
+}
+
+.video-container-full #unifiedVideoContainer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .video-container-full video {
@@ -328,18 +339,44 @@ include __DIR__ . '/includes/header.php';
 
 /* Orientación horizontal en móviles */
 @media (max-width: 992px) and (orientation: landscape) {
-    .video-container-full {
-        padding-bottom: 56.25%;
-        max-height: 100vh;
-    }
-    
     .watch-page {
         padding-top: 0;
     }
     
+    .video-container-full {
+        padding-bottom: 0;
+        height: 100vh;
+        max-height: 100vh;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+    }
+    
+    .video-container-full #unifiedVideoContainer {
+        height: 100%;
+    }
+    
     .video-info {
         padding: 1rem 2%;
+        margin-top: 100vh;
     }
+}
+
+/* Ajustes para pantalla completa */
+.video-container-full:fullscreen,
+.video-container-full:-webkit-full-screen,
+.video-container-full:-moz-full-screen,
+.video-container-full:-ms-fullscreen {
+    padding-bottom: 0;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
 }
 </style>
 
@@ -363,31 +400,7 @@ include __DIR__ . '/includes/header.php';
         ?>
         
         <?php if ($hasVideo): ?>
-            <video 
-                id="videoPlayer" 
-                controls 
-                autoplay
-                preload="metadata"
-                playsinline
-                <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
-                    data-start-time="<?php echo $savedProgress['progress']; ?>"
-                <?php endif; ?>
-            >
-                <source src="<?php echo htmlspecialchars($videoUrl); ?>" type="video/mp4">
-                <source src="<?php echo htmlspecialchars($videoUrl); ?>" type="video/webm">
-                <source src="<?php echo htmlspecialchars($videoUrl); ?>" type="video/ogg">
-                Tu navegador no soporta el elemento de video HTML5.
-            </video>
-            <div id="videoError" class="video-error" style="display: none;">
-                <div class="error-content">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <h3>Error al cargar el video</h3>
-                    <p>No se pudo cargar el video. Por favor, verifica tu conexión a internet o intenta más tarde.</p>
-                    <button class="btn btn-primary" onclick="retryVideo()">
-                        <i class="fas fa-redo"></i> Reintentar
-                    </button>
-                </div>
-            </div>
+            <div id="unifiedVideoContainer"></div>
         <?php else: ?>
             <div class="no-video-message">
                 <div class="no-video-content">
@@ -521,27 +534,13 @@ if (video) {
         <?php endif; ?>
     });
     
-    // Incrementar contador de vistas cuando el video comience
-    video.addEventListener('play', function() {
-        if (!hasStartedPlaying) {
-            hasStartedPlaying = true;
-            incrementViews();
-        }
-        
-        // Guardar progreso cada 10 segundos
-        saveInterval = setInterval(saveProgress, 10000);
-    });
-    
-    video.addEventListener('pause', function() {
-        clearInterval(saveInterval);
-        saveProgress();
-    });
-    
-    // Guardar progreso cuando el video termine
-    video.addEventListener('ended', function() {
-        clearInterval(saveInterval);
-        saveProgress(true); // Marcar como completado
-    });
+        // Incrementar contador de vistas cuando el video comience
+        video.addEventListener('play', function() {
+            if (!hasStartedPlaying) {
+                hasStartedPlaying = true;
+                incrementViews();
+            }
+        });
     
     // Manejar teclas de atajos
     document.addEventListener('keydown', function(e) {
@@ -583,8 +582,8 @@ if (video) {
     });
 }
 
-function saveProgress(completed = false) {
-    if (!video || !video.duration) return;
+function saveProgress(currentTime, duration, completed = false) {
+    if (!currentTime || !duration) return;
     
     fetch('/streaming-platform/api/playback/save.php', {
         method: 'POST',
@@ -594,8 +593,8 @@ function saveProgress(completed = false) {
         body: JSON.stringify({
             content_id: contentId,
             episode_id: episodeId,
-            progress: Math.floor(video.currentTime),
-            duration: Math.floor(video.duration),
+            progress: Math.floor(currentTime),
+            duration: Math.floor(duration),
             completed: completed
         })
     }).catch(error => console.error('Error guardando progreso:', error));
@@ -630,25 +629,16 @@ function playEpisode(epId) {
 }
 
 function retryVideo() {
-    const errorDiv = document.getElementById('videoError');
-    if (errorDiv) {
-        errorDiv.style.display = 'none';
-    }
-    if (video) {
-        video.style.display = 'block';
-        video.load();
-        video.play().catch(e => console.error('Error al reproducir:', e));
+    if (player && videoUrl) {
+        player.loadVideo(videoUrl).catch(error => {
+            console.error('Error al reintentar:', error);
+        });
     }
 }
 
 function toggleFullscreen() {
-    const container = document.querySelector('.video-container-full');
-    if (!document.fullscreenElement) {
-        container.requestFullscreen().catch(err => {
-            console.error('Error al entrar en pantalla completa:', err);
-        });
-    } else {
-        document.exitFullscreen();
+    if (player) {
+        player.toggleFullscreen();
     }
 }
 
@@ -658,17 +648,19 @@ function playTrailer() {
     <?php endif; ?>
 }
 
-// Guardar al cerrar la página
-window.addEventListener('beforeunload', function() {
-    if (video) {
-        saveProgress();
-    }
-});
+        // Guardar al cerrar la página
+        window.addEventListener('beforeunload', function() {
+            if (player && player.currentTime && player.duration) {
+                saveProgress(player.currentTime, player.duration);
+            }
+        });
 
-// Manejar cambios de visibilidad de la página
-document.addEventListener('visibilitychange', function() {
-    if (document.hidden && video && !video.paused) {
-        saveProgress();
+        // Manejar cambios de visibilidad de la página
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && player && player.isPlaying && player.currentTime && player.duration) {
+                saveProgress(player.currentTime, player.duration);
+            }
+        });
     }
 });
 <?php endif; ?>

@@ -812,6 +812,48 @@ button {
     transform: translateY(-2px);
 }
 
+/* Botón hamburguesa para móviles */
+.menu-toggle {
+    display: none;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    z-index: 1001;
+    position: relative;
+}
+
+.menu-toggle:hover {
+    background: var(--primary-dark);
+}
+
+.menu-toggle i {
+    font-size: 1.2rem;
+}
+
+/* Overlay para móviles */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
     .sidebar {
@@ -819,8 +861,8 @@ button {
         overflow: hidden;
     }
     
-    .sidebar .logo h2,
-    .sidebar .nav-text,
+    .sidebar .logo h2 span,
+    .sidebar .admin-nav span,
     .sidebar .logout span {
         display: none;
     }
@@ -863,16 +905,60 @@ button {
     }
 }
 
+@media (max-width: 992px) {
+    .menu-toggle {
+        display: block;
+    }
+    
+    .sidebar {
+        width: 250px;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .sidebar.active {
+        transform: translateX(0);
+    }
+    
+    .sidebar-overlay {
+        display: block;
+    }
+    
+    .main-content {
+        margin-left: 0;
+    }
+    
+    .top-bar {
+        padding: 1rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .content-options {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
     .top-bar {
-        flex-direction: column;
+        flex-direction: row;
         gap: 1rem;
-        padding: 1rem;
+        padding: 0.75rem 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .top-bar .user-info {
+        order: 3;
+        width: 100%;
+        justify-content: center;
     }
     
     .search-bar {
         width: 100%;
-        max-width: 400px;
+        max-width: none;
+        order: 2;
     }
     
     .dashboard {
@@ -880,6 +966,11 @@ button {
     }
     
     .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .content-options {
         grid-template-columns: 1fr;
     }
     
@@ -890,6 +981,153 @@ button {
     
     .form-row .form-group {
         margin: 0 0 1.5rem 0;
+    }
+    
+    .form-actions {
+        flex-direction: column-reverse;
+    }
+    
+    .form-actions button {
+        width: 100%;
+    }
+    
+    /* Tablas responsive */
+    .table-responsive {
+        margin: 0 -1rem;
+        padding: 0 1rem;
+    }
+    
+    .data-table {
+        font-size: 0.875rem;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .data-table .thumbnail {
+        width: 40px;
+        height: 60px;
+    }
+    
+    .data-table .actions {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .data-table .actions button {
+        width: 100%;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    /* Modales responsive */
+    .modal {
+        padding: 1rem;
+        margin: 0.5rem;
+        max-width: calc(100% - 1rem);
+        max-height: calc(100vh - 1rem);
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        padding: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .modal-title {
+        font-size: 1.25rem;
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+    
+    .modal-footer {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .modal-footer button {
+        width: 100%;
+    }
+    
+    /* Cards responsive */
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .card-header {
+        padding: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    /* Header actions responsive */
+    .header-actions {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+    }
+    
+    .header-actions button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 576px) {
+    .top-bar {
+        padding: 0.5rem;
+    }
+    
+    .dashboard {
+        padding: 0.5rem;
+    }
+    
+    .stats-grid {
+        gap: 0.75rem;
+    }
+    
+    .stat-card {
+        padding: 1rem;
+    }
+    
+    .stat-card h3 {
+        font-size: 1.5rem;
+    }
+    
+    .data-table {
+        font-size: 0.75rem;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        font-size: 16px; /* Evita zoom en iOS */
+    }
+    
+    .modal {
+        margin: 0.25rem;
+        padding: 0.75rem;
+        max-width: calc(100% - 0.5rem);
+    }
+    
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: 0.75rem;
     }
 }
 

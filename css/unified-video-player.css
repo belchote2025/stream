@@ -1,0 +1,671 @@
+/* ============================================
+   REPRODUCTOR DE VIDEO UNIFICADO
+   ============================================ */
+
+.unified-video-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+    background: #000;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.unified-video-wrapper video,
+.unified-video-wrapper iframe {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+#youtubePlayerContainer,
+#torrentPlayerContainer {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+#youtubePlayerContainer iframe,
+#torrentPlayerContainer video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Overlay de carga */
+.video-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    color: #fff;
+}
+
+.video-loading-overlay p {
+    margin-top: 1rem;
+    font-size: 1rem;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #e50914;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Overlay de error */
+.video-error-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    color: #fff;
+    text-align: center;
+    padding: 2rem;
+}
+
+.error-content i {
+    font-size: 4rem;
+    color: #e50914;
+    margin-bottom: 1rem;
+}
+
+.error-content h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.error-content p {
+    color: #999;
+    margin-bottom: 2rem;
+    max-width: 500px;
+}
+
+.btn-retry {
+    background: #e50914;
+    color: #fff;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-retry:hover {
+    background: #f40612;
+}
+
+/* Controles personalizados */
+.custom-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.controls-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 150px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.7) 50%, transparent 100%);
+    pointer-events: none;
+}
+
+.controls-bar {
+    position: relative;
+    padding: 1rem 1.5rem;
+    pointer-events: all;
+}
+
+.progress-section {
+    margin-bottom: 1rem;
+}
+
+.progress-bar-container {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    transition: height 0.2s ease;
+}
+
+.progress-bar-container:hover {
+    height: 8px;
+}
+
+.progress-filled {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: #e50914;
+    border-radius: 3px;
+    z-index: 2;
+    transition: width 0.1s linear;
+}
+
+.progress-buffer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 3px;
+    z-index: 1;
+}
+
+.progress-hover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    z-index: 3;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.progress-bar-container:hover .progress-hover {
+    opacity: 1;
+}
+
+.time-info {
+    display: flex;
+    justify-content: space-between;
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.current-time,
+.duration {
+    font-weight: 500;
+}
+
+.controls-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.left-controls,
+.right-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.control-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.1rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.control-btn:active {
+    transform: scale(0.95);
+}
+
+.play-pause-btn {
+    font-size: 1.3rem;
+}
+
+.volume-slider-container {
+    width: 0;
+    overflow: hidden;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+
+.left-controls:hover .volume-slider-container {
+    width: 100px;
+}
+
+.volume-slider {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.time-display {
+    color: #fff;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    margin-left: 0.5rem;
+}
+
+.speed-control {
+    position: relative;
+}
+
+.speed-btn {
+    min-width: 50px;
+}
+
+.speed-menu {
+    position: absolute;
+    bottom: calc(100% + 0.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.95);
+    border-radius: 4px;
+    padding: 0.5rem 0;
+    min-width: 100px;
+    display: none;
+    z-index: 30;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.speed-control:hover .speed-menu {
+    display: block;
+}
+
+.speed-menu button {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #fff;
+    padding: 0.75rem 1.5rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.speed-menu button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.speed-menu button.active {
+    background: rgba(229, 9, 20, 0.3);
+    color: #e50914;
+}
+
+.fullscreen-btn {
+    font-size: 1.1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .unified-video-wrapper {
+        min-height: 250px;
+    }
+    
+    .controls-overlay {
+        height: 120px;
+    }
+    
+    .controls-bar {
+        padding: 0.75rem 1rem;
+    }
+    
+    .progress-section {
+        margin-bottom: 0.75rem;
+    }
+    
+    .progress-bar-container {
+        height: 5px;
+        margin-bottom: 0.4rem;
+    }
+    
+    .progress-bar-container:hover {
+        height: 6px;
+    }
+    
+    .time-info {
+        font-size: 0.8rem;
+    }
+    
+    .control-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+        min-width: 44px;
+        min-height: 44px;
+    }
+    
+    .play-pause-btn {
+        font-size: 1.2rem;
+    }
+    
+    .time-display {
+        font-size: 0.8rem;
+        margin-left: 0.25rem;
+    }
+    
+    .controls-section {
+        gap: 0.5rem;
+    }
+    
+    .left-controls,
+    .right-controls {
+        gap: 0.5rem;
+    }
+    
+    .volume-slider-container {
+        width: 80px !important;
+    }
+    
+    .left-controls:hover .volume-slider-container,
+    .left-controls:active .volume-slider-container {
+        width: 80px;
+    }
+    
+    .speed-menu {
+        min-width: 90px;
+        font-size: 0.85rem;
+    }
+    
+    .error-content i {
+        font-size: 3rem;
+    }
+    
+    .error-content h3 {
+        font-size: 1.25rem;
+    }
+    
+    .error-content p {
+        font-size: 0.9rem;
+        padding: 0 1rem;
+    }
+    
+    .video-loading-overlay p {
+        font-size: 0.9rem;
+    }
+    
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (max-width: 576px) {
+    .unified-video-wrapper {
+        min-height: 200px;
+    }
+    
+    .controls-overlay {
+        height: 100px;
+    }
+    
+    .controls-bar {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .progress-section {
+        margin-bottom: 0.5rem;
+    }
+    
+    .progress-bar-container {
+        height: 4px;
+        margin-bottom: 0.3rem;
+    }
+    
+    .progress-bar-container:hover {
+        height: 5px;
+    }
+    
+    .time-info {
+        font-size: 0.75rem;
+    }
+    
+    .control-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+        min-width: 44px;
+        min-height: 44px;
+    }
+    
+    .play-pause-btn {
+        font-size: 1.1rem;
+    }
+    
+    .time-display {
+        font-size: 0.75rem;
+        margin-left: 0;
+    }
+    
+    .controls-section {
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    
+    .left-controls,
+    .right-controls {
+        gap: 0.4rem;
+        flex-wrap: wrap;
+    }
+    
+    .volume-slider-container {
+        width: 60px !important;
+    }
+    
+    .left-controls:hover .volume-slider-container,
+    .left-controls:active .volume-slider-container {
+        width: 60px;
+    }
+    
+    .speed-menu {
+        min-width: 80px;
+        font-size: 0.8rem;
+        bottom: calc(100% + 0.25rem);
+    }
+    
+    .speed-menu button {
+        padding: 0.6rem 1rem;
+        font-size: 0.8rem;
+    }
+    
+    .error-content {
+        padding: 1.5rem;
+    }
+    
+    .error-content i {
+        font-size: 2.5rem;
+    }
+    
+    .error-content h3 {
+        font-size: 1.1rem;
+    }
+    
+    .error-content p {
+        font-size: 0.85rem;
+    }
+    
+    .btn-retry {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+    }
+    
+    .video-loading-overlay {
+        padding: 1rem;
+    }
+    
+    .video-loading-overlay p {
+        font-size: 0.85rem;
+        margin-top: 0.75rem;
+    }
+    
+    .loading-spinner {
+        width: 35px;
+        height: 35px;
+    }
+}
+
+/* Orientación horizontal en móviles */
+@media (max-width: 992px) and (orientation: landscape) {
+    .unified-video-wrapper {
+        min-height: 100vh;
+        max-height: 100vh;
+    }
+    
+    .controls-overlay {
+        height: 100px;
+    }
+    
+    .controls-bar {
+        padding: 0.5rem 1rem;
+    }
+    
+    .progress-section {
+        margin-bottom: 0.5rem;
+    }
+    
+    .controls-section {
+        gap: 0.5rem;
+    }
+}
+
+/* Optimización para dispositivos táctiles */
+@media (hover: none) and (pointer: coarse) {
+    .progress-bar-container:hover {
+        height: 6px;
+    }
+    
+    .control-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+    
+    .left-controls:hover .volume-slider-container,
+    .left-controls:active .volume-slider-container {
+        width: 100px;
+    }
+    
+    .speed-control:hover .speed-menu,
+    .speed-control.active .speed-menu {
+        display: block;
+    }
+    
+    /* Mostrar controles siempre en dispositivos táctiles */
+    .custom-controls {
+        opacity: 1;
+        pointer-events: all;
+    }
+    
+    /* Aumentar área táctil de la barra de progreso */
+    .progress-bar-container {
+        min-height: 44px;
+        padding: 20px 0;
+    }
+}
+
+/* Pantalla completa */
+.unified-video-wrapper:fullscreen,
+.unified-video-wrapper:-webkit-full-screen,
+.unified-video-wrapper:-moz-full-screen,
+.unified-video-wrapper:-ms-fullscreen {
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+}
+
+.unified-video-wrapper:fullscreen video,
+.unified-video-wrapper:-webkit-full-screen video,
+.unified-video-wrapper:-moz-full-screen video,
+.unified-video-wrapper:-ms-fullscreen video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.unified-video-wrapper:fullscreen #youtubePlayerContainer,
+.unified-video-wrapper:-webkit-full-screen #youtubePlayerContainer,
+.unified-video-wrapper:-moz-full-screen #youtubePlayerContainer,
+.unified-video-wrapper:-ms-fullscreen #youtubePlayerContainer {
+    width: 100%;
+    height: 100%;
+}
+
+/* Mejoras para tablets */
+@media (min-width: 577px) and (max-width: 991px) {
+    .unified-video-wrapper {
+        min-height: 400px;
+    }
+    
+    .controls-bar {
+        padding: 1rem 1.25rem;
+    }
+    
+    .control-btn {
+        width: 42px;
+        height: 42px;
+    }
+}

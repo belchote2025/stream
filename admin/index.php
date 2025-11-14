@@ -78,8 +78,11 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
 </head>
 <body>
     <div class="admin-container">
+        <!-- Overlay para móviles -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        
         <!-- Barra lateral -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="logo">
                 <h2><?php echo SITE_NAME; ?><span>Admin</span></h2>
             </div>
@@ -140,6 +143,9 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
         <main class="main-content">
             <!-- Barra superior -->
             <header class="top-bar">
+                <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <div class="search-bar">
                     <input type="text" id="admin-search" placeholder="Buscar en el panel...">
                     <button id="search-btn"><i class="fas fa-search"></i></button>
@@ -301,7 +307,7 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                     <button class="close-modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <form id="contentForm">
+                    <form id="contentForm" enctype="multipart/form-data">
                         <input type="hidden" id="content-id" name="id" value="">
                         <input type="hidden" id="content-type" name="type" value="movie">
                         
@@ -343,11 +349,35 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                             <div class="form-group">
                                 <label for="video_url">URL del Video</label>
                                 <input type="url" id="video_url" name="video_url" placeholder="https://...">
+                                <small class="form-text">O sube un archivo de video local</small>
                             </div>
                             
                             <div class="form-group">
+                                <label for="video_file">Subir Video Local</label>
+                                <input type="file" id="video_file" name="video_file" accept="video/*" data-max-size="2147483648">
+                                <small class="form-text">Formatos: MP4, WebM, AVI, MKV (máx. 2GB)</small>
+                                <div id="video_file_info" class="file-info" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 4px;">
+                                    <span class="file-name"></span>
+                                    <span class="file-size"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
                                 <label for="trailer_url">URL del Tráiler</label>
                                 <input type="url" id="trailer_url" name="trailer_url" placeholder="https://...">
+                                <small class="form-text">O sube un archivo de tráiler local</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="trailer_file">Subir Tráiler Local</label>
+                                <input type="file" id="trailer_file" name="trailer_file" accept="video/*" data-max-size="524288000">
+                                <small class="form-text">Formatos: MP4, WebM, AVI, MKV (máx. 500MB)</small>
+                                <div id="trailer_file_info" class="file-info" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 4px;">
+                                    <span class="file-name"></span>
+                                    <span class="file-size"></span>
+                                </div>
                             </div>
                         </div>
                         

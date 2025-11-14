@@ -70,6 +70,9 @@
     <!-- WebTorrent for P2P streaming (solo si se necesita) -->
     <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
     
+    <!-- Reproductor de video unificado -->
+    <script src="/streaming-platform/js/video-player.js"></script>
+    
     <!-- Scripts personalizados -->
     <script src="/streaming-platform/js/performance-optimizer.js"></script>
     <script src="/streaming-platform/js/hero-optimizer.js"></script>

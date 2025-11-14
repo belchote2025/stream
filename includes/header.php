@@ -19,8 +19,22 @@
             // Interceptar console.warn para suprimir warnings no críticos
             const originalWarn = console.warn;
             console.warn = function(...args) {
-                const message = args.join(' ');
-                if (typeof message === 'string') {
+                // Convertir todos los argumentos a string para verificación
+                const message = args.map(arg => {
+                    if (typeof arg === 'string') return arg;
+                    if (arg && typeof arg === 'object') {
+                        if (arg.message) return arg.message;
+                        if (arg.stack) return arg.stack;
+                        try { return JSON.stringify(arg); } catch(e) { return String(arg); }
+                    }
+                    return String(arg);
+                }).join(' ');
+                
+                // Verificar también en el stack trace si existe
+                const stackTrace = args.find(arg => arg && typeof arg === 'object' && arg.stack)?.stack || '';
+                const fullMessage = message + ' ' + stackTrace;
+                
+                if (typeof message === 'string' || message) {
                     // Suprimir warnings de YouTube postMessage (normales en localhost)
                     if (message.includes('Failed to execute') && message.includes('postMessage') ||
                         message.includes('www-widgetapi.js') ||
@@ -29,6 +43,15 @@
                         (message.includes('postMessage') && message.includes('DOMWindow')) ||
                         (message.includes('postMessage') && message.includes('youtube.com')) ||
                         (message.includes('target origin') && message.includes('youtube.com'))) {
+                        return;
+                    }
+                    // Suprimir warnings de spoofer.js (extensiones del navegador)
+                    if (message.includes('spoofer.js') ||
+                        fullMessage.includes('spoofer.js') ||
+                        stackTrace.includes('spoofer.js') ||
+                        (message.includes('An unexpected error occurred') && (fullMessage.includes('spoofer') || stackTrace.includes('spoofer'))) ||
+                        /spoofer\.js:\d+/.test(fullMessage) ||
+                        /spoofer\.js:\d+/.test(stackTrace)) {
                         return;
                     }
                     // Suprimir warnings de Feature Policy de YouTube
@@ -151,8 +174,24 @@
             // Interceptar console.error para suprimir errores no críticos de YouTube
             const originalError = console.error;
             console.error = function(...args) {
-                const message = args.join(' ');
-                if (typeof message === 'string') {
+                // Convertir todos los argumentos a string para verificación
+                const message = args.map(arg => {
+                    if (typeof arg === 'string') return arg;
+                    if (arg && typeof arg === 'object') {
+                        // Verificar si es un Error object
+                        if (arg.message) return arg.message;
+                        if (arg.stack) return arg.stack;
+                        // Intentar stringify
+                        try { return JSON.stringify(arg); } catch(e) { return String(arg); }
+                    }
+                    return String(arg);
+                }).join(' ');
+                
+                // Verificar también en el stack trace si existe
+                const stackTrace = args.find(arg => arg && typeof arg === 'object' && arg.stack)?.stack || '';
+                const fullMessage = message + ' ' + stackTrace;
+                
+                if (typeof message === 'string' || message) {
                     // Suprimir errores de YouTube postMessage (normales en localhost)
                     if (message.includes('Failed to execute') && message.includes('postMessage') ||
                         message.includes('www-widgetapi.js') ||
@@ -197,9 +236,14 @@
                         /^Advertencias de cookies \d+$/.test(message.trim())) {
                         return;
                     }
-                    // Suprimir errores de spoofer.js (extensiones del navegador)
+                    // Suprimir errores de spoofer.js (extensiones del navegador) - Mejorado
                     if (message.includes('spoofer.js') ||
-                        message.includes('An unexpected error occurred') && (message.includes('spoofer') || message.includes('spoofer.js'))) {
+                        fullMessage.includes('spoofer.js') ||
+                        stackTrace.includes('spoofer.js') ||
+                        (message.includes('An unexpected error occurred') && (fullMessage.includes('spoofer') || stackTrace.includes('spoofer'))) ||
+                        (message.trim() === 'Error: An unexpected error occurred' && (fullMessage.includes('spoofer') || stackTrace.includes('spoofer'))) ||
+                        /spoofer\.js:\d+/.test(fullMessage) ||
+                        /spoofer\.js:\d+/.test(stackTrace)) {
                         return;
                     }
                     // Suprimir errores de redeclaración (probablemente de extensiones del navegador)

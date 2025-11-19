@@ -13,6 +13,29 @@ $pageTitle = 'Mi Cuenta - ' . SITE_NAME;
 $activeTab = $_GET['tab'] ?? 'overview';
 $allowedTabs = ['overview', 'profile', 'watchlist', 'history', 'subscription', 'settings'];
 
+if (!function_exists('countUserWatchlist')) {
+    function countUserWatchlist($userId) {
+        static $cache = [];
+        $userId = (int)$userId;
+        if ($userId <= 0) {
+            return 0;
+        }
+        if (isset($cache[$userId])) {
+            return $cache[$userId];
+        }
+        try {
+            $db = getDbConnection();
+            $stmt = $db->prepare('SELECT COUNT(*) FROM user_watchlist WHERE user_id = ?');
+            $stmt->execute([$userId]);
+            $cache[$userId] = (int)$stmt->fetchColumn();
+        } catch (Exception $e) {
+            error_log('countUserWatchlist error: ' . $e->getMessage());
+            $cache[$userId] = 0;
+        }
+        return $cache[$userId];
+    }
+}
+
 // Validar pestaña
 if (!in_array($activeTab, $allowedTabs)) {
     $activeTab = 'overview';

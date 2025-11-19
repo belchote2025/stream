@@ -8,6 +8,48 @@ $db = getDbConnection();
 $userId = $user['id'];
 $success = '';
 $error = '';
+$birthDateFormatted = '';
+
+if (!function_exists('dashboardTableExists')) {
+    function dashboardTableExists(PDO $db, string $table): bool {
+        static $cache = [];
+        if (isset($cache[$table])) {
+            return $cache[$table];
+        }
+        try {
+            $stmt = $db->prepare("
+                SELECT COUNT(*) 
+                FROM information_schema.TABLES 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                  AND TABLE_NAME = ?
+            ");
+            $stmt->execute([$table]);
+            $cache[$table] = $stmt->fetchColumn() > 0;
+        } catch (Exception $e) {
+            error_log('dashboardTableExists error: ' . $e->getMessage());
+            $cache[$table] = false;
+        }
+        return $cache[$table];
+    }
+}
+
+if (!function_exists('time_elapsed_string')) {
+    function time_elapsed_string($datetime): string {
+        if (empty($datetime)) {
+            return '';
+        }
+        $timestamp = is_numeric($datetime) ? (int)$datetime : strtotime($datetime);
+        if (!$timestamp) {
+            return '';
+        }
+        $diff = time() - $timestamp;
+        if ($diff < 60) return 'Hace segundos';
+        if ($diff < 3600) return 'Hace ' . floor($diff / 60) . ' min';
+        if ($diff < 86400) return 'Hace ' . floor($diff / 3600) . ' h';
+        if ($diff < 604800) return 'Hace ' . floor($diff / 86400) . ' días';
+        return date('d/m/Y', $timestamp);
+    }
+}
 
 // Procesar el formulario de actualización de perfil
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
@@ -125,15 +167,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
 
 // Obtener la información actualizada del perfil
 try {
-    $stmt = $db->prepare("
+    $subFields = [];
+    $subFields[] = dashboardTableExists($db, 'watch_history')
+        ? "(SELECT COUNT(*) FROM watch_history WHERE user_id = u.id) AS total_watched"
+        : "0 AS total_watched";
+    $subFields[] = dashboardTableExists($db, 'user_playlists')
+        ? "(SELECT COUNT(*) FROM user_playlists WHERE user_id = u.id) AS total_playlists"
+        : "0 AS total_playlists";
+    $subFields[] = dashboardTableExists($db, 'ratings')
+        ? "(SELECT COUNT(*) FROM ratings WHERE user_id = u.id) AS total_ratings"
+        : "0 AS total_ratings";
+    
+    $select = implode(",\n               ", $subFields);
+    $sql = "
         SELECT u.*, 
-               (SELECT COUNT(*) FROM watch_history WHERE user_id = u.id) as total_watched,
-               (SELECT COUNT(*) FROM user_playlists WHERE user_id = u.id) as total_playlists,
-               (SELECT COUNT(*) FROM ratings WHERE user_id = u.id) as total_ratings
+               {$select}
         FROM users u 
         WHERE u.id = ?
+    ";
     
-    ");
+    $stmt = $db->prepare($sql);
     
     $stmt->execute([$userId]);
     $profile = $stmt->fetch();
@@ -143,10 +196,29 @@ try {
     }
     
     // Formatear la fecha de nacimiento para el input de fecha
-    $birthDateFormatted = !empty($profile['birth_date']) ? date('Y-m-d', strtotime($profile['birth_date'])) : '';
+    if (!empty($profile['birth_date'])) {
+        $timestamp = strtotime($profile['birth_date']);
+        $birthDateFormatted = $timestamp ? date('Y-m-d', $timestamp) : '';
+    } else {
+        $birthDateFormatted = '';
+    }
     
 } catch (Exception $e) {
-    $error = $e->getMessage();
+    $error = $error ?: $e->getMessage();
+    $profile = array_merge($user, [
+        'full_name' => $user['full_name'] ?? '',
+        'bio' => $user['bio'] ?? '',
+        'location' => $user['location'] ?? '',
+        'website' => $user['website'] ?? '',
+        'birth_date' => $user['birth_date'] ?? null,
+        'gender' => $user['gender'] ?? '',
+        'avatar_url' => $user['avatar_url'] ?? '',
+        'created_at' => $user['created_at'] ?? date('Y-m-d H:i:s'),
+        'total_watched' => 0,
+        'total_playlists' => 0,
+        'total_ratings' => 0
+    ]);
+    $birthDateFormatted = !empty($profile['birth_date']) ? date('Y-m-d', strtotime($profile['birth_date'])) : '';
 }
 ?>
 
@@ -429,7 +501,7 @@ try {
                     <div class="row g-2">
                         <div class="col-4">
                             <div class="position-relative">
-                                <img src="/assets/images/badges/film-lover.png" alt="Amante del cine" class="img-fluid opacity-50" data-bs-toggle="tooltip" title="Amante del cine - Ve 10 películas">
+                                <img src="<?php echo rtrim(SITE_URL, '/'); ?>/assets/images/badges/film-lover.png" alt="Amante del cine" class="img-fluid opacity-50" data-bs-toggle="tooltip" title="Amante del cine - Ve 10 películas">
                                 <div class="position-absolute top-50 start-50 translate-middle">
                                     <i class="fas fa-lock text-muted"></i>
                                 </div>
@@ -437,7 +509,7 @@ try {
                         </div>
                         <div class="col-4">
                             <div class="position-relative">
-                                <img src="/assets/images/badges/binge-watcher.png" alt="Maratonista" class="img-fluid opacity-50" data-bs-toggle="tooltip" title="Maratonista - Ve 5 episodios seguidos">
+                                <img src="<?php echo rtrim(SITE_URL, '/'); ?>/assets/images/badges/binge-watcher.png" alt="Maratonista" class="img-fluid opacity-50" data-bs-toggle="tooltip" title="Maratonista - Ve 5 episodios seguidos">
                                 <div class="position-absolute top-50 start-50 translate-middle">
                                     <i class="fas fa-lock text-muted"></i>
                                 </div>
@@ -445,7 +517,7 @@ try {
                         </div>
                         <div class="col-4">
                             <div class="position-relative">
-                                <img src="/assets/images/badges/critic.png" alt="Crítico" class="img-fluid opacity-50" data-bs-toggle="tooltip" title="Crítico - Escribe 10 reseñas">
+                                <img src="<?php echo rtrim(SITE_URL, '/'); ?>/assets/images/badges/critic.png" alt="Crítico" class="img-fluid opacity-50" data-bs-toggle="tooltip" title="Crítico - Escribe 10 reseñas">
                                 <div class="position-absolute top-50 start-50 translate-middle">
                                     <i class="fas fa-lock text-muted"></i>
                                 </div>

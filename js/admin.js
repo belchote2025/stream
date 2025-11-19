@@ -10,7 +10,27 @@ const appState = {
     currentSection: 'dashboard',
     currentSubsection: '',
     isSidebarCollapsed: false,
-    editingItemId: null // ID del item que se está editando
+    editingItemId: null, // ID del item que se está editando
+    userMenuOpen: false,
+    notifications: {
+        items: [],
+        unreadCount: 0,
+        isOpen: false
+    },
+    subscriptionsData: {
+        stats: {},
+        plans: [],
+        list: [],
+        filtered: [],
+        payments: [],
+        filteredPayments: [],
+        filters: {
+            search: '',
+            plan: '',
+            status: '',
+            period: 'all'
+        }
+    }
 };
 
 // Elementos del DOM
@@ -41,24 +61,54 @@ function handleSearch() {
     }
 }
 
-function toggleUserMenu() {
-    const userMenu = elements.userMenu || document.querySelector('.user-menu');
-    if (userMenu) {
-        userMenu.classList.toggle('active');
+function toggleUserMenu(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
     }
+    const userMenu = elements.userMenu || document.querySelector('.user-menu');
+    if (!userMenu) return;
+
+    closeNotifications();
+
+    const dropdown = ensureUserDropdown(userMenu);
+    if (!dropdown) return;
+
+    dropdown.innerHTML = renderUserDropdown();
+
+    const shouldOpen = !userMenu.classList.contains('active');
+    userMenu.classList.toggle('active', shouldOpen);
+    dropdown.classList.toggle('show', shouldOpen);
+    appState.userMenuOpen = shouldOpen;
 }
 
-function toggleNotifications() {
-    const notifications = elements.notifications || document.querySelector('.notifications');
-    if (notifications) {
-        notifications.classList.toggle('active');
+function toggleNotifications(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
     }
+    const notifications = elements.notifications || document.querySelector('#notifications');
+    if (!notifications) return;
+
+    closeUserMenu();
+    loadNotificationsData();
+
+    const panel = ensureNotificationsDropdown(notifications);
+    if (!panel) return;
+
+    panel.innerHTML = renderNotificationsDropdown();
+
+    const shouldOpen = !notifications.classList.contains('active');
+    notifications.classList.toggle('active', shouldOpen);
+    panel.classList.toggle('show', shouldOpen);
+    appState.notifications.isOpen = shouldOpen;
 }
 
 // Inicialización de la aplicación
 function init() {
     // Cargar datos del usuario actual
     loadUserData();
+    loadNotificationsData();
     
     // Configurar event listeners
     setupEventListeners();
@@ -160,6 +210,9 @@ function setupEventListeners() {
             closeUserModal();
         }
     });
+
+    document.addEventListener('click', handleGlobalMenusClose);
+    document.addEventListener('keydown', handleEscapeKeyClose);
     
     // Formulario de contenido
     const contentForm = document.getElementById('contentForm');
@@ -402,7 +455,15 @@ async function loadSection() {
             break;
             
         case 'suscripciones':
-            content = renderSubscriptions();
+            try {
+                const response = await apiRequest('/api/subscriptions/index.php');
+                const payload = response && response.success && response.data ? response.data : {};
+                appState.subscriptionsData = prepareSubscriptionData(payload);
+                content = renderSubscriptions(appState.subscriptionsData);
+            } catch (error) {
+                console.error('Error cargando suscripciones:', error);
+                content = renderError('No se pudieron cargar las suscripciones: ' + error.message);
+            }
             break;
             
         case 'reportes':
@@ -1131,363 +1192,740 @@ function formatStatus(status) {
     return statusMap[status] || status;
 }
 
-// Renderizar suscripciones
-function renderSubscriptions() {
+function formatRelativeTime(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const diff = Date.now() - date.getTime();
+    const minutes = Math.max(0, Math.floor(diff / (1000 * 60)));
+    if (minutes < 1) return 'Justo ahora';
+    if (minutes < 60) return `Hace ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Hace ${hours} h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `Hace ${days} d`;
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+}
+
+function formatNumber(value = 0) {
+    const number = Number(value) || 0;
+    return number.toLocaleString('es-ES');
+}
+
+function formatCurrency(value = 0, currency = 'USD') {
+    const amount = Number(value) || 0;
+    return new Intl.NumberFormat('es-ES', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: 2
+    }).format(amount);
+}
+
+function formatDateShort(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatSubscriptionStatus(status) {
+    const statusMap = {
+        'active': 'Activa',
+        'pending': 'Pendiente',
+        'cancelled': 'Cancelada',
+        'expired': 'Expirada',
+        'paid': 'Pagado',
+        'failed': 'Fallido',
+        'refunded': 'Reembolsado'
+    };
+    return statusMap[status] || status;
+}
+
+function buildSubscriptionRows(subscriptions = []) {
+    if (!subscriptions.length) {
+        return `
+            <tr>
+                <td colspan="7" class="empty-state">
+                    <div class="empty-content">
+                        <i class="fas fa-users-slash"></i>
+                        <h3>No hay suscripciones registradas</h3>
+                        <p>Cuando agregues suscriptores aparecerán aquí.</p>
+                        <button class="btn btn-primary" id="add-first-subscription-btn">
+                            <i class="fas fa-user-plus"></i> Crear suscripción
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    return subscriptions.map(sub => `
+        <tr data-id="${sub.id}" class="${sub.status !== 'active' ? 'inactive-row' : ''}">
+            <td>
+                <div class="user-cell">
+                    <img 
+                        src="${sub.avatar_url || '/streaming-platform/assets/img/default-poster.svg'}" 
+                        alt="${escapeHtml(sub.full_name || sub.username || 'Usuario')}" 
+                        class="user-avatar"
+                        onerror="this.src='/streaming-platform/assets/img/default-poster.svg'"
+                    >
+                    <div class="user-info">
+                        <strong>${escapeHtml(sub.full_name || sub.username || 'Usuario')}</strong>
+                        <span class="username">@${escapeHtml(sub.username || '')}</span>
+                    </div>
+                </div>
+            </td>
+            <td>${escapeHtml(sub.email || 'Sin email')}</td>
+            <td>${renderPlanBadge(sub.plan_name || '')}</td>
+            <td>${formatDateShort(sub.start_date)}</td>
+            <td>${formatDateShort(sub.next_payment_date)}</td>
+            <td>
+                <span class="status ${sub.status}">
+                    <i class="fas fa-circle"></i> ${formatSubscriptionStatus(sub.status)}
+                </span>
+            </td>
+            <td>
+                <div class="action-buttons">
+                    <button class="btn-icon" data-subscription-action="view" data-id="${sub.id}" title="Ver detalles">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn-icon" data-subscription-action="edit" data-id="${sub.id}" title="Editar suscripción">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon danger" data-subscription-action="cancel" data-id="${sub.id}" title="Cancelar suscripción">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function buildPaymentsRows(payments = []) {
+    if (!payments.length) {
+        return `
+            <tr>
+                <td colspan="8" class="empty-state">
+                    <div class="empty-content">
+                        <i class="fas fa-file-invoice"></i>
+                        <h3>Sin movimientos de facturación</h3>
+                        <p>Aquí aparecerán los pagos registrados.</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    return payments.map(payment => `
+        <tr data-id="${payment.id}">
+            <td><strong>#INV-${String(payment.id).padStart(5, '0')}</strong></td>
+            <td>${escapeHtml(payment.full_name || payment.username || 'Usuario')}</td>
+            <td>${formatDateShort(payment.payment_date)}</td>
+            <td>${escapeHtml(payment.plan_name || 'N/D')}</td>
+            <td><strong>${formatCurrency(payment.amount, payment.currency || 'USD')}</strong></td>
+            <td><i class="fas fa-credit-card"></i> ${escapeHtml(payment.payment_method || 'Manual')}</td>
+            <td>
+                <span class="status ${payment.status}">
+                    ${formatSubscriptionStatus(payment.status)}
+                </span>
+            </td>
+            <td>
+                <button class="btn-link" data-payment-id="${payment.id}" title="Ver comprobante">
+                    <i class="fas fa-file-invoice"></i> Ver
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderPlanBadge(planName = '') {
+    const normalized = (planName || '').toLowerCase();
+    let badgeClass = 'free';
+    if (normalized.includes('premium')) {
+        badgeClass = 'premium';
+    } else if (normalized.includes('fam')) {
+        badgeClass = 'family';
+    } else if (normalized.includes('bas')) {
+        badgeClass = 'basic';
+    }
+    
+    return `<span class="badge ${badgeClass}">${escapeHtml(planName || 'Plan')}</span>`;
+}
+
+function prepareSubscriptionData(payload = {}) {
+    const subscriptions = payload.subscriptions || [];
+    const payments = payload.payments || [];
+    
+    return {
+        stats: payload.stats || {},
+        plans: payload.plans || [],
+        list: subscriptions,
+        filtered: subscriptions,
+        payments,
+        filteredPayments: payments,
+        filters: {
+            search: '',
+            plan: '',
+            status: '',
+            period: 'all'
+        }
+    };
+}
+
+function ensureUserDropdown(userMenu) {
+    if (!userMenu) return null;
+    let dropdown = userMenu.querySelector('.user-dropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.className = 'user-dropdown';
+        dropdown.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+        dropdown.addEventListener('click', handleUserDropdownAction);
+        userMenu.appendChild(dropdown);
+    }
+    return dropdown;
+}
+
+function renderUserDropdown() {
+    const name = appState.currentUser?.name || 'Administrador';
+    const email = appState.currentUser?.email || 'admin@streamingplatform.com';
     return `
-        <div class="content-header">
-            <h1>Suscripciones</h1>
-            <button class="btn btn-primary" id="add-subscription-btn">
-                <i class="fas fa-plus"></i> Nueva Suscripción
+        <div class="user-summary">
+            <strong>${escapeHtml(name)}</strong>
+            <span>${escapeHtml(email)}</span>
+        </div>
+        <div class="user-actions">
+            <button class="user-action" data-user-action="profile">
+                <i class="fas fa-user"></i> Ver perfil
+            </button>
+            <button class="user-action" data-user-action="settings">
+                <i class="fas fa-sliders-h"></i> Configuración
+            </button>
+            <button class="user-action" data-user-action="theme">
+                <i class="fas fa-moon"></i> Cambiar tema
             </button>
         </div>
-        
-        <!-- Estadísticas de suscripciones -->
-        <div class="subscription-stats">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Total Suscriptores</h3>
-                    <p class="stat-number">1,234</p>
-                    <p class="stat-change positive">+12% este mes</p>
-                </div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                    <i class="fas fa-crown"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Premium</h3>
-                    <p class="stat-number">856</p>
-                    <p class="stat-change positive">+8% este mes</p>
-                </div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                    <i class="fas fa-home"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Familiar</h3>
-                    <p class="stat-number">234</p>
-                    <p class="stat-change positive">+5% este mes</p>
-                </div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                    <i class="fas fa-dollar-sign"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Ingresos Mensuales</h3>
-                    <p class="stat-number">$12,456</p>
-                    <p class="stat-change positive">+18% este mes</p>
-                </div>
-            </div>
+        <div class="user-actions">
+            <button class="user-action danger" data-user-action="logout">
+                <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+            </button>
         </div>
-        
-        <!-- Filtros y búsqueda -->
-        <div class="subscription-filters">
-            <div class="filter-group">
-                <input type="text" id="subscription-search" class="form-control" placeholder="Buscar por usuario, email o ID...">
-                <i class="fas fa-search"></i>
+    `;
+}
+
+function handleUserDropdownAction(event) {
+    const actionBtn = event.target.closest('[data-user-action]');
+    if (!actionBtn) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const action = actionBtn.dataset.userAction;
+    switch (action) {
+        case 'profile':
+            window.location.href = '/streaming-platform/dashboard/?tab=profile';
+            break;
+        case 'settings':
+            navigateTo('configuracion');
+            closeUserMenu();
+            break;
+        case 'theme':
+            document.body.classList.toggle('theme-alt');
+            showNotification('Tema actualizado', 'success');
+            break;
+        case 'logout':
+            window.location.href = '/streaming-platform/api/auth/logout.php';
+            break;
+        default:
+            break;
+    }
+}
+
+function ensureNotificationsDropdown(container) {
+    if (!container) return null;
+    let dropdown = container.querySelector('.notifications-dropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.className = 'notifications-dropdown';
+        dropdown.addEventListener('click', handleNotificationDropdownClick);
+        container.appendChild(dropdown);
+    }
+    return dropdown;
+}
+
+function renderNotificationsDropdown() {
+    const notifications = appState.notifications.items || [];
+    if (!notifications.length) {
+        return `
+            <div class="notifications-header">
+                <strong>Notificaciones</strong>
+                <button class="btn-link" data-notification-action="refresh">Actualizar</button>
             </div>
-            <div class="filter-group">
-                <select id="plan-filter" class="form-control">
-                    <option value="">Todos los planes</option>
-                    <option value="free">Básico</option>
-                    <option value="premium">Premium</option>
-                    <option value="family">Familiar</option>
-                </select>
+            <div class="notifications-empty">
+                <i class="fas fa-bell-slash"></i>
+                <p>No tienes notificaciones pendientes</p>
             </div>
-            <div class="filter-group">
-                <select id="status-filter" class="form-control">
-                    <option value="">Todos los estados</option>
-                    <option value="active">Activas</option>
-                    <option value="cancelled">Canceladas</option>
-                    <option value="expired">Expiradas</option>
-                </select>
+        `;
+    }
+
+    const list = notifications.map(item => `
+        <div class="notification-item ${item.read ? 'read' : 'unread'}" data-notification-id="${item.id}">
+            <div class="notification-icon">
+                <i class="fas ${item.icon || 'fa-info-circle'}"></i>
             </div>
-            <div class="filter-group">
-                <button class="btn btn-outline" id="export-subscriptions">
-                    <i class="fas fa-download"></i> Exportar
-                </button>
+            <div class="notification-body">
+                <strong>${escapeHtml(item.title)}</strong>
+                <p>${escapeHtml(item.message)}</p>
+                <small>${item.timeAgo || formatRelativeTime(item.timestamp)}</small>
             </div>
+            ${item.read ? '' : `<button class="btn-link" data-notification-action="mark-read" data-id="${item.id}">Marcar leído</button>`}
         </div>
-        
-        <!-- Planes disponibles -->
-        <div class="subscription-section">
-            <div class="section-header">
-                <h2>Planes Disponibles</h2>
-                <button class="btn btn-outline" id="manage-plans-btn">
-                    <i class="fas fa-cog"></i> Gestionar Planes
-                </button>
+    `).join('');
+
+    return `
+        <div class="notifications-header">
+            <strong>Notificaciones</strong>
+            <button class="btn-link" data-notification-action="mark-all">Marcar todo</button>
         </div>
-        
-        <div class="subscription-plans">
-            <div class="plan-card">
+        <div class="notifications-list">
+            ${list}
+        </div>
+        <div class="notifications-footer">
+            <button class="btn btn-outline" data-notification-action="view-all">
+                Ver todo
+            </button>
+            <button class="btn btn-link danger" data-notification-action="clear-all">
+                Limpiar
+            </button>
+        </div>
+    `;
+}
+
+function handleNotificationDropdownClick(event) {
+    event.stopPropagation();
+    const actionBtn = event.target.closest('[data-notification-action]');
+    if (actionBtn) {
+        event.preventDefault();
+        const action = actionBtn.dataset.notificationAction;
+        const id = actionBtn.dataset.id;
+        switch (action) {
+            case 'mark-read':
+                markNotificationAsRead(id);
+                break;
+            case 'mark-all':
+                markAllNotificationsAsRead();
+                break;
+            case 'clear-all':
+                clearNotifications();
+                break;
+            case 'refresh':
+                loadNotificationsData(true);
+                refreshNotificationsDropdown();
+                break;
+            case 'view-all':
+                window.location.href = '/streaming-platform/dashboard/?tab=overview';
+                break;
+            default:
+                break;
+        }
+        return;
+    }
+
+    const item = event.target.closest('.notification-item');
+    if (item) {
+        const id = item.dataset.notificationId;
+        markNotificationAsRead(id);
+        showNotification('Notificación abierta.', 'info');
+    }
+}
+
+function markNotificationAsRead(id) {
+    if (!id) return;
+    const items = appState.notifications.items || [];
+    const notification = items.find(item => String(item.id) === String(id));
+    if (notification && !notification.read) {
+        notification.read = true;
+        updateNotificationBadge();
+        refreshNotificationsDropdown();
+    }
+}
+
+function markAllNotificationsAsRead() {
+    const items = appState.notifications.items || [];
+    items.forEach(item => {
+        item.read = true;
+    });
+    updateNotificationBadge();
+    refreshNotificationsDropdown();
+}
+
+function clearNotifications() {
+    appState.notifications.items = [];
+    updateNotificationBadge();
+    refreshNotificationsDropdown();
+}
+
+function refreshNotificationsDropdown() {
+    if (!appState.notifications.isOpen) return;
+    const notifications = elements.notifications || document.querySelector('#notifications');
+    const panel = notifications?.querySelector('.notifications-dropdown');
+    if (panel) {
+        panel.innerHTML = renderNotificationsDropdown();
+    }
+}
+
+function updateNotificationBadge() {
+    const notifications = elements.notifications || document.querySelector('#notifications');
+    const badge = notifications?.querySelector('.badge');
+    const unread = (appState.notifications.items || []).filter(item => !item.read).length;
+    appState.notifications.unreadCount = unread;
+    if (badge) {
+        badge.textContent = unread;
+        badge.style.display = unread > 0 ? 'inline-flex' : 'none';
+    }
+}
+
+function loadNotificationsData(force = false) {
+    if (!force && appState.notifications.items.length) {
+        updateNotificationBadge();
+        return;
+    }
+
+    const now = Date.now();
+    appState.notifications.items = [
+        {
+            id: 1,
+            title: 'Nueva suscripción Premium',
+            message: 'Sofía Lara se ha unido al plan Premium.',
+            icon: 'fa-crown',
+            timestamp: new Date(now - 2 * 60 * 1000).toISOString(),
+            read: false
+        },
+        {
+            id: 2,
+            title: 'Contenido pendiente de revisión',
+            message: '3 películas necesitan aprobación.',
+            icon: 'fa-film',
+            timestamp: new Date(now - 30 * 60 * 1000).toISOString(),
+            read: false
+        },
+        {
+            id: 3,
+            title: 'Servidor estable',
+            message: 'No se detectaron incidencias en las últimas 24h.',
+            icon: 'fa-check-circle',
+            timestamp: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+            read: true
+        }
+    ];
+
+    updateNotificationBadge();
+}
+
+function handleGlobalMenusClose(event) {
+    const insideUserMenu = event.target.closest('.user-menu');
+    if (!insideUserMenu) {
+        closeUserMenu();
+    }
+
+    const insideNotifications = event.target.closest('#notifications') || event.target.closest('.notifications-dropdown');
+    if (!insideNotifications) {
+        closeNotifications();
+    }
+}
+
+function handleEscapeKeyClose(event) {
+    if (event.key === 'Escape') {
+        closeUserMenu();
+        closeNotifications();
+    }
+}
+
+function closeUserMenu() {
+    const userMenu = elements.userMenu || document.querySelector('.user-menu');
+    if (!userMenu) return;
+    userMenu.classList.remove('active');
+    const dropdown = userMenu.querySelector('.user-dropdown');
+    if (dropdown) {
+        dropdown.classList.remove('show');
+    }
+    appState.userMenuOpen = false;
+}
+
+function closeNotifications() {
+    const notifications = elements.notifications || document.querySelector('#notifications');
+    if (!notifications) return;
+    notifications.classList.remove('active');
+    const panel = notifications.querySelector('.notifications-dropdown');
+    if (panel) {
+        panel.classList.remove('show');
+    }
+    appState.notifications.isOpen = false;
+}
+
+// Renderizar suscripciones
+function renderSubscriptions(data = {}) {
+    const {
+        stats = {},
+        plans = [],
+        filtered = [],
+        filteredPayments = [],
+        filters = {}
+    } = data;
+
+    const planOptions = plans.map(plan => `
+        <option value="${plan.id}" ${Number(filters.plan) === Number(plan.id) ? 'selected' : ''}>
+            ${escapeHtml(plan.name)} (${plan.subscriber_count || 0})
+        </option>
+    `).join('');
+
+    const minPrice = plans.length ? Math.min(...plans.map(plan => parseFloat(plan.price))) : null;
+
+    const planCards = plans.length
+        ? plans.map(plan => `
+            <div class="plan-card ${plan.is_active ? '' : 'disabled'} ${minPrice !== null && parseFloat(plan.price) === minPrice ? 'featured' : ''}">
+                ${minPrice !== null && parseFloat(plan.price) === minPrice ? '<div class="plan-badge">Recomendado</div>' : ''}
                 <div class="plan-header">
-                    <h3>Plan Básico</h3>
+                    <h3>${escapeHtml(plan.name)}</h3>
                     <div class="plan-price">
-                        <span class="amount">$0</span>
-                        <span class="period">/mes</span>
+                        <span class="amount">${formatCurrency(plan.price)}</span>
+                        <span class="period">/${plan.billing_cycle === 'yearly' ? 'año' : 'mes'}</span>
                     </div>
-                        <p class="plan-description">Ideal para empezar</p>
+                    <p class="plan-description">${escapeHtml(plan.description || 'Plan personalizado')}</p>
                 </div>
                 <div class="plan-features">
                     <ul>
-                        <li><i class="fas fa-check"></i> Acceso a contenido básico</li>
-                        <li><i class="fas fa-check"></i> Calidad estándar (SD)</li>
-                        <li><i class="fas fa-check"></i> Un dispositivo a la vez</li>
-                            <li class="disabled"><i class="fas fa-times"></i> Sin anuncios</li>
-                            <li class="disabled"><i class="fas fa-times"></i> Sin descargas</li>
+                        <li><i class="fas fa-check"></i> Calidad ${escapeHtml(plan.video_quality || 'HD')}</li>
+                        <li><i class="fas fa-check"></i> ${plan.max_screens || 1} pantallas simultáneas</li>
+                        <li><i class="fas fa-check"></i> Descargas ${plan.download_limit ? `${plan.download_limit}` : 'limitadas'}</li>
+                        <li>
+                            <i class="fas ${plan.ads_enabled ? 'fa-ad' : 'fa-check'}"></i> 
+                            ${plan.ads_enabled ? 'Incluye anuncios' : 'Sin anuncios'}
+                        </li>
                     </ul>
                 </div>
-                    <div class="plan-stats">
-                        <span><strong>145</strong> usuarios</span>
-                    </div>
+                <div class="plan-stats">
+                    <span><strong>${plan.subscriber_count || 0}</strong> usuarios activos</span>
+                </div>
                 <div class="plan-actions">
-                    <button class="btn btn-outline" disabled>Plan Actual</button>
+                    <button class="btn btn-outline" data-plan-action="edit" data-id="${plan.id}">
+                        <i class="fas fa-edit"></i> Editar plan
+                    </button>
                 </div>
             </div>
-            
-            <div class="plan-card featured">
-                <div class="plan-badge">Recomendado</div>
-                <div class="plan-header">
-                    <h3>Plan Premium</h3>
-                    <div class="plan-price">
-                        <span class="amount">$9.99</span>
-                        <span class="period">/mes</span>
-                    </div>
-                        <p class="plan-description">La mejor experiencia</p>
-                </div>
-                <div class="plan-features">
-                    <ul>
-                        <li><i class="fas fa-check"></i> Acceso a todo el contenido</li>
-                        <li><i class="fas fa-check"></i> Calidad Full HD</li>
-                        <li><i class="fas fa-check"></i> Hasta 4 dispositivos</li>
-                        <li><i class="fas fa-check"></i> Sin anuncios</li>
-                        <li><i class="fas fa-check"></i> Descargas ilimitadas</li>
-                    </ul>
-                </div>
-                    <div class="plan-stats">
-                        <span><strong>856</strong> usuarios</span>
-                    </div>
-                <div class="plan-actions">
-                    <button class="btn btn-primary">Actualizar a Premium</button>
+        `).join('')
+        : `
+            <div class="empty-state">
+                <div class="empty-content">
+                    <i class="fas fa-layer-group"></i>
+                    <h3>No hay planes configurados</h3>
+                    <p>Crea un plan para comenzar a vender suscripciones.</p>
+                    <button class="btn btn-primary" id="create-first-plan-btn">
+                        <i class="fas fa-plus"></i> Crear plan
+                    </button>
                 </div>
             </div>
-            
-            <div class="plan-card">
-                <div class="plan-header">
-                    <h3>Plan Familiar</h3>
-                    <div class="plan-price">
-                        <span class="amount">$14.99</span>
-                        <span class="period">/mes</span>
-                    </div>
-                        <p class="plan-description">Para toda la familia</p>
+        `;
+
+    const subscriptionRows = buildSubscriptionRows(filtered);
+    const paymentsRows = buildPaymentsRows(filteredPayments);
+
+    return `
+        <div class="subscription-view">
+            <div class="content-header">
+                <div>
+                    <h1>Suscripciones</h1>
+                    <p class="text-muted">Gestiona planes, suscriptores y cobros</p>
                 </div>
-                <div class="plan-features">
-                    <ul>
-                        <li><i class="fas fa-check"></i> Acceso a todo el contenido</li>
-                        <li><i class="fas fa-check"></i> Calidad 4K Ultra HD</li>
-                        <li><i class="fas fa-check"></i> Hasta 6 perfiles</li>
-                        <li><i class="fas fa-check"></i> Sin anuncios</li>
-                        <li><i class="fas fa-check"></i> Descargas ilimitadas</li>
-                    </ul>
-                </div>
-                    <div class="plan-stats">
-                        <span><strong>234</strong> usuarios</span>
-                    </div>
-                <div class="plan-actions">
-                    <button class="btn btn-outline">Seleccionar Plan</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Lista de suscripciones activas -->
-        <div class="subscription-section">
-            <div class="section-header">
-                <h2>Suscripciones Activas</h2>
-                <div class="section-actions">
-                    <button class="btn btn-outline" id="refresh-subscriptions">
-                        <i class="fas fa-sync-alt"></i> Actualizar
+                <div class="header-actions">
+                    <button class="btn btn-outline" id="export-subscriptions">
+                        <i class="fas fa-download"></i> Exportar
+                    </button>
+                    <button class="btn btn-primary" id="add-subscription-btn">
+                        <i class="fas fa-plus"></i> Nueva Suscripción
                     </button>
                 </div>
             </div>
             
-            <div class="table-container">
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                                <th>Usuario</th>
-                                <th>Email</th>
-                                <th>Plan</th>
-                                <th>Fecha Inicio</th>
-                                <th>Próximo Pago</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>
-                                    <div class="user-cell">
-                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
-                                        <span>Juan Pérez</span>
-                                    </div>
-                                </td>
-                                <td>juan.perez@email.com</td>
-                                <td><span class="badge premium">Premium</span></td>
-                                <td>15/10/2023</td>
-                                <td>15/11/2023</td>
-                                <td><span class="status active">Activa</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-icon" title="Ver detalles"><i class="fas fa-eye"></i></button>
-                                        <button class="btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
-                                        <button class="btn-icon danger" title="Cancelar"><i class="fas fa-times"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <div class="user-cell">
-                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
-                                        <span>María García</span>
-                                    </div>
-                                </td>
-                                <td>maria.garcia@email.com</td>
-                                <td><span class="badge family">Familiar</span></td>
-                                <td>01/10/2023</td>
-                                <td>01/11/2023</td>
-                                <td><span class="status active">Activa</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-icon" title="Ver detalles"><i class="fas fa-eye"></i></button>
-                                        <button class="btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
-                                        <button class="btn-icon danger" title="Cancelar"><i class="fas fa-times"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <div class="user-cell">
-                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
-                                        <span>Carlos López</span>
-                                    </div>
-                                </td>
-                                <td>carlos.lopez@email.com</td>
-                                <td><span class="badge premium">Premium</span></td>
-                                <td>20/09/2023</td>
-                                <td>20/10/2023</td>
-                                <td><span class="status active">Activa</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-icon" title="Ver detalles"><i class="fas fa-eye"></i></button>
-                                        <button class="btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
-                                        <button class="btn-icon danger" title="Cancelar"><i class="fas fa-times"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div class="subscription-stats">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${formatNumber(stats.totalSubscribers)}</h3>
+                        <p>Suscriptores totales</p>
+                        <span class="trend positive">
+                            <i class="fas fa-chart-line"></i> ${stats.subscriberGrowth || '+0%'} este mes
+                        </span>
+                    </div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Historial de facturación -->
-        <div class="subscription-section">
-            <div class="section-header">
-                <h2>Historial de Facturación</h2>
-                <div class="section-actions">
-                    <select id="billing-period" class="form-control">
-                        <option value="all">Todos los períodos</option>
-                        <option value="month">Este mes</option>
-                        <option value="quarter">Este trimestre</option>
-                        <option value="year">Este año</option>
-                    </select>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${formatNumber(stats.activeSubscriptions)}</h3>
+                        <p>Activas</p>
+                        <span class="trend positive">
+                            <i class="fas fa-check-circle"></i> ${
+                                stats.totalSubscribers
+                                    ? Math.round((stats.activeSubscriptions / stats.totalSubscribers) * 100)
+                                    : 0
+                            }% activas
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${formatCurrency(stats.monthlyRecurringRevenue || 0)}</h3>
+                        <p>MRR estimado</p>
+                        <span class="trend positive">
+                            <i class="fas fa-sync"></i> Renovaciones próximas: ${stats.upcomingRenewals || 0}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${formatNumber(stats.pendingPayments || 0)}</h3>
+                        <p>Pagos pendientes</p>
+                        <span class="trend negative">
+                            <i class="fas fa-arrow-down"></i> ${stats.cancelledThisMonth || 0} canceladas este mes
+                        </span>
+                    </div>
                 </div>
             </div>
             
-            <div class="table-container">
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID de Factura</th>
-                                <th>Usuario</th>
-                            <th>Fecha</th>
-                            <th>Plan</th>
-                            <th>Monto</th>
-                                <th>Método de Pago</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                                <td><strong>#INV-2023-001</strong></td>
-                                <td>Juan Pérez</td>
-                            <td>10/10/2023</td>
-                            <td>Premium Mensual</td>
-                                <td><strong>$9.99</strong></td>
-                                <td><i class="fab fa-cc-visa"></i> Visa •••• 4242</td>
-                            <td><span class="status active">Pagado</span></td>
-                                <td>
-                                    <button class="btn-link" title="Ver factura">
-                                        <i class="fas fa-file-invoice"></i> Ver
-                                    </button>
-                                </td>
-                        </tr>
-                        <tr>
-                                <td><strong>#INV-2023-002</strong></td>
-                                <td>María García</td>
-                                <td>10/10/2023</td>
-                                <td>Familiar Mensual</td>
-                                <td><strong>$14.99</strong></td>
-                                <td><i class="fab fa-cc-paypal"></i> PayPal</td>
-                                <td><span class="status active">Pagado</span></td>
-                                <td>
-                                    <button class="btn-link" title="Ver factura">
-                                        <i class="fas fa-file-invoice"></i> Ver
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><strong>#INV-2023-003</strong></td>
-                                <td>Carlos López</td>
-                            <td>10/09/2023</td>
-                            <td>Premium Mensual</td>
-                                <td><strong>$9.99</strong></td>
-                                <td><i class="fab fa-cc-mastercard"></i> Mastercard •••• 8888</td>
-                            <td><span class="status active">Pagado</span></td>
-                                <td>
-                                    <button class="btn-link" title="Ver factura">
-                                        <i class="fas fa-file-invoice"></i> Ver
-                                    </button>
-                                </td>
-                        </tr>
-                        <tr>
-                                <td><strong>#INV-2023-004</strong></td>
-                                <td>Ana Martínez</td>
-                                <td>09/10/2023</td>
-                            <td>Premium Mensual</td>
-                                <td><strong>$9.99</strong></td>
-                                <td><i class="fab fa-cc-visa"></i> Visa •••• 1234</td>
-                                <td><span class="status warning">Pendiente</span></td>
-                                <td>
-                                    <button class="btn-link" title="Ver factura">
-                                        <i class="fas fa-file-invoice"></i> Ver
-                                    </button>
-                                </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="subscription-filters">
+                <div class="filter-group">
+                    <input 
+                        type="text" 
+                        id="subscription-search" 
+                        class="form-control" 
+                        placeholder="Buscar por usuario, email o ID..." 
+                        value="${filters.search || ''}"
+                    >
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="filter-group">
+                    <select id="plan-filter" class="form-control">
+                        <option value="">Todos los planes</option>
+                        ${planOptions}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <select id="status-filter" class="form-control">
+                        <option value="">Todos los estados</option>
+                        <option value="active" ${filters.status === 'active' ? 'selected' : ''}>Activas</option>
+                        <option value="pending" ${filters.status === 'pending' ? 'selected' : ''}>Pendientes</option>
+                        <option value="cancelled" ${filters.status === 'cancelled' ? 'selected' : ''}>Canceladas</option>
+                        <option value="expired" ${filters.status === 'expired' ? 'selected' : ''}>Expiradas</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <button class="btn btn-outline" id="manage-plans-btn">
+                        <i class="fas fa-cog"></i> Gestionar planes
+                    </button>
+                </div>
+            </div>
+            
+            <div class="subscription-section">
+                <div class="section-header">
+                    <div>
+                        <h2>Planes disponibles</h2>
+                        <p class="text-muted">${plans.length} plan${plans.length === 1 ? '' : 'es'} configurado${plans.length === 1 ? '' : 's'}</p>
+                    </div>
+                    <div class="section-actions">
+                        <button class="btn btn-primary" id="add-plan-btn">
+                            <i class="fas fa-layer-plus"></i> Nuevo plan
+                        </button>
+                    </div>
+                </div>
+                <div class="subscription-plans">
+                    ${planCards}
+                </div>
+            </div>
+            
+            <div class="subscription-section">
+                <div class="section-header">
+                    <div>
+                        <h2>Suscripciones activas</h2>
+                        <p class="text-muted" data-subscription-count>${filtered.length} resultado${filtered.length === 1 ? '' : 's'}</p>
+                    </div>
+                    <div class="section-actions">
+                        <button class="btn btn-outline" id="refresh-subscriptions">
+                            <i class="fas fa-sync-alt"></i> Actualizar
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <div class="table-responsive">
+                        <table class="data-table" data-type="subscriptions">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Email</th>
+                                    <th>Plan</th>
+                                    <th>Inicio</th>
+                                    <th>Próximo pago</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subscriptions-table-body">
+                                ${subscriptionRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="subscription-section">
+                <div class="section-header">
+                    <div>
+                        <h2>Historial de facturación</h2>
+                        <p class="text-muted" data-payments-count>${filteredPayments.length} movimiento${filteredPayments.length === 1 ? '' : 's'}</p>
+                    </div>
+                    <div class="section-actions">
+                        <select id="billing-period" class="form-control">
+                            <option value="all" ${filters.period === 'all' ? 'selected' : ''}>Todos los períodos</option>
+                            <option value="month" ${filters.period === 'month' ? 'selected' : ''}>Este mes</option>
+                            <option value="quarter" ${filters.period === 'quarter' ? 'selected' : ''}>Este trimestre</option>
+                            <option value="year" ${filters.period === 'year' ? 'selected' : ''}>Este año</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <div class="table-responsive">
+                        <table class="data-table" data-type="payments">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Usuario</th>
+                                    <th>Fecha</th>
+                                    <th>Plan</th>
+                                    <th>Monto</th>
+                                    <th>Método</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payments-table-body">
+                                ${paymentsRows}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2401,9 +2839,22 @@ async function viewItem(id, type) {
 async function deleteItem(id, title, type) {
     if (confirm(`¿Estás seguro de que quieres eliminar "${title}"? Esta acción no se puede deshacer.`)) {
         try {
-            const endpoint = type === 'peliculas' || type === 'series' 
-                ? `/api/movies/index.php?id=${id}`
-                : `/api/${type}/${id}`;
+            let endpoint;
+            switch (type) {
+                case 'usuarios':
+                case 'users':
+                case 'user':
+                    endpoint = `/api/users/index.php?id=${id}`;
+                    break;
+                case 'peliculas':
+                case 'movies':
+                case 'series':
+                    endpoint = `/api/movies/index.php?id=${id}`;
+                    break;
+                default:
+                    endpoint = `/api/${type}/index.php?id=${id}`;
+                    break;
+            }
             
             const response = await apiRequest(endpoint, { method: 'DELETE' });
             if (response.success || response.status === 'success') {
@@ -2946,6 +3397,636 @@ function initDynamicComponents() {
         trigger.addEventListener('mouseenter', showTooltip);
         trigger.addEventListener('mouseleave', hideTooltip);
     });
+
+    // Interacciones específicas de la tabla de usuarios
+    setupUserTableInteractions();
+    setupSubscriptionInteractions();
+}
+
+// Configurar eventos de la tabla de usuarios
+function setupUserTableInteractions() {
+    const userTable = document.querySelector('.data-table[data-type="users"]');
+    if (!userTable) {
+        return;
+    }
+
+    const selectAllCheckbox = document.getElementById('select-all-users');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', handleSelectAllUsers);
+    }
+
+    userTable.querySelectorAll('.user-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedUsersCount);
+    });
+
+    userTable.addEventListener('click', handleUserTableClick);
+
+    const refreshUsersBtn = document.getElementById('refresh-users-btn');
+    if (refreshUsersBtn) {
+        refreshUsersBtn.addEventListener('click', handleRefreshUsers);
+    }
+}
+
+function handleSelectAllUsers(event) {
+    const userTable = document.querySelector('.data-table[data-type="users"]');
+    if (!userTable) return;
+
+    const allCheckboxes = userTable.querySelectorAll('.user-checkbox');
+    allCheckboxes.forEach(checkbox => {
+        checkbox.checked = event.target.checked;
+    });
+
+    updateSelectedUsersCount();
+}
+
+function updateSelectedUsersCount() {
+    const userTable = document.querySelector('.data-table[data-type="users"]');
+    if (!userTable) return;
+
+    const totalUsers = userTable.querySelectorAll('.user-checkbox').length;
+    const selectedUsers = userTable.querySelectorAll('.user-checkbox:checked').length;
+    const counter = document.querySelector('.user-table-container .user-count');
+
+    if (!counter) return;
+
+    const baseLabel = `${totalUsers} usuario${totalUsers !== 1 ? 's' : ''}`;
+    counter.textContent = selectedUsers > 0
+        ? `${baseLabel} · ${selectedUsers} seleccionado${selectedUsers !== 1 ? 's' : ''}`
+        : baseLabel;
+}
+
+function handleUserTableClick(event) {
+    const passwordBtn = event.target.closest('.btn-password-toggle');
+    if (passwordBtn) {
+        event.preventDefault();
+        togglePasswordView(passwordBtn);
+        return;
+    }
+
+    const resetBtn = event.target.closest('.btn-reset-password');
+    if (resetBtn) {
+        event.preventDefault();
+        const userId = resetBtn.dataset.id || resetBtn.closest('tr')?.dataset.id;
+        resetUserPassword(userId);
+        return;
+    }
+
+    const actionBtn = event.target.closest('.action-buttons .btn-icon');
+    if (!actionBtn) return;
+
+    event.preventDefault();
+
+    const action = actionBtn.dataset.action;
+    const row = actionBtn.closest('tr');
+    const userId = actionBtn.dataset.id || row?.dataset.id;
+    if (!action || !userId) return;
+
+    switch (action) {
+        case 'view':
+            viewItem(userId, 'usuarios');
+            break;
+        case 'edit':
+            editItem(userId, 'usuarios');
+            break;
+        case 'delete': {
+            const username = row?.querySelector('.user-info strong')?.textContent?.trim() || 'este usuario';
+            deleteItem(userId, username, 'usuarios');
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+function handleRefreshUsers(event) {
+    event.preventDefault();
+
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.classList.add('is-refreshing');
+
+    loadSection();
+
+    // Evitar que el botón quede deshabilitado si la carga falla
+    setTimeout(() => {
+        button.disabled = false;
+        button.classList.remove('is-refreshing');
+    }, 1500);
+}
+
+// Configurar eventos de la sección de suscripciones
+function setupSubscriptionInteractions() {
+    const subscriptionView = document.querySelector('.subscription-view');
+    if (!subscriptionView) {
+        return;
+    }
+
+    const searchInput = document.getElementById('subscription-search');
+    if (searchInput) {
+        let debounceTimer;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                updateSubscriptionFilter('search', e.target.value.trim());
+            }, 250);
+        });
+    }
+
+    const planFilter = document.getElementById('plan-filter');
+    if (planFilter) {
+        planFilter.addEventListener('change', (e) => {
+            updateSubscriptionFilter('plan', e.target.value);
+        });
+    }
+
+    const statusFilter = document.getElementById('status-filter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', (e) => {
+            updateSubscriptionFilter('status', e.target.value);
+        });
+    }
+
+    const billingPeriod = document.getElementById('billing-period');
+    if (billingPeriod) {
+        billingPeriod.addEventListener('change', (e) => {
+            filterPaymentsByPeriod(e.target.value);
+        });
+    }
+
+    const addSubscriptionBtn = document.getElementById('add-subscription-btn');
+    if (addSubscriptionBtn) {
+        addSubscriptionBtn.addEventListener('click', handleAddSubscription);
+    }
+
+    const addFirstSubscriptionBtn = document.getElementById('add-first-subscription-btn');
+    if (addFirstSubscriptionBtn) {
+        addFirstSubscriptionBtn.addEventListener('click', handleAddSubscription);
+    }
+
+    const refreshBtn = document.getElementById('refresh-subscriptions');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', handleRefreshSubscriptions);
+    }
+
+    const exportBtn = document.getElementById('export-subscriptions');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', handleExportSubscriptions);
+    }
+
+    const managePlansBtn = document.getElementById('manage-plans-btn');
+    if (managePlansBtn) {
+        managePlansBtn.addEventListener('click', handleManagePlans);
+    }
+
+    const addPlanBtn = document.getElementById('add-plan-btn');
+    if (addPlanBtn) {
+        addPlanBtn.addEventListener('click', handleCreatePlan);
+    }
+
+    const createFirstPlanBtn = document.getElementById('create-first-plan-btn');
+    if (createFirstPlanBtn) {
+        createFirstPlanBtn.addEventListener('click', handleCreatePlan);
+    }
+
+    subscriptionView.addEventListener('click', handleSubscriptionActionClick);
+}
+
+function updateSubscriptionFilter(key, value) {
+    if (!appState.subscriptionsData || !appState.subscriptionsData.filters) return;
+    appState.subscriptionsData.filters[key] = value;
+    applySubscriptionFilters();
+}
+
+function applySubscriptionFilters() {
+    const data = appState.subscriptionsData;
+    if (!data) return;
+
+    const search = (data.filters.search || '').toLowerCase();
+    const planFilter = data.filters.plan;
+    const statusFilter = data.filters.status;
+
+    let filtered = [...(data.list || [])];
+
+    if (search) {
+        filtered = filtered.filter(sub => {
+            return (
+                (sub.username && sub.username.toLowerCase().includes(search)) ||
+                (sub.full_name && sub.full_name.toLowerCase().includes(search)) ||
+                (sub.email && sub.email.toLowerCase().includes(search)) ||
+                String(sub.id).includes(search)
+            );
+        });
+    }
+
+    if (planFilter) {
+        filtered = filtered.filter(sub => String(sub.plan_id) === String(planFilter));
+    }
+
+    if (statusFilter) {
+        filtered = filtered.filter(sub => sub.status === statusFilter);
+    }
+
+    data.filtered = filtered;
+    updateSubscriptionTable(filtered);
+    updateSubscriptionCounters();
+}
+
+function updateSubscriptionTable(list = []) {
+    const tbody = document.getElementById('subscriptions-table-body');
+    if (tbody) {
+        tbody.innerHTML = buildSubscriptionRows(list);
+    }
+}
+
+function filterPaymentsByPeriod(period) {
+    const data = appState.subscriptionsData;
+    if (!data) return;
+
+    data.filters.period = period;
+    const payments = data.payments || [];
+
+    if (period === 'all') {
+        data.filteredPayments = payments;
+        updatePaymentsTable(payments);
+        updateSubscriptionCounters();
+        return;
+    }
+
+    const now = new Date();
+    let startDate;
+
+    switch (period) {
+        case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        case 'quarter':
+            const quarter = Math.floor(now.getMonth() / 3);
+            startDate = new Date(now.getFullYear(), quarter * 3, 1);
+            break;
+        case 'year':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            break;
+        default:
+            startDate = null;
+            break;
+    }
+
+    const filtered = payments.filter(payment => {
+        if (!startDate) return true;
+        const paymentDate = new Date(payment.payment_date);
+        return paymentDate >= startDate;
+    });
+
+    data.filteredPayments = filtered;
+    updatePaymentsTable(filtered);
+    updateSubscriptionCounters();
+}
+
+function updatePaymentsTable(list = []) {
+    const tbody = document.getElementById('payments-table-body');
+    if (tbody) {
+        tbody.innerHTML = buildPaymentsRows(list);
+    }
+}
+
+function updateSubscriptionCounters() {
+    const data = appState.subscriptionsData;
+    if (!data) return;
+
+    const subscriptionLabel = document.querySelector('[data-subscription-count]');
+    if (subscriptionLabel) {
+        const count = data.filtered ? data.filtered.length : 0;
+        subscriptionLabel.textContent = `${count} resultado${count === 1 ? '' : 's'}`;
+    }
+
+    const paymentsLabel = document.querySelector('[data-payments-count]');
+    if (paymentsLabel) {
+        const count = data.filteredPayments ? data.filteredPayments.length : 0;
+        paymentsLabel.textContent = `${count} movimiento${count === 1 ? '' : 's'}`;
+    }
+}
+
+function handleSubscriptionActionClick(event) {
+    const actionBtn = event.target.closest('[data-subscription-action]');
+    if (actionBtn) {
+        const action = actionBtn.dataset.subscriptionAction;
+        const subscriptionId = actionBtn.dataset.id;
+        if (!action || !subscriptionId) return;
+
+        switch (action) {
+            case 'view':
+                showSubscriptionDetails(subscriptionId);
+                break;
+            case 'edit':
+                editSubscription(subscriptionId);
+                break;
+            case 'cancel':
+                cancelSubscription(subscriptionId);
+                break;
+            default:
+                break;
+        }
+        return;
+    }
+
+    const planBtn = event.target.closest('[data-plan-action]');
+    if (planBtn) {
+        const planId = planBtn.dataset.id;
+        if (planId) {
+            handlePlanInlineEdit(planId);
+        }
+    }
+}
+
+function showSubscriptionDetails(subscriptionId) {
+    const subscription = (appState.subscriptionsData?.list || []).find(sub => String(sub.id) === String(subscriptionId));
+    if (!subscription) {
+        alert('No se encontró la suscripción solicitada.');
+        return;
+    }
+
+    const details = [
+        `Usuario: ${subscription.full_name || subscription.username || 'N/D'}`,
+        `Email: ${subscription.email || 'N/D'}`,
+        `Plan: ${subscription.plan_name} (${formatCurrency(subscription.plan_price)})`,
+        `Estado: ${formatSubscriptionStatus(subscription.status)}`,
+        `Inicio: ${formatDateShort(subscription.start_date)}`,
+        `Próximo pago: ${formatDateShort(subscription.next_payment_date)}`,
+        `Renovación automática: ${subscription.auto_renew ? 'Sí' : 'No'}`
+    ].join('\n');
+
+    alert(`Detalles de la suscripción #${subscription.id}\n\n${details}`);
+}
+
+async function editSubscription(subscriptionId) {
+    const data = appState.subscriptionsData;
+    if (!data) return;
+
+    const plans = data.plans || [];
+    const planList = plans.map(plan => `${plan.id}: ${plan.name} (${formatCurrency(plan.price)})`).join('\n');
+    const newPlanId = prompt(`Ingresa el ID del nuevo plan:\n${planList}`);
+    if (!newPlanId) return;
+
+    const cycle = prompt('Ciclo de facturación (monthly/yearly):', 'monthly');
+    if (!cycle) return;
+
+    const status = prompt('Estado (active/pending/cancelled/expired):', 'active');
+    if (!status) return;
+
+    try {
+        const response = await apiRequest(`/api/subscriptions/index.php?id=${subscriptionId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                plan_id: parseInt(newPlanId, 10),
+                billing_cycle: cycle,
+                status
+            })
+        });
+
+        if (response.success) {
+            showNotification('Suscripción actualizada correctamente.', 'success');
+            await loadSection();
+        } else {
+            throw new Error(response.error || 'No se pudo actualizar la suscripción');
+        }
+    } catch (error) {
+        console.error(error);
+        showNotification(`Error al actualizar: ${error.message}`, 'error');
+    }
+}
+
+async function cancelSubscription(subscriptionId) {
+    if (!confirm('¿Seguro que deseas cancelar esta suscripción?')) {
+        return;
+    }
+
+    try {
+        const response = await apiRequest(`/api/subscriptions/index.php?id=${subscriptionId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.success) {
+            showNotification('Suscripción cancelada correctamente.', 'success');
+            await loadSection();
+        } else {
+            throw new Error(response.error || 'No se pudo cancelar la suscripción');
+        }
+    } catch (error) {
+        console.error(error);
+        showNotification(`Error al cancelar: ${error.message}`, 'error');
+    }
+}
+
+async function handleAddSubscription() {
+    const data = appState.subscriptionsData;
+    if (!data) return;
+
+    const userId = prompt('ID del usuario:');
+    const parsedUserId = parseInt(userId, 10);
+    if (!userId || Number.isNaN(parsedUserId)) {
+        alert('ID de usuario inválido.');
+        return;
+    }
+
+    const planList = (data.plans || []).map(plan => `${plan.id}: ${plan.name}`).join('\n');
+    const planId = prompt(`ID del plan:\n${planList}`);
+    const parsedPlanId = parseInt(planId, 10);
+    if (!planId || Number.isNaN(parsedPlanId)) {
+        alert('ID de plan inválido.');
+        return;
+    }
+
+    const billingCycle = prompt('Ciclo de facturación (monthly/yearly):', 'monthly');
+    if (!billingCycle || !['monthly', 'yearly'].includes(billingCycle)) {
+        alert('Ciclo de facturación no válido.');
+        return;
+    }
+
+    try {
+        const response = await apiRequest('/api/subscriptions/index.php', {
+            method: 'POST',
+            body: JSON.stringify({
+                user_id: parsedUserId,
+                plan_id: parsedPlanId,
+                billing_cycle: billingCycle,
+                create_payment: true
+            })
+        });
+
+        if (response.success) {
+            showNotification('Suscripción creada correctamente.', 'success');
+            await loadSection();
+        } else {
+            throw new Error(response.error || 'No se pudo crear la suscripción');
+        }
+    } catch (error) {
+        console.error(error);
+        showNotification(`Error al crear suscripción: ${error.message}`, 'error');
+    }
+}
+
+async function handleRefreshSubscriptions() {
+    const button = document.getElementById('refresh-subscriptions');
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
+    }
+
+    try {
+        await loadSection();
+        showNotification('Suscripciones actualizadas.', 'success');
+    } catch (error) {
+        console.error(error);
+        showNotification('No se pudieron recargar las suscripciones.', 'error');
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-sync-alt"></i> Actualizar';
+        }
+    }
+}
+
+async function handleExportSubscriptions() {
+    const data = appState.subscriptionsData;
+    if (!data || !data.filtered || !data.filtered.length) {
+        showNotification('No hay suscripciones para exportar.', 'warning');
+        return;
+    }
+
+    const headers = ['ID', 'Usuario', 'Email', 'Plan', 'Estado', 'Inicio', 'Próximo pago'];
+    const rows = data.filtered.map(sub => [
+        sub.id,
+        sub.full_name || sub.username || '',
+        sub.email || '',
+        sub.plan_name || '',
+        sub.status,
+        formatDateShort(sub.start_date),
+        formatDateShort(sub.next_payment_date)
+    ]);
+
+    const csvContent = [headers, ...rows]
+        .map(row => row.map(value => `"${String(value || '').replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `suscripciones_${Date.now()}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+async function handleManagePlans() {
+    const data = appState.subscriptionsData;
+    if (!data) return;
+
+    const plans = data.plans || [];
+    if (!plans.length) {
+        alert('No hay planes disponibles. Crea uno nuevo.');
+        handleCreatePlan();
+        return;
+    }
+
+    const planList = plans.map(plan => `${plan.id}: ${plan.name} (${formatCurrency(plan.price)})`).join('\n');
+    const selection = prompt(`Planes disponibles:\n${planList}\n\nIngresa el ID para editar o escribe "nuevo" para crear:`);
+    if (!selection) return;
+
+    if (selection.toLowerCase() === 'nuevo') {
+        handleCreatePlan();
+        return;
+    }
+
+    const planId = parseInt(selection, 10);
+    if (Number.isNaN(planId)) {
+        alert('ID inválido.');
+        return;
+    }
+
+    handlePlanInlineEdit(planId);
+}
+
+async function handlePlanInlineEdit(planId) {
+    const plans = appState.subscriptionsData?.plans || [];
+    const plan = plans.find(p => Number(p.id) === Number(planId));
+    if (!plan) {
+        alert('Plan no encontrado. Actualiza la lista e inténtalo nuevamente.');
+        return;
+    }
+
+    const newPrice = prompt(`Nuevo precio para ${plan.name}:`, plan.price);
+    if (newPrice === null) return;
+    const parsedPrice = parseFloat(newPrice);
+    if (Number.isNaN(parsedPrice)) {
+        alert('Precio inválido.');
+        return;
+    }
+
+    const description = prompt('Descripción del plan:', plan.description || '');
+
+    try {
+        const response = await apiRequest(`/api/subscriptions/index.php?resource=plans&id=${planId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                price: parsedPrice,
+                description
+            })
+        });
+
+        if (response.success) {
+            showNotification('Plan actualizado correctamente.', 'success');
+            await loadSection();
+        } else {
+            throw new Error(response.error || 'No se pudo actualizar el plan');
+        }
+    } catch (error) {
+        console.error(error);
+        showNotification(`Error al actualizar plan: ${error.message}`, 'error');
+    }
+}
+
+async function handleCreatePlan() {
+    const name = prompt('Nombre del plan:');
+    if (!name) return;
+
+    const price = prompt('Precio mensual (ej. 9.99):', '9.99');
+    if (price === null) return;
+    const parsedPrice = parseFloat(price);
+    if (Number.isNaN(parsedPrice)) {
+        alert('Precio inválido.');
+        return;
+    }
+
+    const billingCycle = prompt('Ciclo de facturación (monthly/yearly):', 'monthly');
+    if (!billingCycle) return;
+
+    const videoQuality = prompt('Calidad de video (HD/Full HD/4K):', 'HD');
+    if (!videoQuality) return;
+
+    try {
+        const response = await apiRequest('/api/subscriptions/index.php?resource=plans', {
+            method: 'POST',
+            body: JSON.stringify({
+                name,
+                price: parsedPrice,
+                billing_cycle: billingCycle,
+                video_quality: videoQuality,
+                description: `${name} - ${videoQuality}`,
+                max_screens: 2,
+                download_limit: 5,
+                ads_enabled: 0
+            })
+        });
+
+        if (response.success) {
+            showNotification('Plan creado correctamente.', 'success');
+            await loadSection();
+        } else {
+            throw new Error(response.error || 'No se pudo crear el plan');
+        }
+    } catch (error) {
+        console.error(error);
+        showNotification(`Error al crear plan: ${error.message}`, 'error');
+    }
 }
 
 // Mostrar tooltip

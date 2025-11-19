@@ -249,7 +249,7 @@ try {
              role="tabpanel" 
              aria-labelledby="all-tab">
             <?php if (!empty($watchlistItems)): ?>
-                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4">
+                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4 watchlist-container">
                     <?php foreach ($watchlistItems as $item): ?>
                         <?php include __DIR__ . '/../includes/watchlist-item.php'; ?>
                     <?php endforeach; ?>
@@ -280,7 +280,7 @@ try {
             
             if (!empty($movies)): 
             ?>
-                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4">
+                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4 watchlist-container">
                     <?php foreach ($movies as $item): ?>
                         <?php include __DIR__ . '/../includes/watchlist-item.php'; ?>
                     <?php endforeach; ?>
@@ -311,7 +311,7 @@ try {
             
             if (!empty($tvShows)): 
             ?>
-                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4">
+                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4 watchlist-container">
                     <?php foreach ($tvShows as $item): ?>
                         <?php include __DIR__ . '/../includes/watchlist-item.php'; ?>
                     <?php endforeach; ?>
@@ -348,7 +348,7 @@ try {
             
             if (!empty($inProgress)): 
             ?>
-                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4">
+                <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4 watchlist-container">
                     <?php foreach ($inProgress as $item): ?>
                         <?php include __DIR__ . '/../includes/watchlist-item.php'; ?>
                     <?php endforeach; ?>

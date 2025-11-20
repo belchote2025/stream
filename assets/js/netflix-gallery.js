@@ -530,6 +530,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Play content
     async function playContent(contentId, contentType = 'movie') {
+        if (typeof window.playContent === 'function' && window.playContent !== playContent) {
+            window.playContent(contentId, contentType);
+            return;
+        }
+
         try {
             // Stop any currently playing video
             stopCurrentVideo();

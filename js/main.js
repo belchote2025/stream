@@ -257,9 +257,16 @@ async function loadPopularContent() {
 function createContentCard(item, type) {
     const card = document.createElement('div');
     card.className = 'content-card';
+    card.dataset.id = item.id;
+    card.dataset.type = type;
     
     const isPremium = item.is_premium ? '<span class="premium-badge">PREMIUM</span>' : '';
     const hasTorrent = item.torrent_magnet ? '<span class="torrent-badge" title="Disponible por Torrent"><i class="fas fa-magnet"></i></span>' : '';
+    const year = item.release_year ? `<span>${item.release_year}</span>` : '';
+    const durationLabel = type === 'movie'
+        ? `${item.duration || 'N/D'} min`
+        : (item.seasons ? `${item.seasons} Temporada${item.seasons > 1 ? 's' : ''}` : 'Serie');
+    const rating = item.rating ? `<span>•</span><span>⭐ ${parseFloat(item.rating).toFixed(1)}</span>` : '';
     
     card.innerHTML = `
         <img src="${item.poster_url || 'assets/images/placeholder-poster.png'}" alt="${item.title}">
@@ -268,29 +275,32 @@ function createContentCard(item, type) {
             ${hasTorrent}
         </div>
         <div class="content-info">
-            <h3>${item.title}</h3>
+            <h3 class="content-title">${item.title}</h3>
             <div class="content-meta">
-                <span>${item.release_year}</span>
-                <span>•</span>
-                <span>${type === 'movie' ? `${item.duration} min` : (item.seasons + ' Temporada' + (item.seasons > 1 ? 's' : ''))}</span>
+                ${year}
+                ${year ? '<span>•</span>' : ''}
+                <span>${durationLabel}</span>
+                ${rating}
             </div>
-            <button class="btn play-btn" data-id="${item.id}" data-type="${type}">
-                <i class="fas fa-play"></i> Reproducir
-            </button>
+            <div class="content-actions">
+                <button class="action-btn" data-action="play" data-id="${item.id}" title="Reproducir">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button class="action-btn" data-action="add" data-id="${item.id}" title="Añadir a Mi lista">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button class="action-btn" data-action="info" data-id="${item.id}" title="Más información">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </div>
         </div>
     `;
     
-    // Agregar evento de clic al botón de reproducción
-    card.querySelector('.play-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = parseInt(e.target.closest('.play-btn').dataset.id);
-        const type = e.target.closest('.play-btn').dataset.type;
-        playContent(id, type);
-    });
-    
-    // Agregar evento de clic a la tarjeta
-    card.addEventListener('click', () => {
-        // Redirigir a la página de detalles del contenido
+    // Redirigir a detalles cuando se hace clic fuera de los botones
+    card.addEventListener('click', (event) => {
+        if (event.target.closest('.action-btn')) {
+            return;
+        }
         window.location.href = `/streaming-platform/content.php?id=${item.id}`;
     });
     
@@ -1343,7 +1353,26 @@ async function playContent(id, type, videoData = null) {
     if (content.trailer_url) {
         showLoading('Cargando video...');
         try {
-            const url = new URL(content.trailer_url);
+            let trailerUrl = String(content.trailer_url || '').trim();
+            
+            if (!trailerUrl) {
+                throw new Error('URL vacía');
+            }
+
+            // Normalizar URL si falta el esquema o solo recibe un ID de YouTube
+            if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trailerUrl)) {
+                if (trailerUrl.startsWith('//')) {
+                    trailerUrl = `${window.location.protocol}${trailerUrl}`;
+                } else if (trailerUrl.startsWith('www.')) {
+                    trailerUrl = `https://${trailerUrl}`;
+                } else if (/^[\w-]{11}$/.test(trailerUrl)) {
+                    trailerUrl = `https://www.youtube.com/watch?v=${trailerUrl}`;
+                } else {
+                    trailerUrl = `https://${trailerUrl}`;
+                }
+            }
+
+            const url = new URL(trailerUrl);
             let videoId = '';
 
             if (url.pathname.startsWith('/embed/')) {
@@ -1358,92 +1387,113 @@ async function playContent(id, type, videoData = null) {
                 videoId = videoId.split('?')[0];
                 console.log(`Cargando video de YouTube con ID: ${videoId}`);
 
-                if (window.player && typeof window.player.loadVideoById === 'function') {
-                    window.player.loadVideoById(videoId);
-                    window.player.playVideo().then(() => {
-                        hideLoading();
-                    }).catch(error => {
-                        console.error('Error al reproducir el video:', error);
-                        showError('Error al cargar el video.');
-                    });
-                } else {
-                    window.onYouTubeIframeAPIReady = function() {
-                        window.player = new YT.Player('player', {
-                            height: '100%',
-                            width: '100%',
-                            videoId: videoId,
-                            playerVars: {
-                                'autoplay': 1, 'controls': 0, 'disablekb': 1, 'fs': 0,
-                                'modestbranding': 1, 'rel': 0, 'playsinline': 1,
-                                'enablejsapi': 1, 'origin': window.location.origin
+                const createYouTubePlayer = () => {
+                    window.player = new YT.Player('player', {
+                        host: 'https://www.youtube.com',
+                        height: '100%',
+                        width: '100%',
+                        videoId: videoId,
+                        playerVars: {
+                            'autoplay': 1, 'controls': 0, 'disablekb': 1, 'fs': 0,
+                            'modestbranding': 1, 'rel': 0, 'playsinline': 1,
+                            'enablejsapi': 1, 'origin': window.location.origin
+                        },
+                        events: {
+                            'onReady': function(event) {
+                                console.log('Reproductor de YouTube listo');
+                                event.target.playVideo();
+                                hideLoading();
+                                videoPlayerState.isPlaying = true;
+                                updatePlayPauseUI();
+                                
+                                // Actualizar duración
+                                const duration = event.target.getDuration();
+                                if (duration) {
+                                    videoPlayerState.duration = duration;
+                                    updateTimeDisplay();
+                                }
+                                
+                                // Iniciar actualización periódica de la barra de progreso
+                                const progressInterval = setInterval(() => {
+                                    if (window.player && typeof window.player.getCurrentTime === 'function') {
+                                        updateProgressBar();
+                                        const state = window.player.getPlayerState();
+                                        if (state === YT.PlayerState.PLAYING) {
+                                            videoPlayerState.isPlaying = true;
+                                        } else if (state === YT.PlayerState.PAUSED) {
+                                            videoPlayerState.isPlaying = false;
+                                        } else if (state === YT.PlayerState.ENDED) {
+                                            videoPlayerState.isPlaying = false;
+                                            clearInterval(progressInterval);
+                                        }
+                                    } else {
+                                        clearInterval(progressInterval);
+                                    }
+                                }, 250);
+                                
+                                // Guardar referencia al intervalo para limpiarlo después
+                                window.youtubeProgressInterval = progressInterval;
                             },
-                            events: {
-                                'onReady': function(event) {
-                                    console.log('Reproductor de YouTube listo');
-                                    event.target.playVideo();
+                            'onStateChange': function(event) {
+                                console.log('Estado del reproductor:', event.data);
+                                if (event.data === YT.PlayerState.PLAYING) {
                                     hideLoading();
                                     videoPlayerState.isPlaying = true;
                                     updatePlayPauseUI();
-                                    
-                                    // Actualizar duración
-                                    const duration = event.target.getDuration();
-                                    if (duration) {
-                                        videoPlayerState.duration = duration;
-                                        updateTimeDisplay();
-                                    }
-                                    
-                                    // Iniciar actualización periódica de la barra de progreso
-                                    const progressInterval = setInterval(() => {
-                                        if (window.player && typeof window.player.getCurrentTime === 'function') {
-                                            updateProgressBar();
-                                            const state = window.player.getPlayerState();
-                                            if (state === YT.PlayerState.PLAYING) {
-                                                videoPlayerState.isPlaying = true;
-                                            } else if (state === YT.PlayerState.PAUSED) {
-                                                videoPlayerState.isPlaying = false;
-                                            } else if (state === YT.PlayerState.ENDED) {
-                                                videoPlayerState.isPlaying = false;
-                                                clearInterval(progressInterval);
-                                            }
-                                        } else {
-                                            clearInterval(progressInterval);
-                                        }
-                                    }, 250);
-                                    
-                                    // Guardar referencia al intervalo para limpiarlo después
-                                    window.youtubeProgressInterval = progressInterval;
-                                },
-                                'onStateChange': function(event) {
-                                    console.log('Estado del reproductor:', event.data);
-                                    if (event.data === YT.PlayerState.PLAYING) {
-                                        hideLoading();
-                                        videoPlayerState.isPlaying = true;
-                                        updatePlayPauseUI();
-                                        startHideControlsTimer();
-                                    } else if (event.data === YT.PlayerState.PAUSED) {
-                                        videoPlayerState.isPlaying = false;
-                                        updatePlayPauseUI();
-                                        showVideoControls();
-                                    } else if (event.data === YT.PlayerState.ENDED) {
-                                        videoPlayerState.isPlaying = false;
-                                        updatePlayPauseUI();
-                                        if (window.youtubeProgressInterval) {
-                                            clearInterval(window.youtubeProgressInterval);
-                                        }
-                                    }
-                                },
-                                'onError': function(event) {
-                                    console.error('Error en el reproductor de YouTube:', event.data);
-                                    showError(`Error al cargar el video (${event.data})`);
+                                    startHideControlsTimer();
+                                } else if (event.data === YT.PlayerState.PAUSED) {
+                                    videoPlayerState.isPlaying = false;
+                                    updatePlayPauseUI();
+                                    showVideoControls();
+                                } else if (event.data === YT.PlayerState.ENDED) {
+                                    videoPlayerState.isPlaying = false;
+                                    updatePlayPauseUI();
                                     if (window.youtubeProgressInterval) {
                                         clearInterval(window.youtubeProgressInterval);
                                     }
                                 }
+                            },
+                            'onError': function(event) {
+                                console.error('Error en el reproductor de YouTube:', event.data);
+                                showError(`Error al cargar el video (${event.data})`);
+                                if (window.youtubeProgressInterval) {
+                                    clearInterval(window.youtubeProgressInterval);
+                                }
                             }
+                        }
+                    });
+                };
+
+                if (window.player && typeof window.player.loadVideoById === 'function') {
+                    window.player.loadVideoById(videoId);
+                    const playPromise = window.player.playVideo?.();
+                    if (playPromise && typeof playPromise.then === 'function') {
+                        playPromise.then(() => {
+                            hideLoading();
+                        }).catch(error => {
+                            console.error('Error al reproducir el video:', error);
+                            showError('Error al cargar el video.');
                         });
+                    } else {
+                        hideLoading();
+                    }
+                } else if (window.YT && typeof window.YT.Player === 'function') {
+                    createYouTubePlayer();
+                } else if (window.YouTubeAPIManager && typeof window.YouTubeAPIManager.register === 'function') {
+                    window.YouTubeAPIManager.register(createYouTubePlayer);
+                    if (typeof window.YouTubeAPIManager.ensureScriptLoaded === 'function') {
+                        window.YouTubeAPIManager.ensureScriptLoaded();
+                    }
+                } else {
+                    const previousReady = window.onYouTubeIframeAPIReady;
+                    window.onYouTubeIframeAPIReady = function() {
+                        if (typeof previousReady === 'function') {
+                            previousReady();
+                        }
+                        createYouTubePlayer();
                     };
 
-                    if (!window.YT) {
+                    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
                         const tag = document.createElement('script');
                         tag.src = 'https://www.youtube.com/iframe_api';
                         const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -1478,66 +1528,6 @@ async function playContent(id, type, videoData = null) {
     startHideControlsTimer();
 }
 
-// Función para probar el reproductor con un video de YouTube
-function testYoutubeVideo(videoId) {
-    playContent(null, null, {
-        title: 'Video de YouTube',
-        trailer_url: `https://www.youtube.com/watch?v=${videoId}`
-    });
-}
-
-// Función para probar el reproductor con un video local
-function testLocalVideo(videoUrl, title = 'Video local') {
-    playContent(null, null, {
-        title: title,
-        videoUrl: videoUrl
-    });
-}
-
-// Cargar la API de YouTube
-let player;
-
-// Esta función se llama cuando la API de YouTube está lista
-function onYouTubeIframeAPIReady() {
-    player = new YT.Player('player', {
-        height: '100%',
-        width: '100%',
-        playerVars: {
-            'autoplay': 0,
-            'controls': 1,
-            'disablekb': 0,
-            'fs': 1,
-            'modestbranding': 1,
-            'rel': 0,
-            'playsinline': 1,
-            'enablejsapi': 1,
-            'origin': window.location.origin
-        },
-        events: {
-            'onReady': onPlayerReady,
-            'onStateChange': onPlayerStateChange,
-            'onError': onPlayerError
-        }
-    });
-}
-
-// Función que se llama cuando el reproductor está listo
-function onPlayerReady(event) {
-    console.log('Reproductor de YouTube listo');
-}
-
-// Función que se llama cuando cambia el estado del reproductor
-function onPlayerStateChange(event) {
-    console.log('Estado del reproductor:', event.data);
-    // Aquí puedes agregar lógica adicional según el estado
-}
-
-// Función que se llama cuando hay un error
-function onPlayerError(event) {
-    console.error('Error en el reproductor de YouTube:', event.data);
-    showNotification('Error al cargar el video', 'error');
-}
-
 // Inicialización de la aplicación cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
     // Inicializar WebTorrent si está disponible
@@ -1547,7 +1537,9 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
     
     // Cargar la API de YouTube
-    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+    if (window.YouTubeAPIManager && typeof window.YouTubeAPIManager.ensureScriptLoaded === 'function') {
+        window.YouTubeAPIManager.ensureScriptLoaded();
+    } else if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
         const tag = document.createElement('script');
         tag.src = 'https://www.youtube.com/iframe_api';
         const firstScriptTag = document.getElementsByTagName('script')[0];

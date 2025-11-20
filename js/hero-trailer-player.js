@@ -6,6 +6,68 @@
 (function() {
     'use strict';
 
+    // Gestor compartido para la API de YouTube
+    window.YouTubeAPIManager = window.YouTubeAPIManager || (function() {
+        const state = {
+            callbacks: [],
+            hooked: false,
+            ready: false
+        };
+
+        function flushCallbacks() {
+            if (!window.YT || typeof window.YT.Player !== 'function') {
+                return;
+            }
+            state.ready = true;
+            const pending = state.callbacks.splice(0);
+            pending.forEach(callback => {
+                try {
+                    callback();
+                } catch (error) {
+                    console.error('Error al ejecutar callback de YouTube:', error);
+                }
+            });
+        }
+
+        function hookOnReady() {
+            if (state.hooked) return;
+            const previous = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = function() {
+                if (typeof previous === 'function') {
+                    try {
+                        previous();
+                    } catch (error) {
+                        console.error('Error en callback previo de YouTube:', error);
+                    }
+                }
+                flushCallbacks();
+            };
+            state.hooked = true;
+        }
+
+        return {
+            register(callback) {
+                if (typeof callback !== 'function') return;
+                if (window.YT && typeof window.YT.Player === 'function') {
+                    state.ready = true;
+                    callback();
+                    return;
+                }
+                state.callbacks.push(callback);
+                hookOnReady();
+            },
+            ensureScriptLoaded() {
+                if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+                    const tag = document.createElement('script');
+                    tag.src = 'https://www.youtube.com/iframe_api';
+                    const firstScriptTag = document.getElementsByTagName('script')[0];
+                    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                }
+                hookOnReady();
+            }
+        };
+    })();
+
     let youtubePlayers = new Map();
     let currentActiveIndex = -1;
     let isYouTubeAPIReady = false;
@@ -67,18 +129,59 @@
             initYouTubePlayers();
             return;
         }
+        
+        if (window.YouTubeAPIManager) {
+            window.YouTubeAPIManager.register(() => {
+                isYouTubeAPIReady = true;
+                initYouTubePlayers();
+            });
+            window.YouTubeAPIManager.ensureScriptLoaded();
+        } else {
+            // Fallback en caso extremo
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-        // Cargar script de YouTube
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        const firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            const previous = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = function() {
+                if (typeof previous === 'function') {
+                    previous();
+                }
+                isYouTubeAPIReady = true;
+                initYouTubePlayers();
+            };
+        }
+    }
 
-        // Callback cuando la API esté lista
-        window.onYouTubeIframeAPIReady = function() {
-            isYouTubeAPIReady = true;
-            initYouTubePlayers();
+    function playHTML5Trailer(video) {
+        if (!video) return;
+
+        const attemptPlay = () => {
+            const playPromise = video.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch(error => {
+                    if (error && error.name === 'AbortError') {
+                        return;
+                    }
+                    console.warn('Error al reproducir video:', error);
+                });
+            }
         };
+
+        video.pause();
+        video.currentTime = 0;
+
+        if (video.readyState >= 2) {
+            attemptPlay();
+        } else {
+            const onLoaded = () => {
+                video.removeEventListener('loadeddata', onLoaded);
+                attemptPlay();
+            };
+            video.addEventListener('loadeddata', onLoaded, { once: true });
+            video.load();
+        }
     }
 
     // Inicializar reproductores de YouTube
@@ -96,6 +199,7 @@
 
             try {
                 const player = new YT.Player(playerId, {
+                    host: 'https://www.youtube.com',
                     videoId: videoId,
                     playerVars: {
                         'autoplay': 0,
@@ -164,15 +268,12 @@
         const index = parseInt(slide.dataset.index) || -1;
         
         // Pausar todos los demás slides
-        pauseAllSlides();
+        pauseAllSlides(index);
 
         // Reproducir video HTML5 si existe
         const video = slide.querySelector('.hero-trailer-video');
         if (video) {
-            video.currentTime = 0;
-            video.play().catch(error => {
-                console.warn('Error al reproducir video:', error);
-            });
+            playHTML5Trailer(video);
         }
 
         // Reproducir YouTube si existe
@@ -221,15 +322,23 @@
     }
 
     // Pausar todos los slides
-    function pauseAllSlides() {
+    function pauseAllSlides(exceptIndex = null) {
         // Pausar todos los videos HTML5
         const videos = document.querySelectorAll('.hero-trailer-video');
         videos.forEach(video => {
+            const parentSlide = video.closest('.hero-slide');
+            const slideIndex = parentSlide ? parseInt(parentSlide.dataset.index) || 0 : null;
+            if (exceptIndex !== null && slideIndex === exceptIndex) {
+                return;
+            }
             video.pause();
         });
 
         // Pausar todos los videos de YouTube
-        youtubePlayers.forEach((player) => {
+        youtubePlayers.forEach((player, idx) => {
+            if (exceptIndex !== null && idx === exceptIndex) {
+                return;
+            }
             if (player && typeof player.pauseVideo === 'function') {
                 try {
                     player.pauseVideo();

@@ -197,59 +197,60 @@ function getMostViewed($db, $type = null, $limit = 10) {
 function createContentCard($item) {
     require_once __DIR__ . '/image-helper.php';
     
-    // Asegurar que todos los campos necesarios existan
     $id = isset($item['id']) ? (int)$item['id'] : 0;
-    $title = isset($item['title']) ? htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') : 'Sin título';
     $type = isset($item['type']) ? htmlspecialchars($item['type'], ENT_QUOTES, 'UTF-8') : 'movie';
+    $title = isset($item['title']) ? htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8') : 'Sin título';
     $releaseYear = isset($item['release_year']) ? (int)$item['release_year'] : (isset($item['year']) ? (int)$item['year'] : '');
     $duration = isset($item['duration']) ? htmlspecialchars($item['duration'], ENT_QUOTES, 'UTF-8') : '';
     $rating = isset($item['rating']) ? number_format((float)$item['rating'], 1) : '';
     $posterUrl = getImageUrl($item['poster_url'] ?? $item['backdrop_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
-    $isPremium = isset($item['is_premium']) ? (bool)$item['is_premium'] : false;
+    $isPremium = !empty($item['is_premium']);
+    $hasTorrent = !empty($item['torrent_magnet']);
     $slug = isset($item['slug']) ? htmlspecialchars($item['slug'], ENT_QUOTES, 'UTF-8') : '';
     
-    // Construir URL de detalle
     $detailUrl = '/streaming-platform/content.php?id=' . $id;
     if ($slug) {
         $detailUrl = '/streaming-platform/content/' . $slug;
     }
+    $detailUrlEscaped = htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8');
     
-    // Badge premium
-    $premiumBadge = $isPremium ? '<span class="premium-badge">PREMIUM</span>' : '';
+    $durationLabel = $type === 'movie'
+        ? ($duration ? $duration . ' min' : 'Película')
+        : (!empty($item['seasons']) ? ((int)$item['seasons']) . ' Temporada' . ((int)$item['seasons'] > 1 ? 's' : '') : 'Serie');
     
-    // Meta información
-    $meta = [];
+    $metaParts = [];
     if ($releaseYear) {
-        $meta[] = $releaseYear;
+        $metaParts[] = '<span>' . $releaseYear . '</span>';
     }
-    if ($duration) {
-        $meta[] = $type === 'movie' ? $duration . ' min' : $duration;
+    if ($durationLabel) {
+        if (!empty($metaParts)) {
+            $metaParts[] = '<span>•</span>';
+        }
+        $metaParts[] = '<span>' . htmlspecialchars($durationLabel, ENT_QUOTES, 'UTF-8') . '</span>';
     }
     if ($rating) {
-        $meta[] = '⭐ ' . $rating;
+        $metaParts[] = '<span>•</span><span>⭐ ' . $rating . '</span>';
     }
-    $metaStr = !empty($meta) ? '<div class="content-meta">' . implode(' • ', $meta) . '</div>' : '';
+    $metaHtml = '<div class="content-meta">' . implode('', $metaParts) . '</div>';
     
-    // Construir HTML de la tarjeta
-    $html = '<div class="content-card" data-id="' . $id . '" data-type="' . $type . '">';
-    $html .= '<a href="' . htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') . '" class="content-card-link">';
+    $premiumBadge = $isPremium ? '<span class="premium-badge">PREMIUM</span>' : '';
+    $torrentBadge = $hasTorrent ? '<span class="torrent-badge" title="Disponible por Torrent"><i class="fas fa-magnet"></i></span>' : '';
+    
+    $html = '<div class="content-card" data-id="' . $id . '" data-type="' . $type . '" data-detail-url="' . $detailUrlEscaped . '" onclick="if(!event.target.closest(\'.action-btn\')){window.location.href=this.dataset.detailUrl;}">';
     $html .= '<img src="' . htmlspecialchars($posterUrl, ENT_QUOTES, 'UTF-8') . '" alt="' . $title . '" loading="lazy">';
-    
-    if ($premiumBadge) {
-        $html .= '<div class="content-badges">' . $premiumBadge . '</div>';
+    if ($premiumBadge || $torrentBadge) {
+        $html .= '<div class="content-badges">' . $premiumBadge . $torrentBadge . '</div>';
     }
-    
     $html .= '<div class="content-info">';
-    $html .= '<h3>' . $title . '</h3>';
-    if ($metaStr) {
-        $html .= $metaStr;
-    }
-    $html .= '<button class="btn btn-sm btn-primary play-btn" data-id="' . $id . '" data-type="' . $type . '" onclick="event.preventDefault(); event.stopPropagation(); if(typeof playContent === \'function\') { playContent(' . $id . ', \'' . $type . '\'); } else { window.location.href=\'/streaming-platform/watch.php?id=' . $id . '\'; }">';
-    $html .= '<i class="fas fa-play"></i> Reproducir';
-    $html .= '</button>';
-    $html .= '</div>'; // .content-info
-    $html .= '</a>'; // .content-card-link
-    $html .= '</div>'; // .content-card
+    $html .= '<h3 class="content-title">' . $title . '</h3>';
+    $html .= $metaHtml;
+    $html .= '<div class="content-actions">';
+    $html .= '<button class="action-btn" data-action="play" data-id="' . $id . '" title="Reproducir"><i class="fas fa-play"></i></button>';
+    $html .= '<button class="action-btn" data-action="add" data-id="' . $id . '" title="Añadir a Mi lista"><i class="fas fa-plus"></i></button>';
+    $html .= '<button class="action-btn" data-action="info" data-id="' . $id . '" title="Más información"><i class="fas fa-info-circle"></i></button>';
+    $html .= '</div>'; // content-actions
+    $html .= '</div>'; // content-info
+    $html .= '</div>'; // content-card
     
     return $html;
 }

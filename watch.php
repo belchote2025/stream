@@ -11,7 +11,7 @@ $episodeId = $_GET['episode_id'] ?? null;
 $contentId = (int)$contentId;
 
 if (!$contentId) {
-    header('Location: /streaming-platform/');
+    header('Location: /');
     exit;
 }
 
@@ -25,7 +25,7 @@ $stmt->execute();
 $content = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$content) {
-    header('Location: /streaming-platform/');
+    header('Location: /');
     exit;
 }
 
@@ -64,7 +64,7 @@ $pageTitle = 'Reproducir: ' . htmlspecialchars($content['title']) . ' - ' . SITE
 include __DIR__ . '/includes/header.php';
 ?>
 
-<link rel="stylesheet" href="/streaming-platform/css/unified-video-player.css">
+<link rel="stylesheet" href="/css/unified-video-player.css">
 
 <style>
 .watch-page {
@@ -397,6 +397,24 @@ include __DIR__ . '/includes/header.php';
             $videoUrl = $content['trailer_url'];
             $hasVideo = true;
         }
+        
+        // Convertir URL relativa a absoluta si es necesario
+        if ($videoUrl && !empty($videoUrl)) {
+            // Si es una ruta relativa que empieza con /uploads/, convertirla a URL absoluta
+            if (strpos($videoUrl, '/uploads/') === 0 || strpos($videoUrl, '/streaming-platform/uploads/') === 0) {
+                // Remover /streaming-platform si existe
+                $videoUrl = str_replace('/streaming-platform', '', $videoUrl);
+                // Si no empieza con http, convertir a URL absoluta
+                if (strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0) {
+                    $baseUrl = rtrim(SITE_URL, '/');
+                    $videoUrl = $baseUrl . $videoUrl;
+                }
+            } elseif (strpos($videoUrl, '/') === 0 && strpos($videoUrl, 'http') !== 0) {
+                // Otra ruta relativa que empieza con /
+                $baseUrl = rtrim(SITE_URL, '/');
+                $videoUrl = $baseUrl . $videoUrl;
+            }
+        }
         ?>
         
         <?php if ($hasVideo): ?>
@@ -412,7 +430,7 @@ include __DIR__ . '/includes/header.php';
                             <i class="fas fa-play"></i> Ver Tráiler
                         </button>
                     <?php endif; ?>
-                    <a href="/streaming-platform/content-detail.php?id=<?php echo $contentId; ?>" class="btn btn-outline">
+                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/content-detail.php?id=<?php echo $contentId; ?>" class="btn btn-outline">
                         <i class="fas fa-arrow-left"></i> Volver a detalles
                     </a>
                 </div>
@@ -488,104 +506,95 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <script>
-const video = document.getElementById('videoPlayer');
+const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
 const contentId = <?php echo $contentId; ?>;
 const episodeId = <?php echo $episodeId ? $episodeId : 'null'; ?>;
 const duration = <?php echo $episode ? ($episode['duration'] * 60) : ($content['duration'] * 60); ?>;
 const videoUrl = <?php echo $hasVideo ? "'" . htmlspecialchars($videoUrl, ENT_QUOTES) . "'" : 'null'; ?>;
 
+let player = null;
 let saveInterval;
 let hasStartedPlaying = false;
 
 // Solo inicializar si hay video
 <?php if ($hasVideo): ?>
-if (video) {
-    // Mostrar indicador de carga
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.className = 'video-loading';
-    loadingIndicator.innerHTML = '<i class="fas fa-spinner"></i>';
-    video.parentElement.appendChild(loadingIndicator);
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('unifiedVideoContainer');
+    if (!container || !videoUrl) {
+        console.error('Contenedor de video o URL no encontrados');
+        return;
+    }
     
-    // Manejo de errores del video
-    video.addEventListener('error', function(e) {
-        console.error('Error en el video:', e);
-        loadingIndicator.style.display = 'none';
-        const errorDiv = document.getElementById('videoError');
-        if (errorDiv) {
-            errorDiv.style.display = 'flex';
+    // Inicializar el reproductor unificado
+    const startTime = <?php echo ($savedProgress && $savedProgress['progress'] > 10) ? $savedProgress['progress'] : 0; ?>;
+    
+    player = new UnifiedVideoPlayer('unifiedVideoContainer', {
+        autoplay: false,
+        controls: true,
+        startTime: startTime > 0 && startTime < duration * 0.9 ? startTime : 0,
+        onProgress: (currentTime, totalDuration) => {
+            if (currentTime && totalDuration) {
+                clearTimeout(saveInterval);
+                saveInterval = setTimeout(() => {
+                    saveProgress(currentTime, totalDuration);
+                }, 5000); // Guardar cada 5 segundos
+            }
+        },
+        onEnded: () => {
+            saveProgress(duration, duration, true);
+            incrementViews();
+        },
+        onError: (error) => {
+            console.error('Error en el reproductor:', error);
         }
-        video.style.display = 'none';
     });
     
-    // Ocultar indicador cuando el video esté listo
-    video.addEventListener('loadedmetadata', function() {
-        loadingIndicator.style.display = 'none';
+    // Cargar el video
+    player.loadVideo(videoUrl).then(() => {
+        console.log('Video cargado correctamente');
         
-        // Restaurar progreso guardado
+        // Restaurar progreso guardado si existe
         <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
-            const startTime = <?php echo $savedProgress['progress']; ?>;
-            const progressPercent = Math.round((startTime / video.duration) * 100);
-            
-            if (progressPercent < 90) { // Solo restaurar si no está casi al final
-                if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
-                    video.currentTime = startTime;
+            const progressPercent = Math.round((startTime / duration) * 100);
+            if (progressPercent < 90) {
+                // Esperar a que el video tenga metadata antes de hacer seek
+                if (player.videoElement) {
+                    player.videoElement.addEventListener('loadedmetadata', function() {
+                        if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
+                            player.seek(startTime);
+                        }
+                    }, { once: true });
+                } else {
+                    // Si no hay videoElement, intentar después de un delay
+                    setTimeout(() => {
+                        if (player && player.seek) {
+                            if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
+                                player.seek(startTime);
+                            }
+                        }
+                    }, 1000);
                 }
             }
         <?php endif; ?>
-    });
-    
-        // Incrementar contador de vistas cuando el video comience
-        video.addEventListener('play', function() {
-            if (!hasStartedPlaying) {
-                hasStartedPlaying = true;
-                incrementViews();
-            }
-        });
-    
-    // Manejar teclas de atajos
-    document.addEventListener('keydown', function(e) {
-        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
-            return;
-        }
         
-        switch(e.key) {
-            case ' ': // Espacio para play/pause
-                e.preventDefault();
-                if (video.paused) {
-                    video.play();
-                } else {
-                    video.pause();
+        // Incrementar contador de vistas cuando el video comience
+        if (player.videoElement) {
+            player.videoElement.addEventListener('play', function() {
+                if (!hasStartedPlaying) {
+                    hasStartedPlaying = true;
+                    incrementViews();
                 }
-                break;
-            case 'ArrowLeft': // Retroceder 10 segundos
-                e.preventDefault();
-                video.currentTime = Math.max(0, video.currentTime - 10);
-                break;
-            case 'ArrowRight': // Avanzar 10 segundos
-                e.preventDefault();
-                video.currentTime = Math.min(video.duration, video.currentTime + 10);
-                break;
-            case 'ArrowUp': // Subir volumen
-                e.preventDefault();
-                video.volume = Math.min(1, video.volume + 0.1);
-                break;
-            case 'ArrowDown': // Bajar volumen
-                e.preventDefault();
-                video.volume = Math.max(0, video.volume - 0.1);
-                break;
-            case 'f': // Pantalla completa
-            case 'F':
-                e.preventDefault();
-                toggleFullscreen();
-                break;
+            }, { once: true });
         }
+    }).catch(error => {
+        console.error('Error al cargar el video:', error);
     });
-}
+});
 
 function saveProgress(currentTime, duration, completed = false) {
     if (!currentTime || !duration) return;
     
-    fetch('/streaming-platform/api/playback/save.php', {
+    fetch(`${BASE_URL}/api/playback/save.php`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -601,7 +610,7 @@ function saveProgress(currentTime, duration, completed = false) {
 }
 
 function incrementViews() {
-    fetch('/streaming-platform/api/content/view.php', {
+    fetch(`${BASE_URL}/api/content/view.php`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -625,7 +634,7 @@ function formatTime(seconds) {
 }
 
 function playEpisode(epId) {
-    window.location.href = `/streaming-platform/watch.php?id=${contentId}&episode_id=${epId}`;
+    window.location.href = `${BASE_URL}/watch.php?id=${contentId}&episode_id=${epId}`;
 }
 
 function retryVideo() {
@@ -644,7 +653,7 @@ function toggleFullscreen() {
 
 function playTrailer() {
     <?php if (!empty($content['trailer_url'])): ?>
-        window.location.href = '/streaming-platform/watch.php?id=<?php echo $contentId; ?>&trailer=1';
+        window.location.href = `${BASE_URL}/watch.php?id=<?php echo $contentId; ?>&trailer=1`;
     <?php endif; ?>
 }
 

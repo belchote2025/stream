@@ -1,46 +1,61 @@
+<?php $baseUrl = rtrim(SITE_URL, '/'); ?>
         </div>
     </main>
 
     <!-- Pie de página estilo Netflix -->
-    <footer style="background-color: #141414; color: #757575; padding: 4rem 0 2rem; margin-top: 3rem;">
+    <footer style="background-color: #141414; color: #9ea1a6; padding: 4rem 0 2rem; margin-top: 3rem;">
+        <style>
+            .footer-link {
+                color: #c9ccd3 !important;
+                transition: color 0.2s ease;
+            }
+            .footer-link:hover {
+                color: #ffffff !important;
+                text-decoration: none;
+            }
+            .footer-heading {
+                color: #f0f1f5;
+                font-weight: 600;
+            }
+        </style>
         <div class="container">
             <div class="row">
                 <div class="col-md-3 mb-4">
-                    <h5>Navegación</h5>
+                    <h5 class="footer-heading">Navegación</h5>
                     <ul class="list-unstyled">
-                        <li><a href="/streaming-platform/" class="text-muted text-decoration-none">Inicio</a></li>
-                        <li><a href="/streaming-platform/movies.php" class="text-muted text-decoration-none">Películas</a></li>
-                        <li><a href="/streaming-platform/series.php" class="text-muted text-decoration-none">Series</a></li>
-                        <li><a href="/streaming-platform/categories.php" class="text-muted text-decoration-none">Categorías</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/" class="footer-link text-decoration-none">Inicio</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/movies.php" class="footer-link text-decoration-none">Películas</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/series.php" class="footer-link text-decoration-none">Series</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/categories.php" class="footer-link text-decoration-none">Categorías</a></li>
                     </ul>
                 </div>
                 <div class="col-md-3 mb-4">
-                    <h5>Mi cuenta</h5>
+                    <h5 class="footer-heading">Mi cuenta</h5>
                     <ul class="list-unstyled">
-                        <?php if (isLoggedIn()): ?>
-                            <li><a href="/streaming-platform/profile.php" class="text-muted text-decoration-none">Mi perfil</a></li>
-                            <li><a href="/streaming-platform/my-list.php" class="text-muted text-decoration-none">Mi lista</a></li>
-                            <li><a href="/streaming-platform/settings.php" class="text-muted text-decoration-none">Configuración</a></li>
-                        <?php else: ?>
-                            <li><a href="/streaming-platform/login.php" class="text-muted text-decoration-none">Iniciar sesión</a></li>
-                            <li><a href="/streaming-platform/register.php" class="text-muted text-decoration-none">Registrarse</a></li>
-                        <?php endif; ?>
+<?php if (isLoggedIn()): ?>
+                        <li><a href="<?php echo $baseUrl; ?>/profile.php" class="footer-link text-decoration-none">Mi perfil</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/my-list.php" class="footer-link text-decoration-none">Mi lista</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/settings.php" class="footer-link text-decoration-none">Configuración</a></li>
+<?php else: ?>
+                        <li><a href="<?php echo $baseUrl; ?>/login.php" class="footer-link text-decoration-none">Iniciar sesión</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/register.php" class="footer-link text-decoration-none">Registrarse</a></li>
+<?php endif; ?>
                     </ul>
                 </div>
                 <div class="col-md-3 mb-4">
-                    <h5>Legal</h5>
+                    <h5 class="footer-heading">Legal</h5>
                     <ul class="list-unstyled">
-                        <li><a href="/streaming-platform/terms.php" class="text-muted text-decoration-none">Términos de uso</a></li>
-                        <li><a href="/streaming-platform/privacy.php" class="text-muted text-decoration-none">Política de privacidad</a></li>
-                        <li><a href="/streaming-platform/cookies.php" class="text-muted text-decoration-none">Política de cookies</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/terms.php" class="footer-link text-decoration-none">Términos de uso</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/privacy.php" class="footer-link text-decoration-none">Política de privacidad</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/cookies.php" class="footer-link text-decoration-none">Política de cookies</a></li>
                     </ul>
                 </div>
                 <div class="col-md-3 mb-4">
-                    <h5>Contáctanos</h5>
+                    <h5 class="footer-heading">Contáctanos</h5>
                     <ul class="list-unstyled">
-                        <li><a href="mailto:soporte@streamingplatform.com" class="text-muted text-decoration-none">Soporte</a></li>
-                        <li><a href="/streaming-platform/contact.php" class="text-muted text-decoration-none">Contacto</a></li>
-                        <li><a href="/streaming-platform/faq.php" class="text-muted text-decoration-none">Preguntas frecuentes</a></li>
+                        <li><a href="mailto:soporte@streamingplatform.com" class="footer-link text-decoration-none">Soporte</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/contact.php" class="footer-link text-decoration-none">Contacto</a></li>
+                        <li><a href="<?php echo $baseUrl; ?>/faq.php" class="footer-link text-decoration-none">Preguntas frecuentes</a></li>
                     </ul>
                     
                     <div class="mt-3">
@@ -71,20 +86,54 @@
     <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
     
     <!-- Reproductor de video unificado -->
-    <script src="/streaming-platform/js/video-player.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/video-player.js"></script>
     
     <!-- Scripts personalizados -->
-    <script src="/streaming-platform/js/performance-optimizer.js"></script>
-    <script src="/streaming-platform/js/hero-optimizer.js"></script>
-    <script src="/streaming-platform/js/hero-trailer-player.js"></script>
-    <script src="/streaming-platform/assets/js/netflix-gallery.js"></script>
-    <script src="/streaming-platform/js/netflix-enhancements.js"></script>
-    <script src="/streaming-platform/js/animations.js"></script>
-    <script src="/streaming-platform/js/notifications.js"></script>
-    <script src="/streaming-platform/js/main.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/performance-optimizer.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/hero-optimizer.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/hero-trailer-player.js"></script>
+    <script src="<?php echo $baseUrl; ?>/assets/js/netflix-gallery.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/netflix-enhancements.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/animations.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/notifications.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/main.js"></script>
     
     <!-- Script de prueba de consola (comentado - puede activarse si se necesita) -->
-    <!-- <script src="/streaming-platform/js/console-test.js"></script> -->
+    <!-- <script src="/js/console-test.js"></script> -->
+    
+    <?php if (defined('APP_ENV') && APP_ENV === 'local'): ?>
+    <!-- Debug temporal para detectar respuestas HTML en fetch (solo entorno local) -->
+    <script>
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = async function(resource, config = {}) {
+                const start = performance.now();
+                try {
+                    const response = await originalFetch(resource, config);
+                    const duration = (performance.now() - start).toFixed(0);
+                    const contentType = response.headers.get('content-type') || '';
+                    
+                    if (!response.ok || !contentType.includes('application/json')) {
+                        let preview = '';
+                        try {
+                            preview = (await response.clone().text()).slice(0, 200);
+                        } catch (e) {
+                            preview = '[Respuesta no legible]';
+                        }
+                        console.warn('[FETCH DEBUG]', response.status, response.url, `(${duration} ms)`);
+                        console.warn('Tipo:', contentType || 'N/A');
+                        console.warn('Preview:', preview);
+                    }
+                    
+                    return response;
+                } catch (error) {
+                    console.error('[FETCH DEBUG] Error en', resource, error);
+                    throw error;
+                }
+            };
+        })();
+    </script>
+    <?php endif; ?>
     
     <script>
         // Inicializar tooltips de Bootstrap

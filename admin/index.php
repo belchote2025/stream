@@ -65,6 +65,7 @@ $currentUser = [
     'role' => $_SESSION['user_role'] ?? 'admin'
 ];
 
+$baseUrl = rtrim(SITE_URL, '/');
 $pageTitle = 'Panel de Administración - ' . SITE_NAME;
 ?>
 <!DOCTYPE html>
@@ -74,7 +75,7 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="/streaming-platform/css/admin.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/admin.css">
 </head>
 <body>
     <div class="admin-container">
@@ -132,7 +133,7 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                 </ul>
             </nav>
             <div class="logout">
-                <a href="/streaming-platform/api/auth/logout.php">
+                <a href="<?php echo $baseUrl; ?>/api/auth/logout.php">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Cerrar Sesión</span>
                 </a>
@@ -156,7 +157,7 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                         <span class="badge">0</span>
                     </div>
                     <div class="user-info">
-                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Admin" class="avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
+                        <img src="<?php echo $baseUrl; ?>/assets/img/default-poster.svg" alt="Admin" class="avatar" onerror="this.src='<?php echo $baseUrl; ?>/assets/img/default-poster.svg'">
                         <span><?php echo htmlspecialchars($currentUser['username']); ?></span>
                         <i class="fas fa-chevron-down"></i>
                     </div>
@@ -273,7 +274,7 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                                         <tr data-id="<?php echo $user['id']; ?>">
                                             <td>
                                                 <div class="user-cell">
-                                                    <img src="/streaming-platform/assets/img/default-poster.svg" alt="<?php echo htmlspecialchars($user['username']); ?>">
+                                                <img src="<?php echo $baseUrl; ?>/assets/img/default-poster.svg" alt="<?php echo htmlspecialchars($user['username']); ?>">
                                                     <span><?php echo htmlspecialchars($user['full_name'] ?: $user['username']); ?></span>
                                                 </div>
                                             </td>
@@ -510,7 +511,10 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
         </div>
     </div>
 
-    <script src="/streaming-platform/js/admin.js"></script>
+    <script>
+        window.__APP_BASE_URL = '<?php echo $baseUrl; ?>';
+    </script>
+    <script src="<?php echo $baseUrl; ?>/js/admin.js"></script>
 </body>
 </html>
 

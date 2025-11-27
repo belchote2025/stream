@@ -129,7 +129,7 @@ include __DIR__ . '/includes/header.php';
     <div class="series-grid">
         <?php if (!empty($recentSeries)): ?>
             <?php foreach ($recentSeries as $series): 
-                $posterUrl = getImageUrl($series['poster_url'] ?? $series['backdrop_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
+                $posterUrl = getImageUrl($series['poster_url'] ?? $series['backdrop_url'] ?? '', '/assets/img/default-poster.svg');
                 $isPremium = isset($series['is_premium']) && $series['is_premium'];
                 $year = $series['year'] ?? $series['release_year'] ?? '';
                 $rating = isset($series['rating']) && $series['rating'] > 0 ? number_format($series['rating'], 1) : '';
@@ -142,7 +142,7 @@ include __DIR__ . '/includes/header.php';
                 $seasonsData = $seasonsStmt->fetch(PDO::FETCH_ASSOC);
                 $seasons = $seasonsData['seasons'] ?? 0;
             ?>
-                <div class="series-card" onclick="window.location.href='/streaming-platform/content.php?id=<?php echo $series['id']; ?>'">
+                <div class="series-card" onclick="window.location.href='/content.php?id=<?php echo $series['id']; ?>'">
                     <?php if ($isPremium): ?>
                         <span class="series-badge premium">
                             <i class="fas fa-crown"></i> PREMIUM

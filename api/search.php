@@ -5,6 +5,7 @@
 
 header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/image-helper.php';
 
 try {
     $db = getDbConnection();
@@ -50,7 +51,7 @@ try {
             'title' => $item['title'],
             'type' => $item['type'],
             'release_year' => (int)$item['release_year'],
-            'poster_url' => $item['poster_url'] ?: '/streaming-platform/assets/img/default-poster.svg',
+            'poster_url' => getImageUrl($item['poster_url'] ?? '', '/assets/img/default-poster.svg'),
             'rating' => $item['rating'] ? (float)$item['rating'] : null
         ];
     }

@@ -97,7 +97,7 @@ try {
     }
     
     // Generar URL relativa del archivo
-    $fileUrl = '/streaming-platform/uploads/videos/' . $newFileName;
+    $fileUrl = '/uploads/videos/' . $newFileName;
     
     // Obtener información del archivo
     $fileInfo = [

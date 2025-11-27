@@ -2,12 +2,14 @@
 // Include configuration and database connection
 require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/gallery-functions.php';
+require_once __DIR__ . '/includes/image-helper.php';
 
 // Set page title
 $pageTitle = 'Inicio - ' . SITE_NAME;
 
 // Get database connection
 $db = getDbConnection();
+$baseUrl = rtrim(SITE_URL, '/');
 
 // Get content for the hero section - últimas novedades con trailers
 $featuredContent = getLatestWithTrailers($db, 5);
@@ -34,8 +36,7 @@ include __DIR__ . '/includes/header.php';
         <?php foreach ($featuredContent as $index => $content): ?>
             <div class="hero-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>" data-trailer="<?php echo htmlspecialchars($content['trailer_url'] ?? ''); ?>">
                 <?php 
-                require_once __DIR__ . '/includes/image-helper.php';
-                $backdropUrl = getImageUrl($content['backdrop_url'] ?? $content['poster_url'] ?? '', '/streaming-platform/assets/img/default-backdrop.svg');
+                $backdropUrl = getImageUrl($content['backdrop_url'] ?? $content['poster_url'] ?? '', '/assets/img/default-backdrop.svg');
                 ?>
                 <!-- Video trailer -->
                 <div class="hero-video-container">
@@ -63,7 +64,7 @@ include __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
     <?php else: ?>
         <div class="hero-slide active">
-            <div class="hero-backdrop" style="background-image: url('/streaming-platform/assets/img/default-backdrop.svg'); background-size: cover;"></div>
+            <div class="hero-backdrop" style="background-image: url('<?php echo $baseUrl; ?>/assets/img/default-backdrop.svg'); background-size: cover;"></div>
         </div>
     <?php endif; ?>
     
@@ -84,10 +85,10 @@ include __DIR__ . '/includes/header.php';
             <h1 class="hero-title">Bienvenido a <?php echo SITE_NAME; ?></h1>
             <p class="hero-description">Disfruta de las mejores películas y series en un solo lugar.</p>
             <div class="hero-actions">
-                <a href="/register" class="btn btn-primary">
+                <a href="<?php echo $baseUrl; ?>/register" class="btn btn-primary">
                     <i class="fas fa-user-plus"></i> Regístrate
                 </a>
-                <a href="/login" class="btn btn-secondary">
+                <a href="<?php echo $baseUrl; ?>/login" class="btn btn-secondary">
                     <i class="fas fa-sign-in-alt"></i> Iniciar sesión
                 </a>
             </div>
@@ -139,7 +140,7 @@ include __DIR__ . '/includes/header.php';
             <div class="row-container">
                 <div class="row-header">
                     <h2 class="row-title">Continuar viendo</h2>
-                    <a href="/my-list" class="row-link">Ver todo</a>
+                    <a href="<?php echo $baseUrl; ?>/my-list" class="row-link">Ver todo</a>
                 </div>
                 <div class="row-nav prev">
                     <i class="fas fa-chevron-left"></i>
@@ -150,8 +151,8 @@ include __DIR__ . '/includes/header.php';
                             ? round(($item['progress'] / $item['total_duration']) * 100) 
                             : 0;
                         $watchUrl = $item['episode_id'] 
-                            ? "/streaming-platform/watch.php?id={$item['id']}&episode_id={$item['episode_id']}"
-                            : "/streaming-platform/watch.php?id={$item['id']}";
+                            ? $baseUrl . "/watch.php?id={$item['id']}&episode_id={$item['episode_id']}"
+                            : $baseUrl . "/watch.php?id={$item['id']}";
                     ?>
                         <div class="content-card" data-id="<?php echo $item['id']; ?>" data-type="<?php echo $item['type']; ?>" onclick="window.location.href='<?php echo $watchUrl; ?>';" style="cursor: pointer;">
                             <?php if ($progressPercent > 0): ?>
@@ -161,12 +162,12 @@ include __DIR__ . '/includes/header.php';
                             <?php endif; ?>
                             <img 
                                 <?php 
-                                $itemPosterUrl = getImageUrl($item['poster_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
+                                $itemPosterUrl = getImageUrl($item['poster_url'] ?? '', '/assets/img/default-poster.svg');
                                 ?>
                                 src="<?php echo htmlspecialchars($itemPosterUrl); ?>" 
                                 alt="<?php echo htmlspecialchars($item['title']); ?>"
                                 loading="lazy"
-                                onerror="this.onerror=null; this.src='/streaming-platform/assets/img/default-poster.svg'; this.style.background='linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%)';"
+                                onerror="this.onerror=null; this.src='<?php echo $baseUrl; ?>/assets/img/default-poster.svg'; this.style.background='linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%)';"
                                 style="background: linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%);"
                             >
                             <div class="content-info">
@@ -288,7 +289,11 @@ include __DIR__ . '/includes/header.php';
             INNER JOIN content_genres cg2 ON cg1.genre_id = cg2.genre_id
             INNER JOIN user_favorites uf ON cg2.content_id = uf.content_id
             WHERE uf.user_id = :user_id
-            AND c.id NOT IN (SELECT content_id FROM user_favorites WHERE user_id = :user_id)
+            AND c.id NOT IN (
+                SELECT content_id 
+                FROM user_favorites 
+                WHERE user_id = :user_id_exclude
+            )
             GROUP BY c.id
             ORDER BY COUNT(*) DESC, c.rating DESC
             LIMIT 10
@@ -296,6 +301,7 @@ include __DIR__ . '/includes/header.php';
         
         $recommendedStmt = $db->prepare($recommendedQuery);
         $recommendedStmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $recommendedStmt->bindValue(':user_id_exclude', $userId, PDO::PARAM_INT);
         $recommendedStmt->execute();
         $recommended = $recommendedStmt->fetchAll(PDO::FETCH_ASSOC);
         

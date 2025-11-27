@@ -12,7 +12,7 @@ const appState = {
     }
 };
 
-const APP_BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
 
 // Elementos del DOM
 const elements = {
@@ -128,20 +128,10 @@ async function loadCarousel() {
     elements.carouselInner.innerHTML = '';
 
     try {
-        // Usar el endpoint de featured que no requiere autenticación
-        const response = await fetch(`${APP_BASE_URL}/api/content/featured.php?limit=5`);
+        const response = await fetch('/api/movies/?featured=true&limit=5');
         if (!response.ok) throw new Error('Error al cargar el contenido del carrusel');
-        
-        // Verificar que la respuesta sea JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.error('Respuesta no es JSON:', text.substring(0, 200));
-            throw new Error('El servidor devolvió HTML en lugar de JSON');
-        }
-        
         const result = await response.json();
-        const content = result.data || result;
+        const content = result.data;
 
         if (!content || content.length === 0) {
             elements.carouselInner.innerHTML = '<div class="carousel-item active" style="background-image: url(\'assets/images/placeholder-hero.jpg\');"><div class="carousel-content"><h1>Bienvenido a UrresTv</h1><p>Tu plataforma de streaming favorita. Contenido nuevo próximamente.</p></div></div>';
@@ -188,7 +178,7 @@ function createCarouselSlide(item, index) {
     slide.querySelector('.play-btn').addEventListener('click', () => playContent(item.id, 'movie'));
     slide.querySelector('.btn-outline').addEventListener('click', () => {
         // Redirigir a la página de detalles del contenido
-        window.location.href = `/content.php?id=${item.id}`;
+        window.location.href = `${BASE_URL}/content.php?id=${item.id}`;
     });
 
     return slide;
@@ -221,17 +211,8 @@ async function loadPopularContent() {
     // Cargar películas populares
     if (elements.popularMovies) {
         try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=movie&limit=8`);
+            const response = await fetch(`${BASE_URL}/api/content/popular.php?type=movie&limit=8`);
             if (!response.ok) throw new Error('Error al cargar películas');
-            
-            // Verificar que la respuesta sea JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Respuesta no es JSON:', text.substring(0, 200));
-                throw new Error('El servidor devolvió HTML en lugar de JSON');
-            }
-            
             const result = await response.json();
             const movies = result.data || result;
 
@@ -253,17 +234,8 @@ async function loadPopularContent() {
     // Cargar series populares
     if (elements.popularSeries) {
         try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=series&limit=8`);
+            const response = await fetch(`${BASE_URL}/api/content/popular.php?type=series&limit=8`);
             if (!response.ok) throw new Error('Error al cargar series');
-            
-            // Verificar que la respuesta sea JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Respuesta no es JSON:', text.substring(0, 200));
-                throw new Error('El servidor devolvió HTML en lugar de JSON');
-            }
-            
             const result = await response.json();
             const series = result.data || result;
 
@@ -331,7 +303,7 @@ function createContentCard(item, type) {
         if (event.target.closest('.action-btn')) {
             return;
         }
-        window.location.href = `/content.php?id=${item.id}`;
+        window.location.href = `${BASE_URL}/content.php?id=${item.id}`;
     });
     
     return card;
@@ -1347,17 +1319,8 @@ async function playContent(id, type, videoData = null) {
     if (!content) {
         // Si no está en caché, buscar en la API
         try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/index.php?id=${id}`);
+            const response = await fetch(`/api/${type}s/${id}`);
             if (!response.ok) throw new Error('Contenido no encontrado en el servidor');
-            
-            // Verificar que la respuesta sea JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Respuesta no es JSON:', text.substring(0, 200));
-                throw new Error('El servidor devolvió HTML en lugar de JSON');
-            }
-            
             const result = await response.json();
             content = result.data;
         } catch (error) {

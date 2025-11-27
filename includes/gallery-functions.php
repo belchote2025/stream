@@ -196,6 +196,7 @@ function getMostViewed($db, $type = null, $limit = 10) {
  */
 function createContentCard($item) {
     require_once __DIR__ . '/image-helper.php';
+    $baseUrl = rtrim(SITE_URL, '/');
     
     $id = isset($item['id']) ? (int)$item['id'] : 0;
     $type = isset($item['type']) ? htmlspecialchars($item['type'], ENT_QUOTES, 'UTF-8') : 'movie';
@@ -203,14 +204,14 @@ function createContentCard($item) {
     $releaseYear = isset($item['release_year']) ? (int)$item['release_year'] : (isset($item['year']) ? (int)$item['year'] : '');
     $duration = isset($item['duration']) ? htmlspecialchars($item['duration'], ENT_QUOTES, 'UTF-8') : '';
     $rating = isset($item['rating']) ? number_format((float)$item['rating'], 1) : '';
-    $posterUrl = getImageUrl($item['poster_url'] ?? $item['backdrop_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
+    $posterUrl = getImageUrl($item['poster_url'] ?? $item['backdrop_url'] ?? '', '/assets/img/default-poster.svg');
     $isPremium = !empty($item['is_premium']);
     $hasTorrent = !empty($item['torrent_magnet']);
     $slug = isset($item['slug']) ? htmlspecialchars($item['slug'], ENT_QUOTES, 'UTF-8') : '';
     
-    $detailUrl = '/streaming-platform/content.php?id=' . $id;
+    $detailUrl = $baseUrl . '/content.php?id=' . $id;
     if ($slug) {
-        $detailUrl = '/streaming-platform/content/' . $slug;
+        $detailUrl = $baseUrl . '/content/' . $slug;
     }
     $detailUrlEscaped = htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8');
     

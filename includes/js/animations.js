@@ -3,8 +3,6 @@
  */
 
 (function() {
-    const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
-    const FALLBACK_POSTER = `${BASE_URL}/assets/img/default-poster.svg`;
     'use strict';
 
     // ============================================
@@ -190,16 +188,7 @@
 
             timeout = setTimeout(async () => {
                 try {
-                    const response = await fetch(`${BASE_URL}/api/content/popular.php?limit=5`);
-                    
-                    // Verificar que la respuesta sea JSON
-                    const contentType = response.headers.get('content-type');
-                    if (!contentType || !contentType.includes('application/json')) {
-                        const text = await response.text();
-                        console.error('Respuesta no es JSON:', text.substring(0, 200));
-                        throw new Error('El servidor devolvió HTML en lugar de JSON');
-                    }
-                    
+                    const response = await fetch(`/api/content/popular.php?limit=5`);
                     const data = await response.json();
                     
                     if (data.success && data.data) {
@@ -209,8 +198,8 @@
 
                         if (results.length > 0) {
                             autocompleteContainer.innerHTML = results.map(item => `
-                                <div class="autocomplete-item" onclick="window.location.href='${BASE_URL}/content-detail.php?id=${item.id}'">
-                                    <img src="${item.poster_url || FALLBACK_POSTER}" alt="${item.title}">
+                                <div class="autocomplete-item" onclick="window.location.href='/content-detail.php?id=${item.id}'">
+                                    <img src="${item.poster_url}" alt="${item.title}">
                                     <div>
                                         <strong>${item.title}</strong>
                                         <span>${item.type === 'movie' ? 'Película' : 'Serie'} • ${item.release_year}</span>

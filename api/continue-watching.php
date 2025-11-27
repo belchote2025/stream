@@ -5,6 +5,7 @@
 
 header('Content-Type: application/json');
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/image-helper.php';
 
 if (!isLoggedIn()) {
     http_response_code(401);
@@ -61,8 +62,8 @@ try {
             'id' => (int)$item['id'],
             'title' => $item['title'],
             'type' => $item['type'],
-            'poster_url' => $item['poster_url'] ?: '/streaming-platform/assets/img/default-poster.svg',
-            'backdrop_url' => $item['backdrop_url'] ?: '/streaming-platform/assets/img/default-backdrop.svg',
+            'poster_url' => getImageUrl($item['poster_url'] ?? '', '/assets/img/default-poster.svg'),
+            'backdrop_url' => getImageUrl($item['backdrop_url'] ?? '', '/assets/img/default-backdrop.svg'),
             'progress' => $progressPercent,
             'progress_seconds' => (int)$item['progress'],
             'duration_seconds' => (int)$item['duration'],

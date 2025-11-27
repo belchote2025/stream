@@ -11,16 +11,31 @@
  * @param string $default URL por defecto si no hay imagen
  * @return string URL procesada
  */
-function getImageUrl($url, $default = '/streaming-platform/assets/img/default-poster.svg') {
+function buildAbsoluteUrl($path) {
+    $path = trim($path);
+    if ($path === '') {
+        return '';
+    }
+    if (preg_match('/^https?:\/\//i', $path)) {
+        return htmlspecialchars($path);
+    }
+    $baseUrl = defined('SITE_URL') ? rtrim(SITE_URL, '/') : '';
+    if ($baseUrl === '') {
+        return '/' . ltrim($path, '/');
+    }
+    return $baseUrl . '/' . ltrim($path, '/');
+}
+
+function getImageUrl($url, $default = '/assets/img/default-poster.svg') {
     if (empty($url) || $url === 'null' || $url === 'NULL') {
-        return $default;
+        return buildAbsoluteUrl($default);
     }
     
     $url = trim($url);
     
     // Si es una URL externa que necesita proxy
     if (preg_match('/^https?:\/\/(image\.tmdb\.org|via\.placeholder\.com|images\.unsplash\.com)/', $url)) {
-        return '/streaming-platform/api/image-proxy.php?url=' . urlencode($url);
+        return buildAbsoluteUrl('/api/image-proxy.php?url=' . urlencode($url));
     }
     
     // Si es una URL externa normal, usar directamente
@@ -30,9 +45,9 @@ function getImageUrl($url, $default = '/streaming-platform/assets/img/default-po
     
     // Si es una ruta relativa, asegurar que empiece con /
     if (!empty($url) && !preg_match('/^\/|^https?:\/\//', $url)) {
-        return '/' . ltrim($url, '/');
+        return buildAbsoluteUrl('/' . ltrim($url, '/'));
     }
     
-    return !empty($url) ? htmlspecialchars($url) : $default;
+    return !empty($url) ? buildAbsoluteUrl($url) : buildAbsoluteUrl($default);
 }
 

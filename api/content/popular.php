@@ -6,6 +6,7 @@
 
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/image-helper.php';
 
 try {
     $db = getDbConnection();
@@ -81,8 +82,8 @@ try {
             'duration' => (int)$row['duration'],
             'rating' => $row['rating'] ? (float)$row['rating'] : null,
             'age_rating' => $row['age_rating'],
-            'poster_url' => !empty($row['poster_url']) ? $row['poster_url'] : '/streaming-platform/assets/img/default-poster.svg',
-            'backdrop_url' => !empty($row['backdrop_url']) ? $row['backdrop_url'] : '/streaming-platform/assets/img/default-backdrop.svg',
+            'poster_url' => getImageUrl($row['poster_url'] ?? '', '/assets/img/default-poster.svg'),
+            'backdrop_url' => getImageUrl($row['backdrop_url'] ?? '', '/assets/img/default-backdrop.svg'),
             'trailer_url' => $row['trailer_url'],
             'video_url' => $row['video_url'],
             'torrent_magnet' => $row['torrent_magnet'],

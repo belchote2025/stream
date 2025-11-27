@@ -1,12 +1,95 @@
 <?php
-// Configuración de la base de datos
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', ''); // En producción, usa una contraseña segura
-define('DB_NAME', 'streaming_platform');
+$projectRoot = dirname(__DIR__);
+$envFile = $projectRoot . '/.env';
+
+if (file_exists($envFile) && is_readable($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '' || strpos($trimmed, '#') === 0) {
+            continue;
+        }
+        if (strpos($line, '=') === false) {
+            continue;
+        }
+        list($key, $value) = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        putenv("$key=$value");
+        $_ENV[$key] = $value;
+    }
+}
+
+$httpHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$isCli = php_sapi_name() === 'cli';
+$isLocalHost = in_array($httpHost, ['localhost', '127.0.0.1'], true) || strpos($httpHost, '.local') !== false;
+$appEnv = getenv('APP_ENV') ?: (($isCli || $isLocalHost) ? 'local' : 'production');
+$appEnv = strtolower($appEnv) === 'local' ? 'local' : 'production';
+define('APP_ENV', $appEnv);
+
+$dbDefaults = [
+    'local' => [
+        'host' => '127.0.0.1',
+        'user' => 'root',
+        'pass' => '',
+        'name' => 'streaming_platform',
+    ],
+    'production' => [
+        'host' => 'localhost',
+        'user' => 'u6O0265163_HAggBlS0j_belchote',
+        'pass' => 'Belchote1@',
+        'name' => 'u6O0265163_HAggBlS0j_streamingplatform',
+    ],
+];
+$currentDbDefaults = $dbDefaults[APP_ENV] ?? $dbDefaults['production'];
+
+define('DB_HOST', getenv('DB_HOST') ?: $currentDbDefaults['host']);
+define('DB_USER', getenv('DB_USER') ?: $currentDbDefaults['user']);
+define('DB_PASS', getenv('DB_PASS') ?: $currentDbDefaults['pass']);
+define('DB_NAME', getenv('DB_NAME') ?: $currentDbDefaults['name']);
 
 // Configuración de la aplicación
-define('SITE_URL', 'http://localhost/streaming-platform');
+if (!defined('SITE_URL')) {
+    $envSiteUrl = getenv('SITE_URL');
+    
+    if ($envSiteUrl) {
+        define('SITE_URL', rtrim($envSiteUrl, '/'));
+    } else {
+        $host = $_SERVER['HTTP_HOST'] ?? null;
+        
+        if ($host) {
+            $usesHttps = (
+                (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+                (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443)
+            );
+            $scheme = $usesHttps ? 'https' : 'http';
+            
+            $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+            $docRoot = $docRoot ? rtrim(str_replace('\\', '/', realpath($docRoot)), '/') : '';
+            $projectRootReal = rtrim(str_replace('\\', '/', realpath(dirname(__DIR__))), '/');
+            
+            $basePath = '';
+            if ($docRoot && $projectRootReal && strpos($projectRootReal, $docRoot) === 0) {
+                $basePath = substr($projectRootReal, strlen($docRoot));
+            }
+
+            // En entornos locales (localhost/XAMPP) forzar la carpeta del proyecto
+            // si Apache no reporta correctamente DOCUMENT_ROOT.
+            if (($basePath === '' || $basePath === '/') && $isLocalHost) {
+                $basePath = '/' . trim(basename($projectRootReal), '/');
+            }
+            
+            if (!empty($basePath) && $basePath[0] !== '/') {
+                $basePath = '/' . $basePath;
+            }
+            
+            $siteUrl = rtrim($scheme . '://' . $host . $basePath, '/');
+            define('SITE_URL', $siteUrl ?: $scheme . '://' . $host);
+        } else {
+            define('SITE_URL', 'http://localhost/streaming-platform');
+        }
+    }
+}
 define('SITE_NAME', 'UrresTv');
 
 // Configuración de seguridad
@@ -16,7 +99,7 @@ define('HASH_OPTIONS', ['cost' => 12]);
 // Configuración de sesión
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', 0); // Cambiar a 1 en producción con HTTPS
+ini_set('session.cookie_secure', APP_ENV === 'production' ? 1 : 0);
 ini_set('session.cookie_samesite', 'Lax');
 
 // Iniciar sesión
@@ -25,19 +108,16 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Manejo de errores
-if (defined('ENVIRONMENT')) {
-    if (ENVIRONMENT === 'development') {
-        error_reporting(E_ALL);
-        ini_set('display_errors', 1);
-    } else {
-        error_reporting(0);
-        ini_set('display_errors', 0);
-    }
-} else {
-    // Por defecto, modo desarrollo
-    define('ENVIRONMENT', 'development');
+if (!defined('ENVIRONMENT')) {
+    define('ENVIRONMENT', APP_ENV === 'local' ? 'development' : 'production');
+}
+
+if (ENVIRONMENT === 'development') {
     error_reporting(E_ALL);
     ini_set('display_errors', 1);
+} else {
+    error_reporting(0);
+    ini_set('display_errors', 0);
 }
 
 // Función para conectar a la base de datos
@@ -58,7 +138,7 @@ function getDbConnection() {
         } catch (PDOException $e) {
             // En producción, registrar el error en un archivo de log
             error_log("Error de conexión: " . $e->getMessage());
-            die("Error de conexión con la base de datos. Por favor, inténtalo de nuevo más tarde.");
+            die("PDOException: " . $e->getMessage());
         }
     }
     

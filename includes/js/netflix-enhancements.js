@@ -4,11 +4,9 @@
 
 (function() {
     'use strict';
-    
-    const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL)
-        ? window.__APP_BASE_URL
-        : '';
-    const FALLBACK_POSTER = `${BASE_URL}/assets/img/default-poster.svg`;
+
+    const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+    const DEFAULT_POSTER = `${BASE_URL}/assets/img/default-poster.svg`;
 
     // ============================================
     // NAVBAR SCROLL EFFECT
@@ -103,7 +101,7 @@
                 e.preventDefault();
                 const query = searchInput.value.trim();
                 if (query) {
-                    window.location.href = `${BASE_URL}/search.php?q=${encodeURIComponent(query)}`;
+                    window.location.href = `/search.php?q=${encodeURIComponent(query)}`;
                 }
             } else if (e.key === 'Escape') {
                 closeSearch();
@@ -143,15 +141,6 @@
 
         try {
             const response = await fetch(`${BASE_URL}/api/search.php?q=${encodeURIComponent(query)}&limit=5`);
-            
-            // Verificar que la respuesta sea JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Respuesta no es JSON:', text.substring(0, 200));
-                throw new Error('El servidor devolvió HTML en lugar de JSON');
-            }
-            
             const data = await response.json();
             
             if (data.success && data.data && data.data.length > 0) {
@@ -172,11 +161,11 @@
         autocompleteResults.innerHTML = results.map(item => {
             const type = item.type === 'movie' ? 'Película' : 'Serie';
             const year = item.release_year || '';
-            const poster = item.poster_url || FALLBACK_POSTER;
+            const poster = item.poster_url || DEFAULT_POSTER;
             
             return `
                 <div class="result-item" onclick="window.location.href='${BASE_URL}/content-detail.php?id=${item.id}'">
-                    <img src="${poster}" alt="${item.title}" onerror="this.src='${FALLBACK_POSTER}'">
+                    <img src="${poster}" alt="${item.title}" onerror="this.src='${DEFAULT_POSTER}'">
                     <div class="result-info">
                         <div class="result-title">${escapeHtml(item.title)}</div>
                         <div class="result-meta">
@@ -350,7 +339,7 @@
             window.playContent(id, type);
         } else {
             // Fallback: redirigir a página de reproducción
-        window.location.href = `${BASE_URL}/watch.php?id=${id}&type=${type}`;
+            window.location.href = `/watch.php?id=${id}&type=${type}`;
         }
     }
 
@@ -390,7 +379,7 @@
 
     function handleShowInfo(id, type) {
         // Redirigir a la página de detalles
-        window.location.href = `${BASE_URL}/content-detail.php?id=${id}`;
+        window.location.href = `/content-detail.php?id=${id}`;
     }
 
     // ============================================

@@ -1,6 +1,3 @@
-const baseUrl = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
-const DEFAULT_POSTER = `${baseUrl || ''}/assets/img/default-poster.svg`;
-
 // Estado de la aplicación
 const appState = {
     currentUser: {
@@ -8,7 +5,7 @@ const appState = {
         name: 'Administrador',
         email: 'admin@urrestv.com',
         role: 'admin',
-        avatar: DEFAULT_POSTER
+        avatar: '/streaming-platform/assets/img/default-poster.svg'
     },
     currentSection: 'dashboard',
     currentSubsection: '',
@@ -342,9 +339,9 @@ function loadUserData() {
         const name = userInfo.querySelector('span');
         
         if (avatar) {
-            avatar.src = appState.currentUser.avatar || DEFAULT_POSTER;
+            avatar.src = appState.currentUser.avatar || '/streaming-platform/assets/img/default-poster.svg';
             avatar.onerror = function() {
-                this.src = DEFAULT_POSTER;
+                this.src = '/streaming-platform/assets/img/default-poster.svg';
             };
         }
         if (name) name.textContent = appState.currentUser.name;
@@ -585,7 +582,7 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
             registrationDate: registrationDate,
             plan: user.role === 'premium' || user.role === 'admin' ? 'Premium' : 'Gratis',
             status: user.status === 'active' ? 'Activo' : 'Inactivo',
-            avatar: user.avatar_url || DEFAULT_POSTER
+            avatar: user.avatar_url || '/streaming-platform/assets/img/default-poster.svg'
         };
     });
     
@@ -710,7 +707,7 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
                             <tr data-id="${user.id}">
                                 <td>
                                     <div class="user-cell">
-                                        <img src="${user.avatar || DEFAULT_POSTER}" alt="${user.name || 'Usuario'}" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="${user.avatar}" alt="${user.name}" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>${escapeHtml(user.name)}</span>
                                     </div>
                                 </td>
@@ -762,7 +759,7 @@ function renderContentList(type, title, items = []) {
                     ${items.length > 0 ? items.map(item => `
                         <tr data-id="${item.id}">
                             <td>
-                                <img src="${item.poster_url || DEFAULT_POSTER}" alt="${item.title || 'Sin título'}" class="thumbnail" onerror="this.src='${DEFAULT_POSTER}'">
+                                <img src="${item.poster_url || '/streaming-platform/assets/img/default-poster.svg'}" alt="${item.title || 'Sin título'}" class="thumbnail" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                             </td>
                             <td>${item.title || 'Sin título'}</td>
                             <td>${item.release_year || 'N/A'}</td>
@@ -1044,10 +1041,10 @@ function renderUsersList(users = []) {
                             <td>
                                 <div class="user-cell">
                                             <img 
-                                                src="${user.avatar_url || DEFAULT_POSTER}" 
-                                                alt="${user.full_name || user.username || 'Usuario'}" 
+                                                src="${user.avatar_url || '/streaming-platform/assets/img/default-poster.svg'}" 
+                                                alt="${user.full_name || user.username}" 
                                                 class="user-avatar"
-                                                onerror="this.src='${DEFAULT_POSTER}'"
+                                                onerror="this.src='/streaming-platform/assets/img/default-poster.svg'"
                                             >
                                             <div class="user-info">
                                                 <strong>${escapeHtml(user.full_name || user.username)}</strong>
@@ -1267,10 +1264,10 @@ function buildSubscriptionRows(subscriptions = []) {
             <td>
                 <div class="user-cell">
                     <img 
-                        src="${sub.avatar_url || DEFAULT_POSTER}" 
+                        src="${sub.avatar_url || '/streaming-platform/assets/img/default-poster.svg'}" 
                         alt="${escapeHtml(sub.full_name || sub.username || 'Usuario')}" 
                         class="user-avatar"
-                        onerror="this.src='${DEFAULT_POSTER}'"
+                        onerror="this.src='/streaming-platform/assets/img/default-poster.svg'"
                     >
                     <div class="user-info">
                         <strong>${escapeHtml(sub.full_name || sub.username || 'Usuario')}</strong>
@@ -1426,7 +1423,7 @@ function handleUserDropdownAction(event) {
     const action = actionBtn.dataset.userAction;
     switch (action) {
         case 'profile':
-            window.location.href = '/dashboard/?tab=profile';
+            window.location.href = '/streaming-platform/dashboard/?tab=profile';
             break;
         case 'settings':
             navigateTo('configuracion');
@@ -1437,7 +1434,7 @@ function handleUserDropdownAction(event) {
             showNotification('Tema actualizado', 'success');
             break;
         case 'logout':
-            window.location.href = '/api/auth/logout.php';
+            window.location.href = '/streaming-platform/api/auth/logout.php';
             break;
         default:
             break;
@@ -1526,7 +1523,7 @@ function handleNotificationDropdownClick(event) {
                 refreshNotificationsDropdown();
                 break;
             case 'view-all':
-                window.location.href = '/dashboard/?tab=overview';
+                window.location.href = '/streaming-platform/dashboard/?tab=overview';
                 break;
             default:
                 break;
@@ -2135,7 +2132,7 @@ function renderReports() {
                                 <td><strong>1</strong></td>
                                 <td>
                                     <div class="content-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Poster" class="content-thumb" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>El Padrino</span>
                                     </div>
                                 </td>
@@ -2152,7 +2149,7 @@ function renderReports() {
                                 <td><strong>2</strong></td>
                                 <td>
                                     <div class="content-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Poster" class="content-thumb" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>El Caballero Oscuro</span>
                                     </div>
                                 </td>
@@ -2169,7 +2166,7 @@ function renderReports() {
                                 <td><strong>3</strong></td>
                                 <td>
                                     <div class="content-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Poster" class="content-thumb" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>El Padrino: Parte II</span>
                                     </div>
                                 </td>
@@ -2186,7 +2183,7 @@ function renderReports() {
                                 <td><strong>4</strong></td>
                                 <td>
                                     <div class="content-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Poster" class="content-thumb" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>Cadena Perpetua</span>
                                     </div>
                                 </td>
@@ -2203,7 +2200,7 @@ function renderReports() {
                                 <td><strong>5</strong></td>
                                 <td>
                                     <div class="content-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Poster" class="content-thumb" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Poster" class="content-thumb" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>Pulp Fiction</span>
                                     </div>
                                 </td>
@@ -2248,7 +2245,7 @@ function renderReports() {
                                 <td><strong>1</strong></td>
                                 <td>
                                     <div class="user-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Usuario" class="user-avatar" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>Carlos López</span>
                                     </div>
                                 </td>
@@ -2263,7 +2260,7 @@ function renderReports() {
                                 <td><strong>2</strong></td>
                                 <td>
                                     <div class="user-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Usuario" class="user-avatar" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>Ana Martínez</span>
                                     </div>
                                 </td>
@@ -2278,7 +2275,7 @@ function renderReports() {
                                 <td><strong>3</strong></td>
                                 <td>
                                     <div class="user-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Usuario" class="user-avatar" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>Laura García</span>
                                     </div>
                                 </td>
@@ -2293,7 +2290,7 @@ function renderReports() {
                                 <td><strong>4</strong></td>
                                 <td>
                                     <div class="user-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Usuario" class="user-avatar" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>Miguel Ángel Ramírez</span>
                                     </div>
                                 </td>
@@ -2308,7 +2305,7 @@ function renderReports() {
                                 <td><strong>5</strong></td>
                                 <td>
                                     <div class="user-cell">
-                                        <img src="${DEFAULT_POSTER}" alt="Usuario" class="user-avatar" onerror="this.src='${DEFAULT_POSTER}'">
+                                        <img src="/streaming-platform/assets/img/default-poster.svg" alt="Usuario" class="user-avatar" onerror="this.src='/streaming-platform/assets/img/default-poster.svg'">
                                         <span>Roberto Sánchez</span>
                                     </div>
                                 </td>
@@ -2942,8 +2939,7 @@ async function handleContentSubmit(e) {
             const videoUploadData = new FormData();
             videoUploadData.append('file', videoFile);
             
-            const uploadEndpoint = `${baseUrl}/api/upload/video.php`;
-            const videoUploadResponse = await fetch(uploadEndpoint, {
+            const videoUploadResponse = await fetch('/streaming-platform/api/upload/video.php', {
                 method: 'POST',
                 body: videoUploadData,
                 credentials: 'same-origin'
@@ -2966,7 +2962,7 @@ async function handleContentSubmit(e) {
             trailerUploadData.append('file', trailerFile);
             trailerUploadData.append('is_trailer', '1');
             
-            const trailerUploadResponse = await fetch(uploadEndpoint, {
+            const trailerUploadResponse = await fetch('/streaming-platform/api/upload/video.php', {
                 method: 'POST',
                 body: trailerUploadData,
                 credentials: 'same-origin'
@@ -3136,14 +3132,15 @@ async function handleUserSubmit(e) {
 async function apiRequest(endpoint, options = {}) {
     try {
         // Asegurar que el endpoint tenga la ruta base correcta
-        const baseUrl = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+        const baseUrl = '/streaming-platform';
         
         // Si el endpoint ya incluye la ruta base, no duplicarla
         let fullEndpoint;
         if (endpoint.startsWith('http')) {
             fullEndpoint = endpoint;
         } else if (endpoint.startsWith('/streaming-platform')) {
-            fullEndpoint = baseUrl + endpoint.replace('/streaming-platform', '');
+            // Ya tiene la ruta base, usarla tal cual
+            fullEndpoint = endpoint;
         } else if (endpoint.startsWith('/')) {
             // Ruta absoluta, añadir base
             fullEndpoint = baseUrl + endpoint;
@@ -4203,7 +4200,7 @@ async function handleSearchTorrent() {
     resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem;"><i class="fas fa-spinner fa-spin"></i> Buscando torrents...</p>';
     
     try {
-        const url = `/api/torrent/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`;
+        const url = `/streaming-platform/api/torrent/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`;
         
         const response = await fetch(url, {
             credentials: 'same-origin'

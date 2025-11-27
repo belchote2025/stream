@@ -58,18 +58,12 @@ body {
    NAVBAR ESTILO NETFLIX
    ============================================ */
 .navbar {
+    /* Estilos base - se sobrescriben en navbar-enhancements.css para diseño cinematográfico */
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
     z-index: 1000;
-    padding: 0 4%;
-    height: 70px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.7) 10%, transparent);
-    transition: background-color var(--transition-normal);
 }
 
 .navbar.scrolled {
@@ -111,43 +105,22 @@ body {
     color: var(--netflix-red);
 }
 
+/* Estilos del navbar movidos a navbar-enhancements.css para diseño cinematográfico */
+/* Los estilos base se mantienen aquí solo como fallback */
+
 .navbar-nav {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
+    /* Estilos base - sobrescritos por navbar-enhancements.css */
     list-style: none;
 }
 
 .nav-link {
-    color: var(--netflix-gray-light);
+    /* Estilos base - sobrescritos por navbar-enhancements.css */
     text-decoration: none;
-    font-size: 0.9rem;
-    font-weight: 500;
-    transition: color var(--transition-fast);
-    position: relative;
-}
-
-.nav-link:hover,
-.nav-link.active {
-    color: var(--netflix-white);
-}
-
-.nav-link.active::after {
-    content: '';
-    position: absolute;
-    bottom: -5px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background-color: var(--netflix-red);
 }
 
 /* Búsqueda mejorada */
 .navbar-left {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-    flex: 1;
+    /* Estilos base - sobrescritos por navbar-enhancements.css */
     position: relative;
 }
 

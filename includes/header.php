@@ -1,9 +1,13 @@
+<?php $baseUrl = rtrim(SITE_URL, '/'); ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' . SITE_NAME : SITE_NAME; ?></title>
+    <script>
+        window.__APP_BASE_URL = window.__APP_BASE_URL || '<?php echo rtrim(SITE_URL, '/'); ?>';
+    </script>
     
     <!-- Suprimir warnings y errores no críticos -->
     <script>
@@ -313,7 +317,7 @@
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     
     <!-- CSS crítico cargado síncronamente -->
-    <link rel="stylesheet" href="/streaming-platform/css/critical.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/critical.css">
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -322,7 +326,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" integrity="sha512-MV7K8+y+gLIBoVD59lQIYicR65iaqukzvf/nwasF0nqhPay5w/9lJmVM2hMDcnK1OnMGCdVK+iQrJ7lzPJQd1w==" crossorigin="anonymous" referrerpolicy="no-referrer">
     
     <!-- Preload de estilos no críticos -->
-    <link rel="preload" href="/streaming-platform/css/styles.css" as="style">
+    <link rel="preload" href="<?php echo $baseUrl; ?>/css/styles.css" as="style">
     
     <!-- Fallback para Font Awesome si falla -->
     <script>
@@ -350,19 +354,19 @@
     </script>
     
     <!-- Estilos personalizados -->
-    <link rel="stylesheet" href="/streaming-platform/assets/css/netflix-gallery.css">
-    <link rel="stylesheet" href="/streaming-platform/assets/css/movies-table.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/netflix-gallery.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/movies-table.css">
     
     <!-- Estilos personalizados -->
-    <link rel="stylesheet" href="/streaming-platform/css/styles.css">
-    <link rel="stylesheet" href="/streaming-platform/css/animations.css">
-    <link rel="stylesheet" href="/streaming-platform/css/responsive.css">
-    <link rel="stylesheet" href="/streaming-platform/css/mobile-improvements.css">
-    <link rel="stylesheet" href="/streaming-platform/css/hero-optimizations.css">
-    <link rel="stylesheet" href="/streaming-platform/css/navbar-enhancements.css">
-    <link rel="stylesheet" href="/streaming-platform/css/hero-trailer.css">
-    <link rel="stylesheet" href="/streaming-platform/css/font-awesome-fallback.css">
-    <link rel="stylesheet" href="/streaming-platform/css/fix-visibility.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/styles.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/animations.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/responsive.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/mobile-improvements.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/hero-optimizations.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/navbar-enhancements.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/hero-trailer.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/font-awesome-fallback.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/fix-visibility.css">
     
     <script>
         // Marcar que los estilos están cargados - versión simplificada
@@ -388,9 +392,9 @@
     <!-- Barra de navegación estilo Netflix -->
     <nav class="navbar" id="mainNavbar">
         <div class="navbar-left">
-            <a class="navbar-brand" href="/streaming-platform">
+            <a class="navbar-brand" href="<?php echo $baseUrl; ?>/">
                 <?php if (file_exists(__DIR__ . '/../assets/img/logo.png')): ?>
-                    <img src="/streaming-platform/assets/img/logo.png" alt="<?php echo SITE_NAME; ?>" class="brand-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                    <img src="<?php echo $baseUrl; ?>/assets/img/logo.png" alt="<?php echo SITE_NAME; ?>" class="brand-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
                 <?php endif; ?>
                 <span class="brand-text" style="<?php echo file_exists(__DIR__ . '/../assets/img/logo.png') ? 'display:none;' : ''; ?>"><?php echo SITE_NAME; ?></span>
             </a>
@@ -401,25 +405,25 @@
             
             <ul class="navbar-nav" id="navbarNav">
                 <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="/streaming-platform">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="<?php echo $baseUrl; ?>/">
                         <i class="fas fa-home"></i>
                         <span>Inicio</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'movies.php' ? 'active' : ''; ?>" href="/streaming-platform/movies.php">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'movies.php' ? 'active' : ''; ?>" href="<?php echo $baseUrl; ?>/movies.php">
                         <i class="fas fa-film"></i>
                         <span>Películas</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'series.php' ? 'active' : ''; ?>" href="/streaming-platform/series.php">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'series.php' ? 'active' : ''; ?>" href="<?php echo $baseUrl; ?>/series.php">
                         <i class="fas fa-tv"></i>
                         <span>Series</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'categories.php' ? 'active' : ''; ?>" href="/streaming-platform/categories.php">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'categories.php' ? 'active' : ''; ?>" href="<?php echo $baseUrl; ?>/categories.php">
                         <i class="fas fa-th-large"></i>
                         <span>Categorías</span>
                     </a>
@@ -451,10 +455,10 @@
                 <div class="user-menu" id="userMenu">
                     <button class="user-menu-toggle" aria-label="Menú de usuario">
                         <img 
-                            src="<?php echo !empty($_SESSION['user_avatar']) ? htmlspecialchars($_SESSION['user_avatar']) : '/streaming-platform/assets/img/default-poster.svg'; ?>" 
+                            src="<?php echo !empty($_SESSION['user_avatar']) ? htmlspecialchars($_SESSION['user_avatar']) : $baseUrl . '/assets/img/default-poster.svg'; ?>" 
                             alt="Perfil" 
                             class="avatar"
-                            onerror="this.src='/streaming-platform/assets/img/default-poster.svg';"
+                            onerror="this.src='<?php echo $baseUrl; ?>/assets/img/default-poster.svg';"
                         >
                         <i class="fas fa-chevron-down"></i>
                     </button>
@@ -462,9 +466,9 @@
                         <div class="user-info-dropdown">
                             <div class="user-avatar-large">
                                 <img 
-                                    src="<?php echo !empty($_SESSION['user_avatar']) ? htmlspecialchars($_SESSION['user_avatar']) : '/streaming-platform/assets/img/default-poster.svg'; ?>" 
+                                    src="<?php echo !empty($_SESSION['user_avatar']) ? htmlspecialchars($_SESSION['user_avatar']) : $baseUrl . '/assets/img/default-poster.svg'; ?>" 
                                     alt="Perfil"
-                                    onerror="this.src='/streaming-platform/assets/img/default-poster.svg';"
+                                    onerror="this.src='<?php echo $baseUrl; ?>/assets/img/default-poster.svg';"
                                 >
                             </div>
                             <div class="user-details">
@@ -473,38 +477,38 @@
                             </div>
                         </div>
                         <div class="dropdown-divider"></div>
-                        <a href="/streaming-platform/dashboard/" class="dropdown-item">
+                        <a href="<?php echo $baseUrl; ?>/dashboard/" class="dropdown-item">
                             <i class="fas fa-user"></i>
                             <span>Mi cuenta</span>
                         </a>
-                        <a href="/streaming-platform/my-list.php" class="dropdown-item">
+                        <a href="<?php echo $baseUrl; ?>/my-list.php" class="dropdown-item">
                             <i class="fas fa-list"></i>
                             <span>Mi lista</span>
                         </a>
-                        <a href="/streaming-platform/settings.php" class="dropdown-item">
+                        <a href="<?php echo $baseUrl; ?>/settings.php" class="dropdown-item">
                             <i class="fas fa-cog"></i>
                             <span>Configuración</span>
                         </a>
                         <?php if (isAdmin()): ?>
                             <div class="dropdown-divider"></div>
-                            <a href="/streaming-platform/admin/" class="dropdown-item">
+                            <a href="<?php echo $baseUrl; ?>/admin/" class="dropdown-item">
                                 <i class="fas fa-shield-alt"></i>
                                 <span>Panel de administración</span>
                             </a>
                         <?php endif; ?>
                         <div class="dropdown-divider"></div>
-                        <a href="/streaming-platform/api/auth/logout.php" class="dropdown-item logout">
+                        <a href="<?php echo $baseUrl; ?>/api/auth/logout.php" class="dropdown-item logout">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Cerrar sesión</span>
                         </a>
                     </div>
                 </div>
             <?php else: ?>
-                <a href="/streaming-platform/login.php" class="nav-link login-link">
+                <a href="<?php echo $baseUrl; ?>/login.php" class="nav-link login-link">
                     <i class="fas fa-sign-in-alt"></i>
                     <span>Iniciar sesión</span>
                 </a>
-                <a href="/streaming-platform/register.php" class="btn btn-primary register-btn">
+                <a href="<?php echo $baseUrl; ?>/register.php" class="btn btn-primary register-btn">
                     <i class="fas fa-user-plus"></i>
                     <span>Registrarse</span>
                 </a>

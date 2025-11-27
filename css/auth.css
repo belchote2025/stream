@@ -308,7 +308,7 @@ img {
     flex: 1;
     display: none;
     background: linear-gradient(135deg, rgba(20, 20, 20, 0.9), rgba(20, 20, 20, 0.7)),
-                url('/streaming-platform/assets/images/auth-bg.svg') center/cover no-repeat;
+                url('../assets/images/auth-bg.svg') center/cover no-repeat;
     padding: 3rem;
     color: white;
     position: relative;

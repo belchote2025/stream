@@ -4,6 +4,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/image-helper.php';
 requireAdmin();
 
 $db = getDbConnection();
@@ -76,7 +77,7 @@ function getUsers() {
                 'status' => $user['status'],
                 'registrationDate' => $user['created_at'],
                 'lastLogin' => $user['last_login'],
-                'avatar_url' => $user['avatar_url'] ?: '/streaming-platform/assets/img/default-poster.svg',
+                'avatar_url' => getImageUrl($user['avatar_url'] ?? '', '/assets/img/default-poster.svg'),
                 'plan' => $user['role'] === 'premium' ? 'premium' : ($user['role'] === 'admin' ? 'admin' : 'free'),
                 'password_hash' => $user['password'] // Hash de la contraseña (no la contraseña original)
             ];
@@ -113,6 +114,7 @@ function getUser($id) {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($user) {
+            $user['avatar_url'] = getImageUrl($user['avatar_url'] ?? '', '/assets/img/default-poster.svg');
             echo json_encode([
                 'success' => true,
                 'data' => $user

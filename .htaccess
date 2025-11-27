@@ -1,6 +1,14 @@
 # Habilitar rewrite engine
 RewriteEngine On
 
+# Definir SITE_URL solo para el dominio de producción
+SetEnvIf Host "^goldenrod-finch-839887\.hostingersite\.com$" SITE_URL=https://goldenrod-finch-839887.hostingersite.com
+
+# Permitir que rutas /streaming-platform/ funcionen en hosts sin subcarpeta (solo producción)
+RewriteCond %{HTTP_HOST} ^goldenrod-finch-839887\.hostingersite\.com$ [NC]
+RewriteCond %{REQUEST_URI} ^/streaming-platform/ [NC]
+RewriteRule ^streaming-platform/(.*)$ /$1 [L,R=302,NC]
+
 # Redirigir requests a los endpoints de API
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
@@ -10,6 +18,10 @@ RewriteRule ^api/content/featured$ api/content/featured.php [L]
 RewriteRule ^api/content/popular$ api/content/popular.php [L]
 RewriteRule ^api/content/recent$ api/content/recent.php [L]
 RewriteRule ^api/content/([0-9]+)$ api/content/index.php?id=$1 [L]
+
+# API Movies endpoints
+RewriteRule ^api/movies/?$ api/movies/index.php [L,QSA]
+RewriteRule ^api/movies/([0-9]+)$ api/movies/index.php?id=$1 [L]
 
 # Permitir acceso a archivos estáticos
 RewriteCond %{REQUEST_FILENAME} -f

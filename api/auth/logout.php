@@ -1,5 +1,4 @@
 <?php
-header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
@@ -33,4 +32,15 @@ if ($token) {
 // Cerrar la sesión
 $auth->logout();
 
-echo json_encode(['message' => 'Sesión cerrada correctamente']);
+// Detectar si es una petición AJAX o un enlace directo
+$isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+          strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+if ($isAjax) {
+    // Si es AJAX, devolver JSON
+    header('Content-Type: application/json');
+    echo json_encode(['message' => 'Sesión cerrada correctamente']);
+} else {
+    // Si es un enlace directo, redirigir a la página principal
+    redirect('/');
+}

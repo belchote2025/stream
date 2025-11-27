@@ -129,13 +129,13 @@ include __DIR__ . '/includes/header.php';
     <div class="movies-grid">
         <?php if (!empty($movies)): ?>
             <?php foreach ($movies as $movie): 
-                $posterUrl = getImageUrl($movie['poster_url'] ?? $movie['backdrop_url'] ?? '', '/streaming-platform/assets/img/default-poster.svg');
+                $posterUrl = getImageUrl($movie['poster_url'] ?? $movie['backdrop_url'] ?? '', '/assets/img/default-poster.svg');
                 $isPremium = isset($movie['is_premium']) && $movie['is_premium'];
                 $year = $movie['year'] ?? $movie['release_year'] ?? '';
                 $duration = $movie['duration'] ?? '';
                 $rating = isset($movie['rating']) && $movie['rating'] > 0 ? number_format($movie['rating'], 1) : '';
             ?>
-                <div class="movie-card" onclick="window.location.href='/streaming-platform/content.php?id=<?php echo $movie['id']; ?>'">
+                <div class="movie-card" onclick="window.location.href='/content.php?id=<?php echo $movie['id']; ?>'">
                     <?php if ($isPremium): ?>
                         <span class="movie-badge premium">
                             <i class="fas fa-crown"></i> PREMIUM

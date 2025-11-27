@@ -168,7 +168,7 @@ include __DIR__ . '/includes/header.php';
                 <i class="fas fa-bookmark"></i>
                 <h3>Tu lista está vacía</h3>
                 <p>Comienza a añadir películas y series que te gusten</p>
-                <a href="/streaming-platform/" class="btn btn-primary mt-3">
+                <a href="<?php echo rtrim(SITE_URL, '/'); ?>/" class="btn btn-primary mt-3">
                     <i class="fas fa-search"></i> Explorar contenido
                 </a>
             </div>
@@ -177,6 +177,7 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <script>
+const BASE_URL = '<?php echo rtrim(SITE_URL, '/'); ?>';
 // Filtrado de contenido
 document.querySelectorAll('.filter-tab').forEach(tab => {
     tab.addEventListener('click', function() {
@@ -199,7 +200,7 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
 function removeFromList(contentId) {
     if (!confirm('¿Quitar este contenido de tu lista?')) return;
     
-    fetch('/streaming-platform/api/watchlist/remove.php', {
+    fetch(`${BASE_URL}/api/watchlist/remove.php`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

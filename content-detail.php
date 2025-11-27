@@ -10,7 +10,7 @@ $contentId = $_GET['id'] ?? 0;
 $contentId = (int)$contentId;
 
 if (!$contentId) {
-    header('Location: /streaming-platform/');
+    header('Location: /');
     exit;
 }
 
@@ -35,7 +35,7 @@ $stmt->execute();
 $content = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$content) {
-    header('Location: /streaming-platform/');
+    header('Location: /');
     exit;
 }
 
@@ -72,7 +72,7 @@ $similarQuery = "
     INNER JOIN content_genres cg1 ON c.id = cg1.content_id
     INNER JOIN content_genres cg2 ON cg1.genre_id = cg2.genre_id
     WHERE cg2.content_id = :content_id
-    AND c.id != :content_id
+    AND c.id != :content_id_exclude
     GROUP BY c.id
     ORDER BY COUNT(*) DESC, c.rating DESC
     LIMIT 10
@@ -80,6 +80,7 @@ $similarQuery = "
 
 $similarStmt = $db->prepare($similarQuery);
 $similarStmt->bindValue(':content_id', $contentId, PDO::PARAM_INT);
+$similarStmt->bindValue(':content_id_exclude', $contentId, PDO::PARAM_INT);
 $similarStmt->execute();
 $similarContent = $similarStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -323,7 +324,7 @@ include __DIR__ . '/includes/header.php';
     <div class="hero-detail">
         <?php 
         require_once __DIR__ . '/includes/image-helper.php';
-        $backdropUrl = getImageUrl($content['backdrop_url'] ?? $content['poster_url'] ?? '', '/streaming-platform/assets/img/default-backdrop.svg');
+        $backdropUrl = getImageUrl($content['backdrop_url'] ?? $content['poster_url'] ?? '', '/assets/img/default-backdrop.svg');
         ?>
         <div class="hero-backdrop-detail" style="background-image: url('<?php echo htmlspecialchars($backdropUrl); ?>');"></div>
         
@@ -475,21 +476,23 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <script>
+const CONTENT_BASE_URL = '<?php echo rtrim(SITE_URL, '/'); ?>';
+
 function playContent(id, type) {
     // Implementar lógica de reproducción
     if (typeof window.playContent === 'function') {
         window.playContent(id, type);
     } else {
-        window.location.href = `/streaming-platform/watch.php?id=${id}&type=${type}`;
+        window.location.href = `${CONTENT_BASE_URL}/watch.php?id=${id}&type=${type}`;
     }
 }
 
 function playEpisode(episodeId) {
-    window.location.href = `/streaming-platform/watch.php?episode_id=${episodeId}`;
+    window.location.href = `${CONTENT_BASE_URL}/watch.php?episode_id=${episodeId}`;
 }
 
 function addToMyList(id) {
-    fetch('/streaming-platform/api/watchlist/add.php', {
+    fetch(`${CONTENT_BASE_URL}/api/watchlist/add.php`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

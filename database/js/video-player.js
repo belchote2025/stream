@@ -302,7 +302,7 @@ class UnifiedVideoPlayer {
         }
         
         // Local (relativo o absoluto local)
-        if (url.startsWith('/') || url.startsWith('./') || url.includes('/uploads/')) {
+        if (url.startsWith('/') || url.startsWith('./') || url.includes('/streaming-platform/uploads/')) {
             return 'local';
         }
         

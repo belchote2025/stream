@@ -3,13 +3,16 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
+    const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+    const FALLBACK_BACKDROP = `${BASE_URL}/assets/img/default-backdrop.svg`;
+    const FALLBACK_POSTER = `${BASE_URL}/assets/img/default-poster.svg`;
     // Configuration
     const config = {
         api: {
-            featured: '/streaming-platform/api/content/featured.php',
-            recentlyAdded: '/streaming-platform/api/content/recent.php',
-            mostViewed: '/streaming-platform/api/content/popular.php',
-            contentDetails: '/streaming-platform/api/content/index.php?id='
+            featured: `${BASE_URL}/api/content/featured.php`,
+            recentlyAdded: `${BASE_URL}/api/content/recent.php`,
+            mostViewed: `${BASE_URL}/api/content/popular.php`,
+            contentDetails: `${BASE_URL}/api/content/index.php?id=`
         },
         selectors: {
             hero: '.hero',
@@ -24,8 +27,8 @@ document.addEventListener('DOMContentLoaded', function() {
             modalBody: '.modal-body',
             modalPlayer: '#contentPlayer'
         },
-        defaultBackdrop: '/streaming-platform/assets/img/default-backdrop.svg',
-        defaultPoster: '/streaming-platform/assets/img/default-poster.svg',
+        defaultBackdrop: FALLBACK_BACKDROP,
+        defaultPoster: FALLBACK_POSTER,
         autoPlayTrailer: true,
         autoPlayDelay: 5000, // 5 seconds
         lazyLoadOffset: 200 // pixels from viewport to start loading
@@ -139,6 +142,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Si no hay slides, intentar cargar desde la API
         try {
             const response = await fetch(config.api.featured);
+            
+            // Verificar que la respuesta sea JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Respuesta no es JSON:', text.substring(0, 200));
+                throw new Error('El servidor devolvió HTML en lugar de JSON');
+            }
+            
             const data = await response.json();
             
             if (data.success && data.data && data.data.length > 0) {
@@ -193,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Si es una URL de TMDB, usar proxy
         if (backdropUrl.match(/^https?:\/\/(image\.tmdb\.org|via\.placeholder\.com|images\.unsplash\.com)/)) {
-            backdropUrl = '/streaming-platform/api/image-proxy.php?url=' + encodeURIComponent(backdropUrl);
+            backdropUrl = `${BASE_URL}/api/image-proxy.php?url=` + encodeURIComponent(backdropUrl);
         }
         
         const safeBackdropUrl = backdropUrl.replace(/'/g, "\\'");
@@ -369,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Si es una URL de TMDB, usar proxy
         if (posterUrl.match(/^https?:\/\/(image\.tmdb\.org|via\.placeholder\.com|images\.unsplash\.com)/)) {
-            posterUrl = '/streaming-platform/api/image-proxy.php?url=' + encodeURIComponent(posterUrl);
+                posterUrl = `${BASE_URL}/api/image-proxy.php?url=` + encodeURIComponent(posterUrl);
         }
         
         const year = item.release_year || '';

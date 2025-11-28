@@ -189,6 +189,79 @@ function getMostViewed($db, $type = null, $limit = 10) {
 }
 
 /**
+ * Obtiene las películas con rating de IMDb almacenado
+ */
+function getImdbTopContent($db, $limit = 10) {
+    try {
+        $query = "
+            SELECT 
+                c.id,
+                c.title,
+                c.type,
+                c.release_year,
+                c.duration,
+                c.rating,
+                c.poster_url,
+                c.backdrop_url,
+                c.description,
+                c.is_premium,
+                c.torrent_magnet
+            FROM content c
+            WHERE c.type = 'movie'
+              AND c.rating IS NOT NULL
+              AND c.rating > 0
+            ORDER BY c.rating DESC, c.views DESC, c.release_year DESC
+            LIMIT :limit
+        ";
+
+        $stmt = $db->prepare($query);
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error en getImdbTopContent: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Obtiene videos subidos localmente
+ */
+function getLocalUploadedVideos($db, $limit = 10) {
+    try {
+        $query = "
+            SELECT 
+                c.id,
+                c.title,
+                c.type,
+                c.release_year,
+                c.duration,
+                c.rating,
+                c.poster_url,
+                c.backdrop_url,
+                c.description,
+                c.video_url,
+                c.is_premium,
+                c.torrent_magnet
+            FROM content c
+            WHERE c.video_url IS NOT NULL
+              AND c.video_url <> ''
+              AND (c.video_url LIKE '/uploads/%' OR c.video_url LIKE '%/uploads/%')
+            ORDER BY COALESCE(c.updated_at, c.added_date, c.created_at) DESC
+            LIMIT :limit
+        ";
+
+        $stmt = $db->prepare($query);
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error en getLocalUploadedVideos: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
  * Crea una tarjeta de contenido HTML estilo Netflix
  * 
  * @param array $item Array con los datos del contenido

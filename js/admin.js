@@ -127,21 +127,68 @@ function setupEventListeners() {
     const sidebar = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     
-    if (menuToggle && sidebar) {
-        menuToggle.addEventListener('click', () => {
+    // Función para abrir/cerrar el menú
+    function toggleSidebar() {
+        if (sidebar) {
             sidebar.classList.toggle('active');
             if (sidebarOverlay) {
                 sidebarOverlay.classList.toggle('active');
             }
+            // Prevenir scroll del body cuando el menú está abierto
+            if (sidebar.classList.contains('active')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        }
+    }
+    
+    // Función para cerrar el menú
+    function closeSidebar() {
+        if (sidebar) {
+            sidebar.classList.remove('active');
+            if (sidebarOverlay) {
+                sidebarOverlay.classList.remove('active');
+            }
+            document.body.style.overflow = '';
+        }
+    }
+    
+    // Event listener para el botón hamburguesa
+    if (menuToggle) {
+        menuToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Menú hamburguesa clickeado'); // Debug
+            toggleSidebar();
+        });
+    } else {
+        console.warn('Botón menuToggle no encontrado'); // Debug
+    }
+    
+    if (!sidebar) {
+        console.warn('Sidebar no encontrado'); // Debug
+    }
+    
+    if (!sidebarOverlay) {
+        console.warn('SidebarOverlay no encontrado'); // Debug
+    }
+    
+    // Event listener para el overlay (cerrar al hacer clic fuera)
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeSidebar();
         });
     }
     
-    if (sidebarOverlay) {
-        sidebarOverlay.addEventListener('click', () => {
-            sidebar.classList.remove('active');
-            sidebarOverlay.classList.remove('active');
-        });
-    }
+    // Cerrar menú con la tecla Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sidebar && sidebar.classList.contains('active')) {
+            closeSidebar();
+        }
+    });
     
     // Cerrar menú al hacer clic en un enlace (móviles)
     const navLinks = document.querySelectorAll('.admin-nav a');
@@ -222,11 +269,53 @@ function setupEventListeners() {
     if (contentForm) {
         contentForm.addEventListener('submit', handleContentSubmit);
         
+        // Manejo de opciones mutuamente excluyentes para video
+        setupMutuallyExclusiveOptions('video_source', {
+            'url': {
+                container: 'videoUrlContainer',
+                input: 'video_url',
+                previewBtn: 'previewVideoBtn',
+                otherOption: 'videoFileOption',
+                otherInput: 'video_file'
+            },
+            'file': {
+                container: 'videoFileContainer',
+                input: 'video_file',
+                otherOption: 'videoUrlOption',
+                otherInput: 'video_url',
+                previewBtn: 'previewVideoBtn'
+            }
+        });
+        
+        // Manejo de opciones mutuamente excluyentes para tráiler
+        setupMutuallyExclusiveOptions('trailer_source', {
+            'url': {
+                container: 'trailerUrlContainer',
+                input: 'trailer_url',
+                otherOption: 'trailerFileOption',
+                otherInput: 'trailer_file'
+            },
+            'file': {
+                container: 'trailerFileContainer',
+                input: 'trailer_file',
+                otherOption: 'trailerUrlOption',
+                otherInput: 'trailer_url'
+            },
+            'none': {
+                otherOption: 'trailerUrlOption',
+                otherInput: 'trailer_url',
+                otherOption2: 'trailerFileOption',
+                otherInput2: 'trailer_file'
+            }
+        });
+        
         // Validación de archivos de video
         const videoFileInput = document.getElementById('video_file');
         if (videoFileInput) {
             videoFileInput.addEventListener('change', function(e) {
-                validateFileInput(e.target, 'video_file_info', 2147483648); // 2GB
+                if (e.target.files && e.target.files[0]) {
+                    validateFileInput(e.target, 'video_file_info', 2147483648); // 2GB
+                }
             });
         }
         
@@ -234,14 +323,31 @@ function setupEventListeners() {
         const trailerFileInput = document.getElementById('trailer_file');
         if (trailerFileInput) {
             trailerFileInput.addEventListener('change', function(e) {
-                validateFileInput(e.target, 'trailer_file_info', 524288000); // 500MB
+                if (e.target.files && e.target.files[0]) {
+                    validateFileInput(e.target, 'trailer_file_info', 524288000); // 500MB
+                }
             });
         }
         
         // Búsqueda de torrents
-        const searchTorrentBtn = document.getElementById('searchTorrentBtn');
-        if (searchTorrentBtn) {
-            searchTorrentBtn.addEventListener('click', handleSearchTorrent);
+    const searchTorrentBtn = document.getElementById('searchTorrentBtn');
+    if (searchTorrentBtn) {
+        searchTorrentBtn.addEventListener('click', handleSearchTorrent);
+    }
+    const retryTorrentBtn = document.getElementById('retryTorrentBtn');
+    if (retryTorrentBtn) {
+        retryTorrentBtn.addEventListener('click', handleInvalidTorrent);
+    }
+        
+        // Previsualización de video
+        const previewVideoBtn = document.getElementById('previewVideoBtn');
+        if (previewVideoBtn) {
+            previewVideoBtn.addEventListener('click', handlePreviewVideo);
+        }
+        
+        const closePreviewBtn = document.getElementById('closePreviewBtn');
+        if (closePreviewBtn) {
+            closePreviewBtn.addEventListener('click', closeVideoPreview);
         }
     }
     
@@ -753,30 +859,51 @@ function renderContentList(type, title, items = []) {
                         <th>Año</th>
                         <th>Géneros</th>
                         <th>${isMovie ? 'Duración' : 'Episodios'}</th>
+                        <th>IMDb</th>
                         <th>Premium</th>
                         <th>Destacado</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${items.length > 0 ? items.map(item => `
-                        <tr data-id="${item.id}">
+                    ${items.length > 0 ? items.map(item => {
+                        const itemId = item.id;
+                        const itemTitle = item.title || 'Sin título';
+                        const itemYear = item.release_year || '';
+                        const contentType = isMovie ? 'movie' : 'series';
+                        
+                        return `
+                        <tr data-id="${itemId}" data-title="${escapeHtml(itemTitle)}" data-year="${itemYear}" data-type="${contentType}">
                             <td>
-                                <img src="${item.poster_url || DEFAULT_POSTER}" alt="${item.title || 'Sin título'}" class="thumbnail" onerror="this.src='${DEFAULT_POSTER}'">
+                                <img src="${item.poster_url || DEFAULT_POSTER}" 
+                                     alt="${itemTitle}" 
+                                     class="thumbnail poster-clickable" 
+                                     style="cursor: pointer; transition: transform 0.2s;"
+                                     onerror="this.src='${DEFAULT_POSTER}'"
+                                     onclick="handlePosterClick(${itemId}, '${escapeHtml(itemTitle)}', ${itemYear}, '${contentType}')"
+                                     onmouseover="this.style.transform='scale(1.1)'"
+                                     onmouseout="this.style.transform='scale(1)'"
+                                     title="Clic para buscar torrents">
                             </td>
-                            <td>${item.title || 'Sin título'}</td>
-                            <td>${item.release_year || 'N/A'}</td>
+                            <td>${itemTitle}</td>
+                            <td>${itemYear || 'N/A'}</td>
                             <td>${item.genres ? (Array.isArray(item.genres) ? item.genres.join(', ') : item.genres) : 'N/A'}</td>
                             <td>${isMovie ? `${item.duration || 0} min` : (item.episodes || 'N/A')}</td>
+                            <td>
+                                <span class="imdb-info" data-id="${itemId}" style="color: #f5c518; cursor: pointer;" onclick="loadIMDbInfo(${itemId}, '${escapeHtml(itemTitle)}', ${itemYear}, '${contentType}')">
+                                    <i class="fab fa-imdb"></i> Cargar
+                                </span>
+                            </td>
                             <td>${item.is_premium ? '<span class="badge premium">Sí</span>' : '<span class="badge free">No</span>'}</td>
                             <td>${item.is_featured ? '<span class="badge premium">Sí</span>' : '<span class="badge free">No</span>'}</td>
                             <td class="actions">
-                                <button class="btn btn-sm btn-view" title="Ver" data-id="${item.id}"><i class="fas fa-eye"></i></button>
-                                <button class="btn btn-sm btn-edit" title="Editar" data-id="${item.id}"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-sm btn-delete" title="Eliminar" data-id="${item.id}"><i class="fas fa-trash"></i></button>
+                                <button class="btn btn-sm btn-view" title="Ver" data-id="${itemId}"><i class="fas fa-eye"></i></button>
+                                <button class="btn btn-sm btn-edit" title="Editar" data-id="${itemId}"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-sm btn-delete" title="Eliminar" data-id="${itemId}"><i class="fas fa-trash"></i></button>
                             </td>
                         </tr>
-                    `).join('') : '<tr><td colspan="8" class="text-center">No hay contenido para mostrar.</td></tr>'}
+                    `;
+                    }).join('') : '<tr><td colspan="9" class="text-center">No hay contenido para mostrar.</td></tr>'}
                 </tbody>
             </table>
         </div>
@@ -2633,7 +2760,7 @@ function showContentModal(itemData = null) {
 
     if (itemData) {
         // Rellenar el formulario con los datos existentes
-        const fields = ['id', 'title', 'release_year', 'duration', 'description', 'poster_url', 'backdrop_url', 'video_url', 'trailer_url', 'age_rating', 'type'];
+        const fields = ['id', 'title', 'release_year', 'duration', 'description', 'poster_url', 'backdrop_url', 'age_rating', 'type'];
         fields.forEach(key => {
             const input = form.elements[key];
             if (input && itemData[key] !== undefined && itemData[key] !== null) {
@@ -2645,6 +2772,51 @@ function showContentModal(itemData = null) {
             }
         });
         
+        // Configurar fuente de video (URL por defecto si existe video_url)
+        const videoUrlRadio = document.getElementById('video_source_url');
+        const videoFileRadio = document.getElementById('video_source_file');
+        const videoUrlInput = document.getElementById('video_url');
+        
+        if (itemData.video_url && itemData.video_url.trim() !== '') {
+            // Si hay URL de video, usar opción URL
+            if (videoUrlRadio) {
+                videoUrlRadio.checked = true;
+                videoUrlRadio.dispatchEvent(new Event('change'));
+            }
+            if (videoUrlInput) {
+                videoUrlInput.value = itemData.video_url;
+            }
+        } else {
+            // Si no hay URL, dejar URL seleccionada pero vacía (para que el usuario elija)
+            if (videoUrlRadio) {
+                videoUrlRadio.checked = true;
+                videoUrlRadio.dispatchEvent(new Event('change'));
+            }
+        }
+        
+        // Configurar fuente de tráiler
+        const trailerUrlRadio = document.getElementById('trailer_source_url');
+        const trailerFileRadio = document.getElementById('trailer_source_file');
+        const trailerNoneRadio = document.getElementById('trailer_source_none');
+        const trailerUrlInput = document.getElementById('trailer_url');
+        
+        if (itemData.trailer_url && itemData.trailer_url.trim() !== '') {
+            // Si hay URL de tráiler, usar opción URL
+            if (trailerUrlRadio) {
+                trailerUrlRadio.checked = true;
+                trailerUrlRadio.dispatchEvent(new Event('change'));
+            }
+            if (trailerUrlInput) {
+                trailerUrlInput.value = itemData.trailer_url;
+            }
+        } else {
+            // Si no hay tráiler, usar opción "none"
+            if (trailerNoneRadio) {
+                trailerNoneRadio.checked = true;
+                trailerNoneRadio.dispatchEvent(new Event('change'));
+            }
+        }
+        
         // Checkboxes especiales
         if (form.elements.is_featured) form.elements.is_featured.checked = !!itemData.is_featured;
         if (form.elements.is_trending) form.elements.is_trending.checked = !!itemData.is_trending;
@@ -2653,6 +2825,19 @@ function showContentModal(itemData = null) {
         // Tipo de contenido
         if (form.elements.type) {
             form.elements.type.value = itemData.type || 'movie';
+        }
+    } else {
+        // Modo creación: establecer valores por defecto
+        const videoUrlRadio = document.getElementById('video_source_url');
+        const trailerNoneRadio = document.getElementById('trailer_source_none');
+        
+        if (videoUrlRadio) {
+            videoUrlRadio.checked = true;
+            videoUrlRadio.dispatchEvent(new Event('change'));
+        }
+        if (trailerNoneRadio) {
+            trailerNoneRadio.checked = true;
+            trailerNoneRadio.dispatchEvent(new Event('change'));
         }
     }
 
@@ -2908,12 +3093,39 @@ async function handleContentSubmit(e) {
     }
     
     try {
-        // Validar archivos antes de subir
-        const videoFileInput = document.getElementById('video_file');
-        const trailerFileInput = document.getElementById('trailer_file');
+        // Validar que se haya seleccionado una fuente de video
+        const videoSource = formData.get('video_source');
+        if (!videoSource) {
+            showNotification('Por favor, selecciona una fuente de video (URL o archivo local)', 'error');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+            return;
+        }
         
-        if (videoFileInput && videoFileInput.files[0]) {
+        // Validar archivos antes de subir (solo si se seleccionó archivo)
+        if (videoSource === 'file') {
+            const videoFileInput = document.getElementById('video_file');
+            if (!videoFileInput || !videoFileInput.files || !videoFileInput.files[0]) {
+                showNotification('Por favor, selecciona un archivo de video', 'error');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
+            }
             if (!validateFileInput(videoFileInput, 'video_file_info', 2147483648)) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
+            }
+        } else if (videoSource === 'url') {
+            const videoUrlInput = document.getElementById('video_url');
+            if (!videoUrlInput || !videoUrlInput.value || videoUrlInput.value.trim() === '') {
+                showNotification('Por favor, ingresa una URL de video', 'error');
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.textContent = originalText;
@@ -2922,7 +3134,18 @@ async function handleContentSubmit(e) {
             }
         }
         
-        if (trailerFileInput && trailerFileInput.files[0]) {
+        // Validar tráiler si se seleccionó archivo
+        const trailerSource = formData.get('trailer_source') || 'none';
+        if (trailerSource === 'file') {
+            const trailerFileInput = document.getElementById('trailer_file');
+            if (!trailerFileInput || !trailerFileInput.files || !trailerFileInput.files[0]) {
+                showNotification('Por favor, selecciona un archivo de tráiler', 'error');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
+            }
             if (!validateFileInput(trailerFileInput, 'trailer_file_info', 524288000)) {
                 if (submitBtn) {
                     submitBtn.disabled = false;
@@ -2932,12 +3155,16 @@ async function handleContentSubmit(e) {
             }
         }
         
-        // Subir archivos de video si existen
-        let videoUrl = formData.get('video_url') || '';
-        let trailerUrl = formData.get('trailer_url') || '';
+        // Determinar qué fuente de video usar (URL o archivo)
+        let videoUrl = '';
         
-        const videoFile = formData.get('video_file');
-        if (videoFile && videoFile.size > 0) {
+        if (videoSource === 'file') {
+            // Subir archivo de video
+            const videoFile = formData.get('video_file');
+            if (!videoFile || videoFile.size === 0) {
+                throw new Error('Por favor, selecciona un archivo de video');
+            }
+            
             showNotification('Subiendo video...', 'info');
             const videoUploadData = new FormData();
             videoUploadData.append('file', videoFile);
@@ -2957,15 +3184,33 @@ async function handleContentSubmit(e) {
             } else {
                 throw new Error(videoUploadResult.error || 'Error al subir el video');
             }
+        } else if (videoSource === 'url') {
+            // Usar URL de video
+            videoUrl = formData.get('video_url') || '';
+            if (!videoUrl || videoUrl.trim() === '') {
+                throw new Error('Por favor, ingresa una URL de video');
+            }
+            videoUrl = videoUrl.trim();
+        } else {
+            throw new Error('Por favor, selecciona una fuente de video (URL o archivo)');
         }
         
-        const trailerFile = formData.get('trailer_file');
-        if (trailerFile && trailerFile.size > 0) {
+        // Determinar qué fuente de tráiler usar (URL, archivo o ninguno)
+        let trailerUrl = '';
+        
+        if (trailerSource === 'file') {
+            // Subir archivo de tráiler
+            const trailerFile = formData.get('trailer_file');
+            if (!trailerFile || trailerFile.size === 0) {
+                throw new Error('Por favor, selecciona un archivo de tráiler');
+            }
+            
             showNotification('Subiendo tráiler...', 'info');
             const trailerUploadData = new FormData();
             trailerUploadData.append('file', trailerFile);
             trailerUploadData.append('is_trailer', '1');
             
+            const uploadEndpoint = `${baseUrl}/api/upload/video.php`;
             const trailerUploadResponse = await fetch(uploadEndpoint, {
                 method: 'POST',
                 body: trailerUploadData,
@@ -2980,7 +3225,14 @@ async function handleContentSubmit(e) {
             } else {
                 throw new Error(trailerUploadResult.error || 'Error al subir el tráiler');
             }
+        } else if (trailerSource === 'url') {
+            // Usar URL de tráiler
+            trailerUrl = formData.get('trailer_url') || '';
+            if (trailerUrl) {
+                trailerUrl = trailerUrl.trim();
+            }
         }
+        // Si trailerSource === 'none', trailerUrl permanece vacío
         
         // Preparar datos del formulario
         const data = Object.fromEntries(formData.entries());
@@ -3298,6 +3550,186 @@ function validateFileInput(input, infoId, maxSize) {
     
     return true;
 }
+
+// Configurar opciones mutuamente excluyentes
+function setupMutuallyExclusiveOptions(radioGroupName, options) {
+    const radioButtons = document.querySelectorAll(`input[name="${radioGroupName}"]`);
+    
+    radioButtons.forEach(radio => {
+        radio.addEventListener('change', function() {
+            const selectedValue = this.value;
+            const config = options[selectedValue];
+            
+            if (!config) return;
+            
+            // Ocultar y deshabilitar todas las opciones primero
+            Object.keys(options).forEach(key => {
+                const opt = options[key];
+                if (opt.container) {
+                    const container = document.getElementById(opt.container);
+                    if (container) container.style.display = 'none';
+                }
+                if (opt.input) {
+                    const input = document.getElementById(opt.input);
+                    if (input) {
+                        input.disabled = true;
+                        if (input.type === 'file') {
+                            input.value = '';
+                        } else {
+                            input.value = '';
+                        }
+                    }
+                }
+                if (opt.previewBtn) {
+                    const btn = document.getElementById(opt.previewBtn);
+                    if (btn) btn.disabled = true;
+                }
+            });
+            
+            // Mostrar y habilitar la opción seleccionada
+            if (config.container) {
+                const container = document.getElementById(config.container);
+                if (container) container.style.display = 'block';
+            }
+            if (config.input) {
+                const input = document.getElementById(config.input);
+                if (input) {
+                    input.disabled = false;
+                    input.required = selectedValue !== 'none';
+                }
+            }
+            if (config.previewBtn) {
+                const btn = document.getElementById(config.previewBtn);
+                if (btn) btn.disabled = false;
+            }
+            
+            // Deshabilitar y limpiar la otra opción
+            if (config.otherOption) {
+                const otherOption = document.getElementById(config.otherOption);
+                if (otherOption) {
+                    otherOption.style.opacity = '0.5';
+                    otherOption.style.pointerEvents = 'none';
+                }
+            }
+            if (config.otherInput) {
+                const otherInput = document.getElementById(config.otherInput);
+                if (otherInput) {
+                    otherInput.disabled = true;
+                    if (otherInput.type === 'file') {
+                        otherInput.value = '';
+                        // Limpiar info de archivo si existe
+                        const infoId = otherInput.id + '_info';
+                        const infoDiv = document.getElementById(infoId);
+                        if (infoDiv) {
+                            infoDiv.style.display = 'none';
+                        }
+                    } else {
+                        otherInput.value = '';
+                    }
+                }
+            }
+            
+            // Si es "none", también limpiar la segunda opción si existe
+            if (selectedValue === 'none' && config.otherOption2) {
+                const otherOption2 = document.getElementById(config.otherOption2);
+                if (otherOption2) {
+                    otherOption2.style.opacity = '0.5';
+                    otherOption2.style.pointerEvents = 'none';
+                }
+            }
+            if (selectedValue === 'none' && config.otherInput2) {
+                const otherInput2 = document.getElementById(config.otherInput2);
+                if (otherInput2) {
+                    otherInput2.disabled = true;
+                    if (otherInput2.type === 'file') {
+                        otherInput2.value = '';
+                        const infoId = otherInput2.id + '_info';
+                        const infoDiv = document.getElementById(infoId);
+                        if (infoDiv) {
+                            infoDiv.style.display = 'none';
+                        }
+                    } else {
+                        otherInput2.value = '';
+                    }
+                }
+            }
+            
+            // Restaurar opacidad de la opción seleccionada
+            const selectedOption = document.querySelector(`input[name="${radioGroupName}"]:checked`);
+            if (selectedOption) {
+                const selectedCard = selectedOption.closest('.video-option-card, .trailer-option-card');
+                if (selectedCard) {
+                    selectedCard.style.opacity = '1';
+                    selectedCard.style.pointerEvents = 'auto';
+                    selectedCard.style.borderColor = '#e50914';
+                    selectedCard.style.background = '#fff5f5';
+                }
+            }
+            
+            // Restaurar opacidad de otras opciones no seleccionadas
+            radioButtons.forEach(rb => {
+                if (rb !== this && rb.value !== 'none') {
+                    const card = rb.closest('.video-option-card, .trailer-option-card');
+                    if (card) {
+                        card.style.opacity = '1';
+                        card.style.pointerEvents = 'auto';
+                        card.style.borderColor = '#ddd';
+                        card.style.background = '#f9f9f9';
+                    }
+                }
+            });
+        });
+        
+        // Disparar el evento change si ya está seleccionado
+        if (radio.checked) {
+            radio.dispatchEvent(new Event('change'));
+        }
+    });
+}
+
+// Limpiar archivo de video
+function clearVideoFile() {
+    const videoFileInput = document.getElementById('video_file');
+    const videoFileInfo = document.getElementById('video_file_info');
+    
+    if (videoFileInput) {
+        videoFileInput.value = '';
+    }
+    if (videoFileInfo) {
+        videoFileInfo.style.display = 'none';
+    }
+    
+    // Cambiar a opción de URL
+    const urlRadio = document.getElementById('video_source_url');
+    if (urlRadio) {
+        urlRadio.checked = true;
+        urlRadio.dispatchEvent(new Event('change'));
+    }
+}
+
+// Limpiar archivo de tráiler
+function clearTrailerFile() {
+    const trailerFileInput = document.getElementById('trailer_file');
+    const trailerFileInfo = document.getElementById('trailer_file_info');
+    
+    if (trailerFileInput) {
+        trailerFileInput.value = '';
+    }
+    if (trailerFileInfo) {
+        trailerFileInfo.style.display = 'none';
+    }
+    
+    // Cambiar a opción "none"
+    const noneRadio = document.getElementById('trailer_source_none');
+    if (noneRadio) {
+        noneRadio.checked = true;
+        noneRadio.dispatchEvent(new Event('change'));
+    }
+}
+
+// Hacer funciones globales
+window.clearVideoFile = clearVideoFile;
+window.clearTrailerFile = clearTrailerFile;
 
 // Formatear categoría para mostrar
 function formatCategory(category) {
@@ -4100,7 +4532,13 @@ function renderError(message) {
         </div>`;
 }
 // Inicializar la aplicación cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', init);
+// Inicializar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    // DOM ya está listo
+    init();
+}
 
 // Manejar navegación con el botón de retroceso/avanzar
 // Toggle para ver/ocultar hash de contraseña
@@ -4174,7 +4612,142 @@ window.addEventListener('popstate', () => {
 /**
  * Buscar enlaces de torrents automáticamente
  */
-async function handleSearchTorrent() {
+// Previsualizar video
+let previewPlayer = null;
+
+async function handlePreviewVideo() {
+    const videoUrlInput = document.getElementById('video_url');
+    const videoFileInput = document.getElementById('video_file');
+    const previewContainer = document.getElementById('videoPreviewContainer');
+    const previewPlayerDiv = document.getElementById('videoPreviewPlayer');
+    
+    if (!previewContainer || !previewPlayerDiv) {
+        showNotification('Error: Contenedor de previsualización no encontrado', 'error');
+        return;
+    }
+    
+    let videoUrl = null;
+    
+    // Obtener URL del video desde el input o archivo subido
+    if (videoUrlInput && videoUrlInput.value.trim()) {
+        videoUrl = videoUrlInput.value.trim();
+    } else if (videoFileInput && videoFileInput.files && videoFileInput.files[0]) {
+        // Si hay un archivo seleccionado, crear una URL local para previsualización
+        const file = videoFileInput.files[0];
+        videoUrl = URL.createObjectURL(file);
+    } else {
+        showNotification('Por favor, ingresa una URL de video o selecciona un archivo', 'warning');
+        return;
+    }
+    
+    if (!videoUrl) {
+        return;
+    }
+    
+    // Mostrar el contenedor de previsualización
+    previewContainer.style.display = 'block';
+    
+    // Limpiar el reproductor anterior si existe
+    if (previewPlayer) {
+        try {
+            previewPlayer.destroy();
+        } catch (e) {
+            console.warn('Error al destruir reproductor anterior:', e);
+        }
+        previewPlayer = null;
+    }
+    
+    previewPlayerDiv.innerHTML = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff;"><i class="fas fa-spinner fa-spin"></i> Cargando video...</div>';
+    
+    // Esperar a que UnifiedVideoPlayer esté disponible
+    if (typeof UnifiedVideoPlayer === 'undefined') {
+        // Cargar el script si no está disponible
+        const script = document.createElement('script');
+        script.src = `${baseUrl}/js/video-player.js`;
+        script.onload = () => {
+            initPreviewPlayer(videoUrl, previewPlayerDiv);
+        };
+        script.onerror = () => {
+            previewPlayerDiv.innerHTML = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center;"><i class="fas fa-exclamation-triangle"></i><br>Error al cargar el reproductor</div>';
+        };
+        document.head.appendChild(script);
+    } else {
+        initPreviewPlayer(videoUrl, previewPlayerDiv);
+    }
+}
+
+function initPreviewPlayer(videoUrl, container) {
+    // Crear un contenedor temporal para el reproductor
+    const tempContainer = document.createElement('div');
+    tempContainer.id = 'tempPreviewPlayer';
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.top = '0';
+    tempContainer.style.left = '0';
+    tempContainer.style.width = '100%';
+    tempContainer.style.height = '100%';
+    container.innerHTML = '';
+    container.appendChild(tempContainer);
+    
+    try {
+        previewPlayer = new UnifiedVideoPlayer('tempPreviewPlayer', {
+            autoplay: false,
+            controls: true,
+            onError: (error) => {
+                console.error('Error en previsualización:', error);
+                container.innerHTML = `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; padding: 1rem;">
+                    <i class="fas fa-exclamation-triangle"></i><br>
+                    <p>Error al cargar el video</p>
+                    <small>${error.message || 'Error desconocido'}</small>
+                </div>`;
+            }
+        });
+        
+        previewPlayer.loadVideo(videoUrl).then(() => {
+            console.log('Video de previsualización cargado');
+        }).catch(error => {
+            console.error('Error al cargar video de previsualización:', error);
+            container.innerHTML = `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; padding: 1rem;">
+                <i class="fas fa-exclamation-triangle"></i><br>
+                <p>Error al cargar el video</p>
+                <small>${error.message || 'Error desconocido'}</small>
+            </div>`;
+        });
+    } catch (error) {
+        console.error('Error al inicializar reproductor de previsualización:', error);
+        container.innerHTML = `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; padding: 1rem;">
+            <i class="fas fa-exclamation-triangle"></i><br>
+            <p>Error al inicializar el reproductor</p>
+            <small>${error.message || 'Error desconocido'}</small>
+        </div>`;
+    }
+}
+
+function closeVideoPreview() {
+    const previewContainer = document.getElementById('videoPreviewContainer');
+    if (previewContainer) {
+        previewContainer.style.display = 'none';
+    }
+    
+    // Limpiar el reproductor
+    if (previewPlayer) {
+        try {
+            previewPlayer.destroy();
+        } catch (e) {
+            console.warn('Error al destruir reproductor:', e);
+        }
+        previewPlayer = null;
+    }
+    
+    const previewPlayerDiv = document.getElementById('videoPreviewPlayer');
+    if (previewPlayerDiv) {
+        previewPlayerDiv.innerHTML = '';
+    }
+}
+
+async function handleSearchTorrent(event, presetQuery = null) {
+    if (event) {
+        event.preventDefault();
+    }
     const titleInput = document.getElementById('title');
     const yearInput = document.getElementById('release_year');
     const typeInput = document.getElementById('content-type');
@@ -4182,23 +4755,28 @@ async function handleSearchTorrent() {
     const resultsDiv = document.getElementById('torrent-results');
     const resultsContent = document.getElementById('torrent-results-content');
     const searchBtn = document.getElementById('searchTorrentBtn');
+    const retryBtn = document.getElementById('retryTorrentBtn');
     
-    if (!titleInput || !resultsDiv || !resultsContent) {
+    if (!resultsDiv || !resultsContent) {
         return;
     }
     
-    const title = titleInput.value.trim();
+    const title = presetQuery?.title ?? titleInput?.value.trim();
     if (!title) {
         showNotification('Por favor, ingresa un título primero', 'warning');
         return;
     }
     
-    const year = yearInput ? yearInput.value : '';
-    const type = typeInput ? typeInput.value : 'movie';
+    const year = presetQuery?.year ?? yearInput?.value ?? '';
+    const type = presetQuery?.type ?? typeInput?.value ?? 'movie';
     
-    // Mostrar estado de carga
-    searchBtn.disabled = true;
-    searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
+    window.__lastTorrentQuery = { title, year, type };
+    
+    const loadingBtn = presetQuery?.trigger === 'retry' ? retryBtn : searchBtn;
+    if (loadingBtn) {
+        loadingBtn.disabled = true;
+        loadingBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
+    }
     resultsDiv.style.display = 'block';
     resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem;"><i class="fas fa-spinner fa-spin"></i> Buscando torrents...</p>';
     
@@ -4214,8 +4792,9 @@ async function handleSearchTorrent() {
         if (data.success && data.results && data.results.length > 0) {
             let html = '<div style="margin-bottom: 0.5rem; font-weight: 600;">Encontrados ' + data.count + ' resultados:</div>';
             
-            data.results.forEach((torrent, index) => {
-                const qualityBadge = torrent.quality !== 'Unknown' ? `<span style="background: #e50914; color: white; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.75rem; margin-right: 0.5rem;">${torrent.quality}</span>` : '';
+            data.results.forEach((torrent) => {
+                const safeMagnet = (torrent.magnet || '').replace(/'/g, "\\'");
+                const qualityBadge = torrent.quality && torrent.quality !== 'Unknown' ? `<span style="background: #e50914; color: white; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.75rem; margin-right: 0.5rem;">${torrent.quality}</span>` : '';
                 const seedsInfo = torrent.seeds > 0 ? `<span style="color: #28a745;"><i class="fas fa-arrow-up"></i> ${torrent.seeds}</span>` : '';
                 const sizeInfo = torrent.size ? `<span style="color: #666; margin-left: 0.5rem;"><i class="fas fa-hdd"></i> ${torrent.size}</span>` : '';
                 
@@ -4223,7 +4802,7 @@ async function handleSearchTorrent() {
                     <div style="padding: 0.75rem; margin-bottom: 0.5rem; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s;" 
                          onmouseover="this.style.borderColor='#e50914'; this.style.boxShadow='0 2px 4px rgba(229,9,20,0.2)'"
                          onmouseout="this.style.borderColor='#ddd'; this.style.boxShadow='none'"
-                         onclick="selectTorrent('${torrent.magnet.replace(/'/g, "\\'")}')">
+                         onclick="selectTorrent('${safeMagnet}')">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
                             <div style="flex: 1;">
                                 <div style="font-weight: 600; margin-bottom: 0.25rem;">${torrent.title}</div>
@@ -4234,7 +4813,7 @@ async function handleSearchTorrent() {
                                     <span style="margin-left: 0.5rem; color: #999;">${torrent.source}</span>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="event.stopPropagation(); selectTorrent('${torrent.magnet.replace(/'/g, "\\'")}')">
+                            <button type="button" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="event.stopPropagation(); selectTorrent('${safeMagnet}')">
                                 <i class="fas fa-check"></i> Usar
                             </button>
                         </div>
@@ -4250,9 +4829,23 @@ async function handleSearchTorrent() {
         console.error('Error al buscar torrents:', error);
         resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem; color: #dc3545;">Error al buscar torrents. Intenta nuevamente o ingresa el enlace manualmente.</p>';
     } finally {
-        searchBtn.disabled = false;
-        searchBtn.innerHTML = '<i class="fas fa-search"></i> Buscar';
+        if (loadingBtn) {
+            loadingBtn.disabled = false;
+            loadingBtn.innerHTML = loadingBtn === retryBtn ? '<i class="fas fa-redo"></i> Reintentar' : '<i class="fas fa-search"></i> Buscar';
+        }
     }
+}
+
+function handleInvalidTorrent(e) {
+    if (e) {
+        e.preventDefault();
+    }
+    if (!window.__lastTorrentQuery) {
+        showNotification('Busca torrents primero antes de reintentar.', 'warning');
+        return;
+    }
+    showNotification('Rebuscando torrents en fuentes alternativas...', 'info');
+    handleSearchTorrent(null, { ...window.__lastTorrentQuery, trigger: 'retry' });
 }
 
 /**
@@ -4265,6 +4858,7 @@ function selectTorrent(magnetLink) {
     if (torrentInput) {
         torrentInput.value = magnetLink;
         showNotification('Enlace magnet seleccionado', 'success');
+        window.__selectedTorrent = magnetLink;
     }
     
     if (resultsDiv) {

@@ -8,8 +8,12 @@ const appState = {
     carouselInterval: null,
     contentCache: {
         movies: [],
-        series: []
-    }
+        series: [],
+        imdbMovies: [],
+        localVideos: []
+    },
+    imdbCache: {},
+    torrentCache: {}
 };
 
 const APP_BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
@@ -19,6 +23,8 @@ const elements = {
     carouselInner: document.querySelector('.carousel-inner'),
     popularMovies: document.getElementById('popular-movies'),
     popularSeries: document.getElementById('popular-series'),
+    imdbMovies: document.getElementById('imdb-movies'),
+    localVideos: document.getElementById('local-videos'),
     navLinks: document.querySelectorAll('.nav-links a'),
     searchInput: document.querySelector('.search-container input'),
     userMenu: document.querySelector('.user-menu'),
@@ -31,7 +37,15 @@ const elements = {
     videoElement: document.getElementById('videoElement'),
     loginModal: document.querySelector('.login-modal'),
     closeModal: document.querySelector('.close-modal'),
-    loginForm: document.getElementById('loginForm')
+    loginForm: document.getElementById('loginForm'),
+    torrentModal: document.getElementById('torrentModal'),
+    torrentModalTitle: document.getElementById('torrentModalTitle'),
+    torrentSearchStatus: document.getElementById('torrentSearchStatus'),
+    torrentResultsContainer: document.getElementById('torrentResultsContainer'),
+    torrentResultsList: document.getElementById('torrentResultsList'),
+    torrentIMDbContainer: document.getElementById('torrentIMDbContainer'),
+    torrentModalClose: document.getElementById('torrentModalClose'),
+    recommendedRow: document.getElementById('recommended-row')
 };
 
 // Inicialización de la aplicación
@@ -41,7 +55,8 @@ function init() {
         loadCarousel();
     }
     
-    if (elements.popularMovies || elements.popularSeries) {
+    const hasDynamicRows = document.querySelector('.row-content[data-dynamic="true"]');
+    if (hasDynamicRows) {
         loadPopularContent();
     }
 
@@ -115,6 +130,21 @@ function setupEventListeners() {
     
     // Cambiar el estilo de la barra de navegación al hacer scroll
     window.addEventListener('scroll', handleScroll);
+
+    // Modal de torrents
+    if (elements.torrentModalClose) {
+        elements.torrentModalClose.addEventListener('click', closeTorrentModal);
+    }
+    if (elements.torrentModal) {
+        elements.torrentModal.addEventListener('click', (event) => {
+            if (event.target === elements.torrentModal) {
+                closeTorrentModal();
+            }
+        });
+    }
+    if (elements.torrentResultsList) {
+        elements.torrentResultsList.addEventListener('click', handleTorrentResultClick);
+    }
 }
 
 // Cargar el carrusel con contenido
@@ -192,66 +222,61 @@ function initCarouselControls() {
     appState.carouselInterval = setInterval(nextSlide, 8000);
 }
 
-// Cargar contenido popular
+// Cargar contenido dinámico para las filas
 async function loadPopularContent() {
-    // Limpiar contenedores solo si existen
-    if (elements.popularMovies) {
-        elements.popularMovies.innerHTML = '';
-    }
-    if (elements.popularSeries) {
-        elements.popularSeries.innerHTML = '';
-    }
-    
-    // Si no hay contenedores, salir
-    if (!elements.popularMovies && !elements.popularSeries) {
-        console.warn('Contenedores de contenido popular no encontrados');
+    const dynamicContainers = document.querySelectorAll('.row-content[data-dynamic="true"]');
+    if (!dynamicContainers.length) {
         return;
     }
 
-    // Cargar películas populares
-    if (elements.popularMovies) {
-        try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=movie&limit=8`);
-            if (!response.ok) throw new Error('Error al cargar películas');
-            const result = await response.json();
-            const movies = result.data || result;
+    dynamicContainers.forEach(container => {
+        loadDynamicRow(container);
+    });
+}
 
-            appState.contentCache.movies = [...appState.contentCache.movies, ...movies];
+async function loadDynamicRow(container) {
+    const type = container.dataset.type || '';
+    const sort = container.dataset.sort || 'popular';
+    const source = container.dataset.source || '';
+    const limit = parseInt(container.dataset.limit || '10', 10);
+    const cacheKey = container.dataset.cacheKey || '';
+    const endpoint = container.dataset.endpoint || '/api/content/popular.php';
 
-            if (movies.length > 0) {
-                movies.forEach(movie => {
-                    elements.popularMovies.appendChild(createContentCard(movie, 'movie'));
-                });
-            } else {
-                elements.popularMovies.innerHTML = '<p class="no-content">No hay películas disponibles en este momento.</p>';
-            }
-        } catch (error) {
-            console.error('Error cargando películas populares:', error);
-            elements.popularMovies.innerHTML = '<p class="no-content">No se pudieron cargar las películas.</p>';
+    const loadingMessage = document.createElement('div');
+    loadingMessage.className = 'row-loading';
+    loadingMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+    container.innerHTML = '';
+    container.appendChild(loadingMessage);
+
+    try {
+        const params = new URLSearchParams({ limit: limit.toString() });
+        if (type) params.append('type', type);
+        if (source) params.append('source', source);
+        if (sort && sort !== 'popular') params.append('sort', sort);
+
+        const response = await fetch(`${APP_BASE_URL}${endpoint}?${params.toString()}`);
+        if (!response.ok) throw new Error('Error al cargar contenido');
+        const result = await response.json();
+        const items = result.data || result;
+
+        if (cacheKey && Array.isArray(items)) {
+            appState.contentCache[cacheKey] = items;
         }
-    }
 
-    // Cargar series populares
-    if (elements.popularSeries) {
-        try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=series&limit=8`);
-            if (!response.ok) throw new Error('Error al cargar series');
-            const result = await response.json();
-            const series = result.data || result;
+        container.innerHTML = '';
 
-            appState.contentCache.series = [...appState.contentCache.series, ...series];
-
-            if (series.length > 0) {
-                series.forEach(s => {
-                    elements.popularSeries.appendChild(createContentCard(s, 'series'));
-                });
-            } else {
-                elements.popularSeries.innerHTML = '<p class="no-content">No hay series disponibles en este momento.</p>';
-            }
-        } catch (error) {
-            console.error('Error cargando series populares:', error);
-            elements.popularSeries.innerHTML = '<p class="no-content">No se pudieron cargar las series.</p>';
+        if (!items.length) {
+            container.innerHTML = '<p class="no-content">Sin contenido disponible.</p>';
+            return;
         }
+
+        items.forEach(item => {
+            const cardType = item.type || type || 'movie';
+            container.appendChild(createContentCard(item, cardType));
+        });
+    } catch (error) {
+        console.error('Error cargando fila dinámica:', error);
+        container.innerHTML = '<p class="no-content">No se pudo cargar el contenido.</p>';
     }
 }
 
@@ -269,6 +294,7 @@ function createContentCard(item, type) {
         ? `${item.duration || 'N/D'} min`
         : (item.seasons ? `${item.seasons} Temporada${item.seasons > 1 ? 's' : ''}` : 'Serie');
     const rating = item.rating ? `<span>•</span><span>⭐ ${parseFloat(item.rating).toFixed(1)}</span>` : '';
+    const contentType = type === 'movie' ? 'movie' : 'series';
     
     card.innerHTML = `
         <img src="${item.poster_url || 'assets/images/placeholder-poster.png'}" alt="${item.title}">
@@ -284,6 +310,10 @@ function createContentCard(item, type) {
                 <span>${durationLabel}</span>
                 ${rating}
             </div>
+            <div class="imdb-badge" data-id="${item.id}" style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0.4rem 0; padding: 0.2rem 0.6rem; border-radius: 4px; background: rgba(245,197,24,0.15); color: #f5c518; font-weight: 600; font-size: 0.85rem;">
+                <i class="fab fa-imdb"></i>
+                <span class="imdb-text">IMDb: —</span>
+            </div>
             <div class="content-actions">
                 <button class="action-btn" data-action="play" data-id="${item.id}" title="Reproducir">
                     <i class="fas fa-play"></i>
@@ -293,6 +323,9 @@ function createContentCard(item, type) {
                 </button>
                 <button class="action-btn" data-action="info" data-id="${item.id}" title="Más información">
                     <i class="fas fa-info-circle"></i>
+                </button>
+                <button class="action-btn torrent-btn" data-action="torrent" data-id="${item.id}" title="Buscar torrents" data-title="${encodeURIComponent(item.title)}" data-year="${item.release_year || ''}" data-type="${contentType}">
+                    <i class="fas fa-magnet"></i>
                 </button>
             </div>
         </div>
@@ -306,8 +339,309 @@ function createContentCard(item, type) {
         window.location.href = `/content.php?id=${item.id}`;
     });
     
+    enhanceCardWithIMDb(card, item, contentType);
+    attachTorrentHandlers(card, item, contentType);
+    
     return card;
 }
+
+function enhanceCardWithIMDb(card, item, contentType) {
+    const badge = card.querySelector('.imdb-badge .imdb-text');
+    if (!badge) return;
+    
+    const title = item.title || '';
+    const year = item.release_year || '';
+    if (!title) {
+        badge.textContent = 'IMDb: N/A';
+        return;
+    }
+    
+    const cacheKey = `${contentType}:${title.toLowerCase()}:${year}`;
+    if (appState.imdbCache[cacheKey]) {
+        const info = appState.imdbCache[cacheKey];
+        badge.textContent = info && info.imdb_rating ? `IMDb: ${info.imdb_rating}` : 'IMDb: N/A';
+        return;
+    }
+    
+    badge.textContent = 'IMDb: ...';
+    
+    fetchImdbData(title, year, contentType)
+        .then(info => {
+            appState.imdbCache[cacheKey] = info;
+            badge.textContent = info && info.imdb_rating ? `IMDb: ${info.imdb_rating}` : 'IMDb: N/A';
+        })
+        .catch(() => {
+            badge.textContent = 'IMDb: N/A';
+        });
+}
+
+function attachTorrentHandlers(card, item, contentType) {
+    const title = item.title || '';
+    const year = item.release_year || '';
+    const poster = card.querySelector('img');
+    const torrentBtn = card.querySelector('.torrent-btn');
+    
+    const openModal = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openTorrentModal({
+            id: item.id,
+            title,
+            year,
+            type: contentType
+        });
+    };
+    
+    if (poster) {
+        poster.style.cursor = 'pointer';
+        poster.addEventListener('click', openModal);
+    }
+    
+    if (torrentBtn) {
+        torrentBtn.addEventListener('click', openModal);
+    }
+}
+
+async function fetchImdbData(title, year = '', type = 'movie') {
+    if (!title) return null;
+    const cacheKey = `${type}:${title.toLowerCase()}:${year}`;
+    if (appState.imdbCache[cacheKey]) {
+        return appState.imdbCache[cacheKey];
+    }
+    
+    const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
+    const url = `${baseUrl}/api/imdb/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year || '')}&type=${encodeURIComponent(type)}`;
+    
+    const response = await fetch(url, { credentials: 'same-origin' });
+    const data = await response.json();
+    
+    if (data.success && data.data) {
+        appState.imdbCache[cacheKey] = data.data;
+        return data.data;
+    }
+    
+    throw new Error(data.error || 'Sin resultados de IMDb');
+}
+
+async function fetchTorrentResults(title, year = '', type = 'movie') {
+    if (!title) return [];
+    const cacheKey = `${type}:${title.toLowerCase()}:${year}`;
+    if (appState.torrentCache[cacheKey]) {
+        return appState.torrentCache[cacheKey];
+    }
+    
+    const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
+    const url = `${baseUrl}/api/torrent/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year || '')}&type=${encodeURIComponent(type)}`;
+    
+    const response = await fetch(url, { credentials: 'same-origin' });
+    const data = await response.json();
+    
+    if (data.success && data.results) {
+        appState.torrentCache[cacheKey] = data.results;
+        return data.results;
+    }
+    
+    return [];
+}
+
+function openTorrentModal(content) {
+    if (!elements.torrentModal) {
+        console.warn('Modal de torrents no disponible');
+        return;
+    }
+    
+    appState.activeTorrentContent = content;
+    
+    elements.torrentModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    if (elements.torrentModalTitle) {
+        elements.torrentModalTitle.textContent = `Buscar torrents: ${content.title}${content.year ? ` (${content.year})` : ''}`;
+    }
+    
+    if (elements.torrentIMDbContainer) {
+        elements.torrentIMDbContainer.innerHTML = `
+            <div class="torrent-imdb-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Cargando información de IMDb...</p>
+            </div>
+        `;
+    }
+    
+    if (elements.torrentSearchStatus) {
+        elements.torrentSearchStatus.style.display = 'block';
+        elements.torrentSearchStatus.innerHTML = `
+            <div class="torrent-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Buscando enlaces torrent...</p>
+            </div>
+        `;
+    }
+    
+    if (elements.torrentResultsContainer) {
+        elements.torrentResultsContainer.style.display = 'none';
+    }
+    
+    fetchImdbData(content.title, content.year, content.type)
+        .then(info => renderImdbInfo(info))
+        .catch(() => {
+            if (elements.torrentIMDbContainer) {
+                elements.torrentIMDbContainer.innerHTML = `
+                    <div class="torrent-imdb-loading error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>No se pudo cargar la información de IMDb.</p>
+                    </div>
+                `;
+            }
+        });
+    
+    fetchTorrentResults(content.title, content.year, content.type)
+        .then(results => {
+            if (elements.torrentSearchStatus) {
+                elements.torrentSearchStatus.style.display = 'none';
+            }
+            if (elements.torrentResultsContainer) {
+                elements.torrentResultsContainer.style.display = 'block';
+            }
+            renderTorrentResults(results, content);
+        })
+        .catch(() => {
+            if (elements.torrentSearchStatus) {
+                elements.torrentSearchStatus.style.display = 'block';
+                elements.torrentSearchStatus.innerHTML = `
+                    <div class="torrent-loading error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Error al buscar torrents. Intenta nuevamente.</p>
+                    </div>
+                `;
+            }
+        });
+}
+
+function renderImdbInfo(info) {
+    if (!elements.torrentIMDbContainer) return;
+    
+    if (!info) {
+        elements.torrentIMDbContainer.innerHTML = `
+            <div class="torrent-imdb-loading error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Sin información de IMDb disponible.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    elements.torrentIMDbContainer.innerHTML = `
+        <div class="imdb-modal-info">
+            <div class="imdb-poster">
+                ${info.poster && info.poster !== 'N/A'
+                    ? `<img src="${info.poster}" alt="${info.title || ''}">`
+                    : '<div class="imdb-poster-placeholder"><i class="fas fa-image"></i></div>'}
+            </div>
+            <div class="imdb-details">
+                <h3>${info.title || 'Título desconocido'} ${info.year ? `(${info.year})` : ''}</h3>
+                ${info.imdb_rating ? `<p><strong>IMDb:</strong> ${info.imdb_rating} / 10 ${info.imdb_votes ? `(${info.imdb_votes} votos)` : ''}</p>` : ''}
+                ${info.rated ? `<p><strong>Clasificación:</strong> ${info.rated}</p>` : ''}
+                ${info.runtime ? `<p><strong>Duración:</strong> ${info.runtime}</p>` : ''}
+                ${info.genre ? `<p><strong>Género:</strong> ${info.genre}</p>` : ''}
+                ${info.director ? `<p><strong>Director:</strong> ${info.director}</p>` : ''}
+                ${info.actors ? `<p><strong>Actores:</strong> ${info.actors}</p>` : ''}
+                ${info.plot && info.plot !== 'N/A' ? `<p class="imdb-plot">${info.plot}</p>` : ''}
+                ${info.imdb_id ? `<a href="https://www.imdb.com/title/${info.imdb_id}" target="_blank" rel="noopener" class="imdb-link"><i class="fab fa-imdb"></i> Ver en IMDb</a>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function renderTorrentResults(results, content) {
+    if (!elements.torrentResultsList) return;
+    
+    if (!results || results.length === 0) {
+        elements.torrentResultsList.innerHTML = `
+            <div class="torrent-empty">
+                <i class="fas fa-search"></i>
+                <p>No se encontraron torrents para esta búsqueda.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const html = results.map(result => {
+        const safeMagnet = encodeURIComponent(result.magnet || '');
+        const quality = result.quality && result.quality !== 'Unknown' ? result.quality : 'Desconocida';
+        const seeds = result.seeds || 0;
+        const size = result.size || 'N/A';
+        const source = result.source || 'Fuente desconocida';
+        
+        return `
+            <div class="torrent-result">
+                <div class="torrent-info">
+                    <div class="torrent-title">${result.title || 'Torrent sin título'}</div>
+                    <div class="torrent-meta">
+                        <span class="torrent-quality">${quality}</span>
+                        <span><i class="fas fa-arrow-up"></i> Seeds: ${seeds}</span>
+                        <span><i class="fas fa-hdd"></i> ${size}</span>
+                        <span><i class="fas fa-database"></i> ${source}</span>
+                    </div>
+                </div>
+                <div class="torrent-actions">
+                    <button class="play-torrent-btn" data-magnet="${safeMagnet}" data-content-id="${content.id}" data-title="${encodeURIComponent(content.title)}">
+                        <i class="fas fa-play"></i> Reproducir
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    elements.torrentResultsList.innerHTML = html;
+}
+
+function handleTorrentResultClick(event) {
+    const btn = event.target.closest('.play-torrent-btn');
+    if (!btn) return;
+    event.preventDefault();
+    
+    const magnet = btn.dataset.magnet ? decodeURIComponent(btn.dataset.magnet) : '';
+    const contentId = btn.dataset.contentId;
+    
+    if (!magnet) {
+        alert('Enlace magnet no disponible.');
+        return;
+    }
+    
+    selectTorrentForPlayback(magnet, contentId);
+}
+
+function selectTorrentForPlayback(magnetLink, contentId) {
+    if (!magnetLink) return;
+    closeTorrentModal();
+    
+    const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
+    const url = `${baseUrl}/watch.php?id=${contentId || ''}&torrent=${encodeURIComponent(magnetLink)}`;
+    window.open(url, '_blank');
+}
+
+function closeTorrentModal() {
+    if (elements.torrentModal) {
+        elements.torrentModal.classList.remove('active');
+    }
+    document.body.style.overflow = '';
+}
+
+function triggerTorrentModal(id, title, year = '', type = 'movie') {
+    openTorrentModal({
+        id,
+        title,
+        year,
+        type
+    });
+}
+
+window.closeTorrentModal = closeTorrentModal;
+window.selectTorrentForPlayback = selectTorrentForPlayback;
+window.triggerTorrentModal = triggerTorrentModal;
+window.handleMoviePosterClick = (id, title, year) => triggerTorrentModal(id, title, year, 'movie');
+window.handleSeriesPosterClick = (id, title, year) => triggerTorrentModal(id, title, year, 'series');
 
 // Navegación
 function navigateTo(section) {

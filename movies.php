@@ -141,7 +141,13 @@ include __DIR__ . '/includes/header.php';
                             <i class="fas fa-crown"></i> PREMIUM
                         </span>
                     <?php endif; ?>
-                    <img src="<?php echo htmlspecialchars($posterUrl); ?>" alt="<?php echo htmlspecialchars($movie['title']); ?>" class="movie-poster" loading="lazy">
+                    <img src="<?php echo htmlspecialchars($posterUrl); ?>" 
+                         alt="<?php echo htmlspecialchars($movie['title']); ?>" 
+                         class="movie-poster poster-clickable" 
+                         loading="lazy"
+                         onclick="handleMoviePosterClick(<?php echo $movie['id']; ?>, '<?php echo htmlspecialchars($movie['title'], ENT_QUOTES); ?>', <?php echo $year ?: 'null'; ?>)"
+                         style="cursor: pointer;"
+                         title="Clic para buscar torrents">
                     <div class="movie-info">
                         <div class="movie-title"><?php echo htmlspecialchars($movie['title']); ?></div>
                         <div class="movie-meta">

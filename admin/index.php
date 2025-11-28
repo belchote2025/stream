@@ -346,39 +346,131 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                             </div>
                         </div>
                         
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="video_url">URL del Video</label>
-                                <input type="url" id="video_url" name="video_url" placeholder="https://...">
-                                <small class="form-text">O sube un archivo de video local</small>
+                        <!-- Video Principal -->
+                        <div class="form-group">
+                            <label style="font-weight: 600; margin-bottom: 0.75rem; display: block;">
+                                <i class="fas fa-video"></i> Video Principal
+                            </label>
+                            
+                            <!-- Opción 1: URL -->
+                            <div class="video-option-card" id="videoUrlOption" style="margin-bottom: 1rem; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; background: #f9f9f9;">
+                                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                    <input type="radio" id="video_source_url" name="video_source" value="url" style="margin-right: 0.5rem;">
+                                    <label for="video_source_url" style="margin: 0; font-weight: 600; cursor: pointer; flex: 1;">
+                                        <i class="fas fa-link"></i> Usar URL de Video
+                                    </label>
+                                </div>
+                                <div id="videoUrlContainer" style="display: none; margin-top: 0.75rem;">
+                                    <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                                        <input type="url" id="video_url" name="video_url" placeholder="https://... o /uploads/videos/archivo.mp4" style="flex: 1; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px;" disabled>
+                                        <button type="button" id="previewVideoBtn" class="btn btn-secondary" style="white-space: nowrap; padding: 0.75rem 1rem;" title="Previsualizar video" disabled>
+                                            <i class="fas fa-play"></i> Previsualizar
+                                        </button>
+                                    </div>
+                                    <small class="form-text" style="display: block; margin-top: 0.5rem; color: #666;">
+                                        Puedes usar una URL externa (https://...) o una ruta local (/uploads/videos/...)
+                                    </small>
+                                </div>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="video_file">Subir Video Local</label>
-                                <input type="file" id="video_file" name="video_file" accept="video/*" data-max-size="2147483648">
-                                <small class="form-text">Formatos: MP4, WebM, AVI, MKV (máx. 2GB)</small>
-                                <div id="video_file_info" class="file-info" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 4px;">
-                                    <span class="file-name"></span>
-                                    <span class="file-size"></span>
+                            <!-- Opción 2: Archivo Local -->
+                            <div class="video-option-card" id="videoFileOption" style="margin-bottom: 1rem; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; background: #f9f9f9;">
+                                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                    <input type="radio" id="video_source_file" name="video_source" value="file" style="margin-right: 0.5rem;">
+                                    <label for="video_source_file" style="margin: 0; font-weight: 600; cursor: pointer; flex: 1;">
+                                        <i class="fas fa-upload"></i> Subir Archivo Local
+                                    </label>
+                                </div>
+                                <div id="videoFileContainer" style="display: none; margin-top: 0.75rem;">
+                                    <input type="file" id="video_file" name="video_file" accept="video/*" data-max-size="2147483648" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; background: white;" disabled>
+                                    <small class="form-text" style="display: block; margin-top: 0.5rem; color: #666;">
+                                        Formatos: MP4, WebM, AVI, MKV (máx. 2GB)
+                                    </small>
+                                    <div id="video_file_info" class="file-info" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: rgba(0,0,0,0.05); border-radius: 4px; border-left: 3px solid #28a745;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <i class="fas fa-check-circle" style="color: #28a745;"></i>
+                                            <div style="flex: 1;">
+                                                <div class="file-name" style="font-weight: 600;"></div>
+                                                <div class="file-size" style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;"></div>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="clearVideoFile()" style="padding: 0.25rem 0.5rem;">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="trailer_url">URL del Tráiler</label>
-                                <input type="url" id="trailer_url" name="trailer_url" placeholder="https://...">
-                                <small class="form-text">O sube un archivo de tráiler local</small>
+                        <!-- Contenedor de previsualización de video -->
+                        <div id="videoPreviewContainer" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.1); border-radius: 4px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <h4 style="margin: 0;">Previsualización del Video</h4>
+                                <button type="button" id="closePreviewBtn" class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.5rem;">
+                                    <i class="fas fa-times"></i> Cerrar
+                                </button>
+                            </div>
+                            <div id="videoPreviewPlayer" style="position: relative; width: 100%; padding-bottom: 56.25%; background: #000; border-radius: 4px; overflow: hidden;">
+                                <!-- El reproductor se insertará aquí -->
+                            </div>
+                        </div>
+                        
+                        <!-- Tráiler (Opcional) -->
+                        <div class="form-group">
+                            <label style="font-weight: 600; margin-bottom: 0.75rem; display: block;">
+                                <i class="fas fa-film"></i> Tráiler (Opcional)
+                            </label>
+                            
+                            <!-- Opción 1: URL -->
+                            <div class="trailer-option-card" id="trailerUrlOption" style="margin-bottom: 1rem; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; background: #f9f9f9;">
+                                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                    <input type="radio" id="trailer_source_url" name="trailer_source" value="url" style="margin-right: 0.5rem;">
+                                    <label for="trailer_source_url" style="margin: 0; font-weight: 600; cursor: pointer; flex: 1;">
+                                        <i class="fas fa-link"></i> Usar URL de Tráiler
+                                    </label>
+                                </div>
+                                <div id="trailerUrlContainer" style="display: none; margin-top: 0.75rem;">
+                                    <input type="url" id="trailer_url" name="trailer_url" placeholder="https://... o /uploads/videos/trailer.mp4" style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px;" disabled>
+                                    <small class="form-text" style="display: block; margin-top: 0.5rem; color: #666;">
+                                        Puedes usar una URL externa (https://...) o una ruta local (/uploads/videos/...)
+                                    </small>
+                                </div>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="trailer_file">Subir Tráiler Local</label>
-                                <input type="file" id="trailer_file" name="trailer_file" accept="video/*" data-max-size="524288000">
-                                <small class="form-text">Formatos: MP4, WebM, AVI, MKV (máx. 500MB)</small>
-                                <div id="trailer_file_info" class="file-info" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 4px;">
-                                    <span class="file-name"></span>
-                                    <span class="file-size"></span>
+                            <!-- Opción 2: Archivo Local -->
+                            <div class="trailer-option-card" id="trailerFileOption" style="margin-bottom: 1rem; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; background: #f9f9f9;">
+                                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                    <input type="radio" id="trailer_source_file" name="trailer_source" value="file" style="margin-right: 0.5rem;">
+                                    <label for="trailer_source_file" style="margin: 0; font-weight: 600; cursor: pointer; flex: 1;">
+                                        <i class="fas fa-upload"></i> Subir Tráiler Local
+                                    </label>
                                 </div>
+                                <div id="trailerFileContainer" style="display: none; margin-top: 0.75rem;">
+                                    <input type="file" id="trailer_file" name="trailer_file" accept="video/*" data-max-size="524288000" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; background: white;" disabled>
+                                    <small class="form-text" style="display: block; margin-top: 0.5rem; color: #666;">
+                                        Formatos: MP4, WebM, AVI, MKV (máx. 500MB)
+                                    </small>
+                                    <div id="trailer_file_info" class="file-info" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: rgba(0,0,0,0.05); border-radius: 4px; border-left: 3px solid #28a745;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <i class="fas fa-check-circle" style="color: #28a745;"></i>
+                                            <div style="flex: 1;">
+                                                <div class="file-name" style="font-weight: 600;"></div>
+                                                <div class="file-size" style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;"></div>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="clearTrailerFile()" style="padding: 0.25rem 0.5rem;">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Opción 3: Ninguno -->
+                            <div style="margin-bottom: 0.5rem;">
+                                <input type="radio" id="trailer_source_none" name="trailer_source" value="none" checked style="margin-right: 0.5rem;">
+                                <label for="trailer_source_none" style="margin: 0; cursor: pointer; color: #666;">
+                                    No usar tráiler
+                                </label>
                             </div>
                         </div>
                         
@@ -386,11 +478,16 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                             <label for="torrent_magnet">Enlace Magnet (Torrent)</label>
                             <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
                                 <input type="text" id="torrent_magnet" name="torrent_magnet" placeholder="magnet:?xt=urn:btih:..." style="flex: 1;">
-                                <button type="button" id="searchTorrentBtn" class="btn btn-secondary" style="white-space: nowrap; padding: 0.75rem 1rem;">
-                                    <i class="fas fa-search"></i> Buscar
-                                </button>
+                                <div style="display: flex; gap: 0.35rem;">
+                                    <button type="button" id="searchTorrentBtn" class="btn btn-secondary" style="white-space: nowrap; padding: 0.75rem 1rem;">
+                                        <i class="fas fa-search"></i> Buscar
+                                    </button>
+                                    <button type="button" id="retryTorrentBtn" class="btn btn-outline-warning" style="white-space: nowrap; padding: 0.75rem 1rem;" title="Si el enlace seleccionado no funciona, volver a buscar en otras fuentes">
+                                        <i class="fas fa-redo"></i> Reintentar
+                                    </button>
+                                </div>
                             </div>
-                            <small class="form-text">Busca automáticamente enlaces de torrents usando el título y año</small>
+                            <small class="form-text">Busca automáticamente enlaces (YTS, EZTV, TPB, Torrentio). Usa "Reintentar" si el enlace no funciona.</small>
                             <div id="torrent-results" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.05); border-radius: 4px; max-height: 300px; overflow-y: auto;">
                                 <div id="torrent-results-content"></div>
                             </div>
@@ -506,6 +603,41 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                             <button type="submit" class="btn btn-primary">Guardar Usuario</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para mostrar resultados de torrents -->
+    <div class="modal" id="torrentModal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2 id="torrentModalTitle">Buscar Enlaces Torrent</h2>
+                <button class="close-modal" onclick="closeTorrentModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="torrentSearchStatus" style="text-align: center; padding: 2rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #e50914;"></i>
+                    <p>Buscando enlaces torrent...</p>
+                </div>
+                <div id="torrentResultsContainer" style="display: none;">
+                    <div id="torrentResultsList" style="max-height: 500px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para información de IMDb -->
+    <div class="modal" id="imdbModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 id="imdbModalTitle">Información de IMDb</h2>
+                <button class="close-modal" onclick="closeIMDbModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="imdbModalBody">
+                <div style="text-align: center; padding: 2rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #e50914;"></i>
+                    <p>Cargando información...</p>
                 </div>
             </div>
         </div>

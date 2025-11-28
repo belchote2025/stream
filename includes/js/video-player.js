@@ -350,19 +350,39 @@ class UnifiedVideoPlayer {
             }
             
             // Ocultar otros reproductores
-            document.getElementById('youtubePlayerContainer').style.display = 'none';
-            document.getElementById('torrentPlayerContainer').style.display = 'none';
+            const youtubeContainer = document.getElementById('youtubePlayerContainer');
+            const torrentContainer = document.getElementById('torrentPlayerContainer');
+            if (youtubeContainer) youtubeContainer.style.display = 'none';
+            if (torrentContainer) torrentContainer.style.display = 'none';
             
             // Mostrar video HTML5
             this.videoElement.style.display = 'block';
             
-            // Configurar fuente
-            this.videoElement.src = url;
+            // Normalizar la URL
+            let normalizedUrl = url;
             
-            // Si es una URL local, asegurar que sea absoluta
-            if (url.startsWith('/')) {
-                this.videoElement.src = window.location.origin + url;
+            // Si es una URL absoluta (http/https), usarla directamente
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                normalizedUrl = url;
+            } 
+            // Si es una ruta relativa que empieza con /, convertir a absoluta
+            else if (url.startsWith('/')) {
+                // Obtener el base URL del sitio
+                const baseUrl = window.__APP_BASE_URL || window.location.origin;
+                normalizedUrl = baseUrl + url;
             }
+            // Si es una ruta relativa sin /, añadir el base path
+            else {
+                const baseUrl = window.__APP_BASE_URL || window.location.origin;
+                const currentPath = window.location.pathname;
+                const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+                normalizedUrl = baseUrl + basePath + '/' + url;
+            }
+            
+            console.log('Cargando video:', { original: url, normalized: normalizedUrl });
+            
+            // Configurar fuente
+            this.videoElement.src = normalizedUrl;
             
             // Restaurar tiempo de inicio si existe
             if (this.options.startTime > 0) {
@@ -371,16 +391,60 @@ class UnifiedVideoPlayer {
                 }, { once: true });
             }
             
+            let resolved = false;
+            
             this.videoElement.addEventListener('canplay', () => {
-                this.hideLoading();
-                resolve();
+                if (!resolved) {
+                    resolved = true;
+                    this.hideLoading();
+                    resolve();
+                }
+            }, { once: true });
+            
+            this.videoElement.addEventListener('loadeddata', () => {
+                if (!resolved) {
+                    resolved = true;
+                    this.hideLoading();
+                    resolve();
+                }
             }, { once: true });
             
             this.videoElement.addEventListener('error', (e) => {
-                reject(new Error('Error al cargar el video: ' + (e.message || 'Error desconocido')));
+                if (!resolved) {
+                    resolved = true;
+                    const error = this.videoElement.error;
+                    let errorMessage = 'Error desconocido al cargar el video';
+                    
+                    if (error) {
+                        switch (error.code) {
+                            case error.MEDIA_ERR_ABORTED:
+                                errorMessage = 'La reproducción fue abortada';
+                                break;
+                            case error.MEDIA_ERR_NETWORK:
+                                errorMessage = 'Error de red al cargar el video';
+                                break;
+                            case error.MEDIA_ERR_DECODE:
+                                errorMessage = 'Error al decodificar el video';
+                                break;
+                            case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                                errorMessage = 'El formato de video no es compatible o la URL no es válida';
+                                break;
+                        }
+                    }
+                    
+                    reject(new Error(errorMessage + ' (URL: ' + normalizedUrl + ')'));
+                }
             }, { once: true });
             
-            this.videoElement.load();
+            // Intentar cargar el video
+            try {
+                this.videoElement.load();
+            } catch (e) {
+                if (!resolved) {
+                    resolved = true;
+                    reject(new Error('Error al inicializar el video: ' + e.message));
+                }
+            }
         });
     }
     

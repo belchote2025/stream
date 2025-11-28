@@ -386,8 +386,13 @@ include __DIR__ . '/includes/header.php';
         // Determinar la URL del video a reproducir
         $videoUrl = null;
         $hasVideo = false;
+        $torrentMagnet = null;
         
-        if ($episode && !empty($episode['video_url'])) {
+        // Verificar si hay un enlace torrent en la URL
+        if (isset($_GET['torrent']) && !empty($_GET['torrent'])) {
+            $torrentMagnet = urldecode($_GET['torrent']);
+            $hasVideo = true;
+        } elseif ($episode && !empty($episode['video_url'])) {
             $videoUrl = $episode['video_url'];
             $hasVideo = true;
         } elseif (!empty($content['video_url'])) {
@@ -395,6 +400,9 @@ include __DIR__ . '/includes/header.php';
             $hasVideo = true;
         } elseif (!empty($content['trailer_url'])) {
             $videoUrl = $content['trailer_url'];
+            $hasVideo = true;
+        } elseif (!empty($content['torrent_magnet'])) {
+            $torrentMagnet = $content['torrent_magnet'];
             $hasVideo = true;
         }
         
@@ -413,6 +421,10 @@ include __DIR__ . '/includes/header.php';
                 // Otra ruta relativa que empieza con /
                 $baseUrl = rtrim(SITE_URL, '/');
                 $videoUrl = $baseUrl . $videoUrl;
+            } elseif (strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0 && strpos($videoUrl, '/') !== 0) {
+                // Si es una ruta relativa sin / al inicio, añadirla
+                $baseUrl = rtrim(SITE_URL, '/');
+                $videoUrl = $baseUrl . '/' . ltrim($videoUrl, '/');
             }
         }
         ?>
@@ -510,7 +522,8 @@ const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? wind
 const contentId = <?php echo $contentId; ?>;
 const episodeId = <?php echo $episodeId ? $episodeId : 'null'; ?>;
 const duration = <?php echo $episode ? ($episode['duration'] * 60) : ($content['duration'] * 60); ?>;
-const videoUrl = <?php echo $hasVideo ? "'" . htmlspecialchars($videoUrl, ENT_QUOTES) . "'" : 'null'; ?>;
+const videoUrl = <?php echo ($hasVideo && $videoUrl) ? "'" . htmlspecialchars($videoUrl, ENT_QUOTES) . "'" : 'null'; ?>;
+const torrentMagnet = <?php echo ($hasVideo && $torrentMagnet) ? "'" . htmlspecialchars($torrentMagnet, ENT_QUOTES) . "'" : 'null'; ?>;
 
 let player = null;
 let saveInterval;
@@ -518,78 +531,129 @@ let hasStartedPlaying = false;
 
 // Solo inicializar si hay video
 <?php if ($hasVideo): ?>
-document.addEventListener('DOMContentLoaded', function() {
+// Esperar a que el reproductor esté disponible
+function initVideoPlayer() {
+    // Verificar que UnifiedVideoPlayer esté disponible
+    if (typeof UnifiedVideoPlayer === 'undefined') {
+        console.warn('UnifiedVideoPlayer no está disponible, reintentando...');
+        setTimeout(initVideoPlayer, 100);
+        return;
+    }
+    
     const container = document.getElementById('unifiedVideoContainer');
     if (!container || !videoUrl) {
-        console.error('Contenedor de video o URL no encontrados');
+        console.error('Contenedor de video o URL no encontrados', { container, videoUrl });
         return;
     }
     
     // Inicializar el reproductor unificado
     const startTime = <?php echo ($savedProgress && $savedProgress['progress'] > 10) ? $savedProgress['progress'] : 0; ?>;
     
-    player = new UnifiedVideoPlayer('unifiedVideoContainer', {
-        autoplay: false,
-        controls: true,
-        startTime: startTime > 0 && startTime < duration * 0.9 ? startTime : 0,
-        onProgress: (currentTime, totalDuration) => {
-            if (currentTime && totalDuration) {
-                clearTimeout(saveInterval);
-                saveInterval = setTimeout(() => {
-                    saveProgress(currentTime, totalDuration);
-                }, 5000); // Guardar cada 5 segundos
+    try {
+        player = new UnifiedVideoPlayer('unifiedVideoContainer', {
+            autoplay: false,
+            controls: true,
+            startTime: startTime > 0 && startTime < duration * 0.9 ? startTime : 0,
+            onProgress: (currentTime, totalDuration) => {
+                if (currentTime && totalDuration) {
+                    clearTimeout(saveInterval);
+                    saveInterval = setTimeout(() => {
+                        saveProgress(currentTime, totalDuration);
+                    }, 5000); // Guardar cada 5 segundos
+                }
+            },
+            onEnded: () => {
+                saveProgress(duration, duration, true);
+                incrementViews();
+            },
+            onError: (error) => {
+                console.error('Error en el reproductor:', error);
+                showVideoError(error);
             }
-        },
-        onEnded: () => {
-            saveProgress(duration, duration, true);
-            incrementViews();
-        },
-        onError: (error) => {
-            console.error('Error en el reproductor:', error);
-        }
-    });
-    
-    // Cargar el video
-    player.loadVideo(videoUrl).then(() => {
-        console.log('Video cargado correctamente');
+        });
         
-        // Restaurar progreso guardado si existe
-        <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
-            const progressPercent = Math.round((startTime / duration) * 100);
-            if (progressPercent < 90) {
-                // Esperar a que el video tenga metadata antes de hacer seek
-                if (player.videoElement) {
-                    player.videoElement.addEventListener('loadedmetadata', function() {
-                        if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
-                            player.seek(startTime);
-                        }
-                    }, { once: true });
-                } else {
-                    // Si no hay videoElement, intentar después de un delay
-                    setTimeout(() => {
-                        if (player && player.seek) {
+        // Determinar qué cargar: torrent o video normal
+        const urlToLoad = torrentMagnet || videoUrl;
+        
+        if (!urlToLoad) {
+            throw new Error('No hay URL de video o enlace torrent disponible');
+        }
+        
+        // Cargar el video o torrent
+        player.loadVideo(urlToLoad).then(() => {
+            console.log('Video cargado correctamente');
+            
+            // Restaurar progreso guardado si existe
+            <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
+                const progressPercent = Math.round((startTime / duration) * 100);
+                if (progressPercent < 90) {
+                    // Esperar a que el video tenga metadata antes de hacer seek
+                    if (player.videoElement) {
+                        player.videoElement.addEventListener('loadedmetadata', function() {
                             if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
                                 player.seek(startTime);
                             }
-                        }
-                    }, 1000);
+                        }, { once: true });
+                    } else {
+                        // Si no hay videoElement, intentar después de un delay
+                        setTimeout(() => {
+                            if (player && player.seek) {
+                                if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
+                                    player.seek(startTime);
+                                }
+                            }
+                        }, 1000);
+                    }
                 }
+            <?php endif; ?>
+            
+            // Incrementar contador de vistas cuando el video comience
+            if (player.videoElement) {
+                player.videoElement.addEventListener('play', function() {
+                    if (!hasStartedPlaying) {
+                        hasStartedPlaying = true;
+                        incrementViews();
+                    }
+                }, { once: true });
             }
-        <?php endif; ?>
-        
-        // Incrementar contador de vistas cuando el video comience
-        if (player.videoElement) {
-            player.videoElement.addEventListener('play', function() {
-                if (!hasStartedPlaying) {
-                    hasStartedPlaying = true;
-                    incrementViews();
-                }
-            }, { once: true });
-        }
-    }).catch(error => {
-        console.error('Error al cargar el video:', error);
-    });
-});
+        }).catch(error => {
+            console.error('Error al cargar el video:', error);
+            showVideoError(error);
+        });
+    } catch (error) {
+        console.error('Error al inicializar el reproductor:', error);
+        showVideoError(error);
+    }
+}
+
+function showVideoError(error) {
+    const container = document.getElementById('unifiedVideoContainer');
+    if (container) {
+        container.innerHTML = `
+            <div class="video-error">
+                <div class="error-content">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error al cargar el video</h3>
+                    <p>${error.message || 'No se pudo cargar el video. Por favor, verifica la URL del video.'}</p>
+                    <button class="btn btn-primary" onclick="retryVideo()">
+                        <i class="fas fa-redo"></i> Reintentar
+                    </button>
+                    <a href="${BASE_URL}/content-detail.php?id=${contentId}" class="btn btn-outline">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </a>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Inicializar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initVideoPlayer);
+} else {
+    // DOM ya está listo
+    initVideoPlayer();
+}
 
 function saveProgress(currentTime, duration, completed = false) {
     if (!currentTime || !duration) return;
@@ -657,21 +721,19 @@ function playTrailer() {
     <?php endif; ?>
 }
 
-        // Guardar al cerrar la página
-        window.addEventListener('beforeunload', function() {
-            if (player && player.currentTime && player.duration) {
-                saveProgress(player.currentTime, player.duration);
-            }
-        });
+    // Guardar al cerrar la página
+    window.addEventListener('beforeunload', function() {
+        if (player && player.currentTime && player.duration) {
+            saveProgress(player.currentTime, player.duration);
+        }
+    });
 
-        // Manejar cambios de visibilidad de la página
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden && player && player.isPlaying && player.currentTime && player.duration) {
-                saveProgress(player.currentTime, player.duration);
-            }
-        });
-    }
-});
+    // Manejar cambios de visibilidad de la página
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && player && player.isPlaying && player.currentTime && player.duration) {
+            saveProgress(player.currentTime, player.duration);
+        }
+    });
 <?php endif; ?>
 </script>
 

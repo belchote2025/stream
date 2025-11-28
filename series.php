@@ -142,13 +142,19 @@ include __DIR__ . '/includes/header.php';
                 $seasonsData = $seasonsStmt->fetch(PDO::FETCH_ASSOC);
                 $seasons = $seasonsData['seasons'] ?? 0;
             ?>
-                <div class="series-card" onclick="window.location.href='/content.php?id=<?php echo $series['id']; ?>'">
+                <div class="series-card" data-id="<?php echo $series['id']; ?>" data-title="<?php echo htmlspecialchars($series['title'], ENT_QUOTES); ?>" data-year="<?php echo $year; ?>">
                     <?php if ($isPremium): ?>
                         <span class="series-badge premium">
                             <i class="fas fa-crown"></i> PREMIUM
                         </span>
                     <?php endif; ?>
-                    <img src="<?php echo htmlspecialchars($posterUrl); ?>" alt="<?php echo htmlspecialchars($series['title']); ?>" class="series-poster" loading="lazy">
+                    <img src="<?php echo htmlspecialchars($posterUrl); ?>" 
+                         alt="<?php echo htmlspecialchars($series['title']); ?>" 
+                         class="series-poster poster-clickable" 
+                         loading="lazy"
+                         onclick="handleSeriesPosterClick(<?php echo $series['id']; ?>, '<?php echo htmlspecialchars($series['title'], ENT_QUOTES); ?>', <?php echo $year ?: 'null'; ?>)"
+                         style="cursor: pointer;"
+                         title="Clic para buscar torrents">
                     <div class="series-info">
                         <div class="series-title"><?php echo htmlspecialchars($series['title']); ?></div>
                         <div class="series-meta">

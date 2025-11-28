@@ -43,7 +43,13 @@ try {
         }
     }
     
-    // Opción 3: The Pirate Bay API (búsqueda general)
+    // Opción 3: Torrentio (addon de Stremio, búsqueda agregada)
+    $torrentioResults = searchTorrentio($title, $type, $year);
+    if (!empty($torrentioResults)) {
+        $results = array_merge($results, $torrentioResults);
+    }
+    
+    // Opción 4: The Pirate Bay API (búsqueda general)
     // Nota: TPB puede no estar siempre disponible, usar con precaución
     $tpbResults = searchTPB($title, $type);
     if (!empty($tpbResults)) {
@@ -66,6 +72,72 @@ try {
         'success' => false,
         'error' => 'Error al buscar torrents: ' . $e->getMessage()
     ]);
+}
+
+/**
+ * Buscar en Torrentio (addon de Stremio)
+ */
+function searchTorrentio($title, $type = 'movie', $year = '') {
+    $results = [];
+    $baseUrl = getenv('TORRENTIO_BASE_URL') ?: 'https://torrentio.strem.fun';
+    
+    try {
+        $queryTerm = trim($title . ' ' . $year);
+        $query = urlencode($queryTerm);
+        $catalog = $type === 'series' ? 'series/all' : 'movie/all';
+        $url = rtrim($baseUrl, '/') . "/{$catalog}/search={$query}.json?sort=seeds";
+        
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode === 200 && $response) {
+            $data = json_decode($response, true);
+            if (isset($data['streams']) && is_array($data['streams'])) {
+                foreach ($data['streams'] as $stream) {
+                    $magnet = '';
+                    if (!empty($stream['infoHash'])) {
+                        $magnet = 'magnet:?xt=urn:btih:' . $stream['infoHash'];
+                        if (!empty($stream['title'])) {
+                            $magnet .= '&dn=' . urlencode($stream['title']);
+                        }
+                        if (!empty($stream['sources']) && is_array($stream['sources'])) {
+                            foreach ($stream['sources'] as $tracker) {
+                                $magnet .= '&tr=' . urlencode($tracker);
+                            }
+                        }
+                    } elseif (!empty($stream['url']) && strpos($stream['url'], 'magnet:?') === 0) {
+                        $magnet = $stream['url'];
+                    }
+                    
+                    if (empty($magnet)) {
+                        continue;
+                    }
+                    
+                    $titleText = $stream['title'] ?? $stream['name'] ?? $title;
+                    $size = $stream['size'] ?? $stream['fileSize'] ?? null;
+                    $results[] = [
+                        'title' => $titleText,
+                        'quality' => $stream['quality'] ?? extractQuality($titleText),
+                        'size' => $size ? (is_numeric($size) ? formatBytes((int)$size) : $size) : 'Unknown',
+                        'seeds' => $stream['seeders'] ?? $stream['seeds'] ?? 0,
+                        'peers' => $stream['peers'] ?? 0,
+                        'magnet' => $magnet,
+                        'source' => 'Torrentio'
+                    ];
+                }
+            }
+        }
+    } catch (Exception $e) {
+        error_log('Error en Torrentio: ' . $e->getMessage());
+    }
+    
+    return $results;
 }
 
 /**

@@ -350,19 +350,39 @@ class UnifiedVideoPlayer {
             }
             
             // Ocultar otros reproductores
-            document.getElementById('youtubePlayerContainer').style.display = 'none';
-            document.getElementById('torrentPlayerContainer').style.display = 'none';
+            const youtubeContainer = document.getElementById('youtubePlayerContainer');
+            const torrentContainer = document.getElementById('torrentPlayerContainer');
+            if (youtubeContainer) youtubeContainer.style.display = 'none';
+            if (torrentContainer) torrentContainer.style.display = 'none';
             
             // Mostrar video HTML5
             this.videoElement.style.display = 'block';
             
-            // Configurar fuente
-            this.videoElement.src = url;
+            // Normalizar la URL
+            let normalizedUrl = url;
             
-            // Si es una URL local, asegurar que sea absoluta
-            if (url.startsWith('/')) {
-                this.videoElement.src = window.location.origin + url;
+            // Si es una URL absoluta (http/https), usarla directamente
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                normalizedUrl = url;
+            } 
+            // Si es una ruta relativa que empieza con /, convertir a absoluta
+            else if (url.startsWith('/')) {
+                // Obtener el base URL del sitio
+                const baseUrl = window.__APP_BASE_URL || window.location.origin;
+                normalizedUrl = baseUrl + url;
             }
+            // Si es una ruta relativa sin /, añadir el base path
+            else {
+                const baseUrl = window.__APP_BASE_URL || window.location.origin;
+                const currentPath = window.location.pathname;
+                const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+                normalizedUrl = baseUrl + basePath + '/' + url;
+            }
+            
+            console.log('Cargando video:', { original: url, normalized: normalizedUrl });
+            
+            // Configurar fuente
+            this.videoElement.src = normalizedUrl;
             
             // Restaurar tiempo de inicio si existe
             if (this.options.startTime > 0) {
@@ -371,16 +391,60 @@ class UnifiedVideoPlayer {
                 }, { once: true });
             }
             
+            let resolved = false;
+            
             this.videoElement.addEventListener('canplay', () => {
-                this.hideLoading();
-                resolve();
+                if (!resolved) {
+                    resolved = true;
+                    this.hideLoading();
+                    resolve();
+                }
+            }, { once: true });
+            
+            this.videoElement.addEventListener('loadeddata', () => {
+                if (!resolved) {
+                    resolved = true;
+                    this.hideLoading();
+                    resolve();
+                }
             }, { once: true });
             
             this.videoElement.addEventListener('error', (e) => {
-                reject(new Error('Error al cargar el video: ' + (e.message || 'Error desconocido')));
+                if (!resolved) {
+                    resolved = true;
+                    const error = this.videoElement.error;
+                    let errorMessage = 'Error desconocido al cargar el video';
+                    
+                    if (error) {
+                        switch (error.code) {
+                            case error.MEDIA_ERR_ABORTED:
+                                errorMessage = 'La reproducción fue abortada';
+                                break;
+                            case error.MEDIA_ERR_NETWORK:
+                                errorMessage = 'Error de red al cargar el video';
+                                break;
+                            case error.MEDIA_ERR_DECODE:
+                                errorMessage = 'Error al decodificar el video';
+                                break;
+                            case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                                errorMessage = 'El formato de video no es compatible o la URL no es válida';
+                                break;
+                        }
+                    }
+                    
+                    reject(new Error(errorMessage + ' (URL: ' + normalizedUrl + ')'));
+                }
             }, { once: true });
             
-            this.videoElement.load();
+            // Intentar cargar el video
+            try {
+                this.videoElement.load();
+            } catch (e) {
+                if (!resolved) {
+                    resolved = true;
+                    reject(new Error('Error al inicializar el video: ' + e.message));
+                }
+            }
         });
     }
     
@@ -470,20 +534,65 @@ class UnifiedVideoPlayer {
     }
     
     async loadTorrent(url) {
+        // Verificar que WebTorrent esté disponible
+        if (typeof WebTorrent === 'undefined') {
+            // Intentar cargar WebTorrent dinámicamente
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js';
+                script.onload = () => {
+                    this.initWebTorrent();
+                    this.loadTorrentContent(url).then(resolve).catch(reject);
+                };
+                script.onerror = () => {
+                    reject(new Error('No se pudo cargar WebTorrent. Por favor, verifica tu conexión a internet.'));
+                };
+                document.head.appendChild(script);
+            });
+        }
+        
+        if (!this.torrentClient) {
+            this.initWebTorrent();
+        }
+        
+        return this.loadTorrentContent(url);
+    }
+    
+    async loadTorrentContent(url) {
         if (!this.torrentClient) {
             throw new Error('WebTorrent no está disponible');
         }
         
         return new Promise((resolve, reject) => {
             // Ocultar otros reproductores
-            this.videoElement.style.display = 'none';
-            document.getElementById('youtubePlayerContainer').style.display = 'none';
+            const youtubeContainer = document.getElementById('youtubePlayerContainer');
+            if (youtubeContainer) youtubeContainer.style.display = 'none';
+            if (this.videoElement) this.videoElement.style.display = 'none';
             
             const container = document.getElementById('torrentPlayerContainer');
+            if (!container) {
+                reject(new Error('Contenedor de torrent no encontrado'));
+                return;
+            }
+            
             container.style.display = 'block';
-            container.innerHTML = '<video id="torrentVideo" controls style="width: 100%; height: 100%;"></video>';
+            container.innerHTML = `
+                <video id="torrentVideo" controls style="width: 100%; height: 100%; object-fit: contain;"></video>
+                <div id="torrentProgress" style="position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 0.5rem; border-radius: 4px; color: #fff; font-size: 0.85rem;">
+                    <div>Conectando a la red P2P...</div>
+                    <div style="margin-top: 0.25rem;">
+                        <div style="background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                            <div id="torrentProgressBar" style="background: #e50914; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+                    <div id="torrentStats" style="margin-top: 0.25rem; font-size: 0.75rem; color: #999;"></div>
+                </div>
+            `;
             
             const torrentVideo = document.getElementById('torrentVideo');
+            const progressBar = document.getElementById('torrentProgressBar');
+            const torrentStats = document.getElementById('torrentStats');
+            const torrentProgress = document.getElementById('torrentProgress');
             
             // Detener torrent anterior
             if (this.currentTorrent) {
@@ -492,35 +601,127 @@ class UnifiedVideoPlayer {
             
             this.showLoading('Conectando a la red P2P...');
             
+            // Timeout para evitar esperas infinitas
+            const timeout = setTimeout(() => {
+                if (this.currentTorrent && !this.currentTorrent.ready) {
+                    reject(new Error('Tiempo de espera agotado. El torrent puede no tener suficientes seeds o la conexión es lenta.'));
+                }
+            }, 30000); // 30 segundos
+            
             this.currentTorrent = this.torrentClient.add(url, (torrent) => {
-                const file = torrent.files.find(f => 
-                    f.name.endsWith('.mp4') || 
-                    f.name.endsWith('.webm') || 
-                    f.name.endsWith('.mkv')
-                );
+                clearTimeout(timeout);
+                
+                // Actualizar estadísticas del torrent
+                const updateStats = () => {
+                    if (torrentStats && torrent) {
+                        const downloaded = (torrent.downloaded / 1024 / 1024).toFixed(2);
+                        const total = (torrent.length / 1024 / 1024).toFixed(2);
+                        const progress = torrent.progress * 100;
+                        const downloadSpeed = (torrent.downloadSpeed / 1024 / 1024).toFixed(2);
+                        const uploadSpeed = (torrent.uploadSpeed / 1024 / 1024).toFixed(2);
+                        
+                        torrentStats.innerHTML = `
+                            Descargado: ${downloaded} MB / ${total} MB (${progress.toFixed(1)}%) | 
+                            Velocidad: ↓ ${downloadSpeed} MB/s ↑ ${uploadSpeed} MB/s | 
+                            Seeds: ${torrent.numPeers}
+                        `;
+                        
+                        if (progressBar) {
+                            progressBar.style.width = progress + '%';
+                        }
+                    }
+                };
+                
+                // Actualizar estadísticas periódicamente
+                const statsInterval = setInterval(updateStats, 500);
+                
+                torrent.on('done', () => {
+                    clearInterval(statsInterval);
+                    if (torrentProgress) {
+                        torrentProgress.style.display = 'none';
+                    }
+                });
+                
+                // Buscar archivo de video
+                const file = torrent.files.find(f => {
+                    const name = f.name.toLowerCase();
+                    return name.endsWith('.mp4') || 
+                           name.endsWith('.webm') || 
+                           name.endsWith('.mkv') ||
+                           name.endsWith('.avi') ||
+                           name.endsWith('.mov');
+                });
                 
                 if (!file) {
+                    clearInterval(statsInterval);
                     reject(new Error('No se encontró archivo de video en el torrent'));
                     return;
                 }
                 
+                this.showLoading('Cargando video desde torrent...');
+                
+                // Renderizar el archivo de video
                 file.renderTo(torrentVideo, {
                     autoplay: this.options.autoplay
                 }, (err, element) => {
+                    clearInterval(statsInterval);
+                    
                     if (err) {
                         reject(err);
                         return;
                     }
                     
                     this.videoElement = element;
-                    this.hideLoading();
-                    resolve();
+                    
+                    // Configurar eventos del video
+                    element.addEventListener('canplay', () => {
+                        this.hideLoading();
+                        if (torrentProgress) {
+                            torrentProgress.style.display = 'none';
+                        }
+                        resolve();
+                    }, { once: true });
+                    
+                    element.addEventListener('error', (e) => {
+                        clearInterval(statsInterval);
+                        reject(new Error('Error al reproducir el video del torrent: ' + (e.message || 'Error desconocido')));
+                    }, { once: true });
+                    
+                    // Si ya puede reproducir, resolver inmediatamente
+                    if (element.readyState >= 3) {
+                        this.hideLoading();
+                        if (torrentProgress) {
+                            torrentProgress.style.display = 'none';
+                        }
+                        resolve();
+                    }
                 });
             });
             
             this.currentTorrent.on('error', (err) => {
-                reject(err);
+                clearTimeout(timeout);
+                reject(new Error('Error al cargar el torrent: ' + (err.message || 'Error desconocido')));
             });
+            
+            // Actualizar progreso mientras se descarga
+            if (this.currentTorrent) {
+                const progressInterval = setInterval(() => {
+                    if (this.currentTorrent && progressBar) {
+                        const progress = this.currentTorrent.progress * 100;
+                        progressBar.style.width = progress + '%';
+                        
+                        if (torrentStats && this.currentTorrent.downloaded) {
+                            const downloaded = (this.currentTorrent.downloaded / 1024 / 1024).toFixed(2);
+                            const total = this.currentTorrent.length ? (this.currentTorrent.length / 1024 / 1024).toFixed(2) : '?';
+                            torrentStats.textContent = `Descargando: ${downloaded} MB / ${total} MB`;
+                        }
+                    }
+                }, 1000);
+                
+                this.currentTorrent.on('done', () => {
+                    clearInterval(progressInterval);
+                });
+            }
         });
     }
     

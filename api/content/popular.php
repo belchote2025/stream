@@ -15,6 +15,7 @@ try {
     $type = isset($_GET['type']) ? $_GET['type'] : null; // 'movie' o 'series'
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
     $limit = max(1, min($limit, 50)); // Entre 1 y 50
+    $source = isset($_GET['source']) ? strtolower(trim($_GET['source'])) : null;
     
     // Construir consulta
     $query = "
@@ -45,16 +46,27 @@ try {
     ";
     
     $params = [];
+    $orderBy = "c.views DESC, c.rating DESC, c.release_year DESC, COALESCE(c.added_date, c.created_at) DESC";
     
     // Filtrar por tipo si se especifica
     if ($type && in_array($type, ['movie', 'series'])) {
         $query .= " AND c.type = :type";
         $params[':type'] = $type;
     }
+
+    if ($source === 'imdb') {
+        $query .= " AND (c.rating IS NOT NULL AND c.rating > 0)";
+        $orderBy = "c.rating DESC, c.views DESC, c.release_year DESC";
+    } elseif ($source === 'local') {
+        $query .= " AND c.video_url IS NOT NULL AND c.video_url <> '' AND (c.video_url LIKE :localRelative OR c.video_url LIKE :localAbsolute)";
+        $params[':localRelative'] = '/uploads/%';
+        $params[':localAbsolute'] = '%/uploads/%';
+        $orderBy = "COALESCE(c.updated_at, c.added_date, c.created_at) DESC";
+    }
     
     $query .= "
         GROUP BY c.id
-        ORDER BY c.views DESC, c.rating DESC, c.release_year DESC, COALESCE(c.added_date, c.created_at) DESC
+        ORDER BY {$orderBy}
         LIMIT :limit
     ";
     

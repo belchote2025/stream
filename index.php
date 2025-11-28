@@ -26,6 +26,10 @@ $recentSeries = getRecentlyAdded($db, 'series', 10);
 $popularMovies = getMostViewed($db, 'movie', 10);
 $popularSeries = getMostViewed($db, 'series', 10);
 
+// Additional curated sections
+$imdbMovies = getImdbTopContent($db, 10);
+$localVideos = getLocalUploadedVideos($db, 10);
+
 // Include header
 include __DIR__ . '/includes/header.php';
 ?>
@@ -194,17 +198,68 @@ include __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <!-- Popular Movies -->
-    <?php if (!empty($popularMovies)): ?>
+    <div class="row-container">
+        <div class="row-header">
+            <h2 class="row-title">Películas populares</h2>
+            <a href="/movies/popular" class="row-link">Ver todo</a>
+        </div>
+        <div class="row-nav prev">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="row-content" id="popular-movies" data-dynamic="true" data-type="movie" data-sort="popular" data-limit="12" data-cache-key="movies">
+            <p class="loading-placeholder">Cargando películas populares...</p>
+        </div>
+        <div class="row-nav next">
+            <i class="fas fa-chevron-right"></i>
+        </div>
+    </div>
+
+    <!-- Recent Series -->
+    <div class="row-container">
+        <div class="row-header">
+            <h2 class="row-title">Series recientes</h2>
+            <a href="/series/recent" class="row-link">Ver todo</a>
+        </div>
+        <div class="row-nav prev">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="row-content" id="recent-series" data-dynamic="true" data-type="series" data-sort="recent" data-limit="12">
+            <p class="loading-placeholder">Cargando series recientes...</p>
+        </div>
+        <div class="row-nav next">
+            <i class="fas fa-chevron-right"></i>
+        </div>
+    </div>
+
+    <!-- Popular Series -->
+    <div class="row-container">
+        <div class="row-header">
+            <h2 class="row-title">Series populares</h2>
+            <a href="/series/popular" class="row-link">Ver todo</a>
+        </div>
+        <div class="row-nav prev">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="row-content" id="popular-series" data-dynamic="true" data-type="series" data-sort="popular" data-limit="12" data-cache-key="series">
+            <p class="loading-placeholder">Cargando series populares...</p>
+        </div>
+        <div class="row-nav next">
+            <i class="fas fa-chevron-right"></i>
+        </div>
+    </div>
+
+    <!-- IMDb Highlighted Movies -->
+    <?php if (!empty($imdbMovies)): ?>
         <div class="row-container">
             <div class="row-header">
-                <h2 class="row-title">Películas populares</h2>
-                <a href="/movies/popular" class="row-link">Ver todo</a>
+                <h2 class="row-title">Películas destacadas en IMDb</h2>
+                <a href="/movies/imdb" class="row-link">Ver todo</a>
             </div>
             <div class="row-nav prev">
                 <i class="fas fa-chevron-left"></i>
             </div>
-            <div class="row-content" id="popular-movies">
-                <?php foreach ($popularMovies as $movie): ?>
+            <div class="row-content" id="imdb-movies">
+                <?php foreach ($imdbMovies as $movie): ?>
                     <?php echo createContentCard($movie); ?>
                 <?php endforeach; ?>
             </div>
@@ -214,40 +269,19 @@ include __DIR__ . '/includes/header.php';
         </div>
     <?php endif; ?>
 
-    <!-- Recent Series -->
-    <?php if (!empty($recentSeries)): ?>
+    <!-- Local Uploaded Videos -->
+    <?php if (!empty($localVideos)): ?>
         <div class="row-container">
             <div class="row-header">
-                <h2 class="row-title">Series recientes</h2>
-                <a href="/series/recent" class="row-link">Ver todo</a>
+                <h2 class="row-title">Videos locales</h2>
+                <a href="/videos/local" class="row-link">Ver todo</a>
             </div>
             <div class="row-nav prev">
                 <i class="fas fa-chevron-left"></i>
             </div>
-            <div class="row-content" id="recent-series">
-                <?php foreach ($recentSeries as $series): ?>
-                    <?php echo createContentCard($series); ?>
-                <?php endforeach; ?>
-            </div>
-            <div class="row-nav next">
-                <i class="fas fa-chevron-right"></i>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <!-- Popular Series -->
-    <?php if (!empty($popularSeries)): ?>
-        <div class="row-container">
-            <div class="row-header">
-                <h2 class="row-title">Series populares</h2>
-                <a href="/series/popular" class="row-link">Ver todo</a>
-            </div>
-            <div class="row-nav prev">
-                <i class="fas fa-chevron-left"></i>
-            </div>
-            <div class="row-content" id="popular-series">
-                <?php foreach ($popularSeries as $series): ?>
-                    <?php echo createContentCard($series); ?>
+            <div class="row-content" id="local-videos">
+                <?php foreach ($localVideos as $item): ?>
+                    <?php echo createContentCard($item); ?>
                 <?php endforeach; ?>
             </div>
             <div class="row-nav next">
@@ -257,86 +291,39 @@ include __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <!-- Recent Movies -->
-    <?php if (!empty($recentMovies)): ?>
+    <div class="row-container">
+        <div class="row-header">
+            <h2 class="row-title">Películas recientes</h2>
+            <a href="/movies/recent" class="row-link">Ver todo</a>
+        </div>
+        <div class="row-nav prev">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="row-content" id="recent-movies" data-dynamic="true" data-type="movie" data-sort="recent" data-limit="12">
+            <p class="loading-placeholder">Cargando películas recientes...</p>
+        </div>
+        <div class="row-nav next">
+            <i class="fas fa-chevron-right"></i>
+        </div>
+    </div>
+
+    <!-- Recommended For You (for logged-in users) -->
+    <?php if (isLoggedIn()): ?>
         <div class="row-container">
             <div class="row-header">
-                <h2 class="row-title">Películas recientes</h2>
-                <a href="/movies/recent" class="row-link">Ver todo</a>
+                <h2 class="row-title">Recomendado para ti</h2>
+                <a href="/recommended" class="row-link">Ver todo</a>
             </div>
             <div class="row-nav prev">
                 <i class="fas fa-chevron-left"></i>
             </div>
-            <div class="row-content" id="recent-movies">
-                <?php foreach ($recentMovies as $movie): ?>
-                    <?php echo createContentCard($movie); ?>
-                <?php endforeach; ?>
+            <div class="row-content" id="recommended" data-dynamic="true" data-endpoint="/api/content/recommended.php" data-limit="12" data-cache-key="recommended">
+                <p class="loading-placeholder">Buscando recomendaciones personalizadas...</p>
             </div>
             <div class="row-nav next">
                 <i class="fas fa-chevron-right"></i>
             </div>
         </div>
-    <?php endif; ?>
-
-    <!-- Recommended For You (for logged-in users) -->
-    <?php if (isLoggedIn()): ?>
-        <?php 
-        // Obtener recomendaciones basadas en géneros favoritos
-        $userId = $_SESSION['user_id'];
-        $recommendedQuery = "
-            SELECT DISTINCT c.*
-            FROM content c
-            INNER JOIN content_genres cg1 ON c.id = cg1.content_id
-            INNER JOIN content_genres cg2 ON cg1.genre_id = cg2.genre_id
-            INNER JOIN user_favorites uf ON cg2.content_id = uf.content_id
-            WHERE uf.user_id = :user_id
-            AND c.id NOT IN (
-                SELECT content_id 
-                FROM user_favorites 
-                WHERE user_id = :user_id_exclude
-            )
-            GROUP BY c.id
-            ORDER BY COUNT(*) DESC, c.rating DESC
-            LIMIT 10
-        ";
-        
-        $recommendedStmt = $db->prepare($recommendedQuery);
-        $recommendedStmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
-        $recommendedStmt->bindValue(':user_id_exclude', $userId, PDO::PARAM_INT);
-        $recommendedStmt->execute();
-        $recommended = $recommendedStmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Si no hay recomendaciones personalizadas, mostrar trending
-        if (empty($recommended)) {
-            $trendingQuery = "
-                SELECT * FROM content 
-                WHERE is_trending = 1 
-                ORDER BY rating DESC, views DESC 
-                LIMIT 10
-            ";
-            $trendingStmt = $db->query($trendingQuery);
-            $recommended = $trendingStmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-        
-        if (!empty($recommended)): 
-        ?>
-            <div class="row-container">
-                <div class="row-header">
-                    <h2 class="row-title">Recomendado para ti</h2>
-                    <a href="/recommended" class="row-link">Ver todo</a>
-                </div>
-                <div class="row-nav prev">
-                    <i class="fas fa-chevron-left"></i>
-                </div>
-                <div class="row-content" id="recommended">
-                    <?php foreach ($recommended as $item): ?>
-                        <?php echo createContentCard($item); ?>
-                    <?php endforeach; ?>
-                </div>
-                <div class="row-nav next">
-                    <i class="fas fa-chevron-right"></i>
-                </div>
-            </div>
-        <?php endif; ?>
     <?php endif; ?>
 </main>
 

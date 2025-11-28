@@ -96,8 +96,17 @@ try {
         throw new Exception('Error al guardar el archivo en el servidor.');
     }
     
-    // Generar URL relativa del archivo
+    // Generar URL relativa del archivo (asegurar que empiece con /)
     $fileUrl = '/uploads/videos/' . $newFileName;
+    
+    // En producción, asegurar que la URL sea accesible
+    // Si estamos en un subdirectorio, añadir el path base
+    if (defined('SITE_URL')) {
+        $basePath = parse_url(SITE_URL, PHP_URL_PATH);
+        if ($basePath && $basePath !== '/') {
+            $fileUrl = rtrim($basePath, '/') . $fileUrl;
+        }
+    }
     
     // Obtener información del archivo
     $fileInfo = [

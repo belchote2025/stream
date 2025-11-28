@@ -129,6 +129,18 @@ function createMovie() {
         // Iniciar transacción
         $db->beginTransaction();
         
+        // Normalizar URLs de video (asegurar que sean rutas relativas o absolutas válidas)
+        $videoUrl = !empty($data['video_url']) ? trim($data['video_url']) : null;
+        $trailerUrl = !empty($data['trailer_url']) ? trim($data['trailer_url']) : null;
+        
+        // Si la URL de video es relativa sin / al inicio, añadirla
+        if ($videoUrl && strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0 && strpos($videoUrl, '/') !== 0) {
+            $videoUrl = '/' . ltrim($videoUrl, '/');
+        }
+        if ($trailerUrl && strpos($trailerUrl, 'http://') !== 0 && strpos($trailerUrl, 'https://') !== 0 && strpos($trailerUrl, '/') !== 0) {
+            $trailerUrl = '/' . ltrim($trailerUrl, '/');
+        }
+        
         // Insertar la película en la tabla content
         $query = "INSERT INTO content (
                     title, slug, description, type, release_year, duration, 
@@ -151,10 +163,10 @@ function createMovie() {
             ':duration' => $data['duration'],
             ':rating' => $data['rating'] ?? null,
             ':age_rating' => $data['age_rating'] ?? null,
-            ':poster_url' => !empty($data['poster_url']) ? $data['poster_url'] : null,
-            ':backdrop_url' => !empty($data['backdrop_url']) ? $data['backdrop_url'] : null,
-            ':video_url' => !empty($data['video_url']) ? $data['video_url'] : null,
-            ':trailer_url' => !empty($data['trailer_url']) ? $data['trailer_url'] : null,
+            ':poster_url' => !empty($data['poster_url']) ? trim($data['poster_url']) : null,
+            ':backdrop_url' => !empty($data['backdrop_url']) ? trim($data['backdrop_url']) : null,
+            ':video_url' => $videoUrl,
+            ':trailer_url' => $trailerUrl,
             ':torrent_magnet' => $data['torrent_magnet'] ?? null,
             ':is_featured' => isset($data['is_featured']) ? (int)$data['is_featured'] : 0,
             ':is_trending' => isset($data['is_trending']) ? (int)$data['is_trending'] : 0,
@@ -212,6 +224,11 @@ function updateMovie($id) {
         // Obtener los datos del cuerpo de la petición
         $data = json_decode(file_get_contents('php://input'), true);
         
+        // Si no se puede decodificar JSON, intentar con POST
+        if (!$data && $_SERVER['REQUEST_METHOD'] === 'PUT') {
+            parse_str(file_get_contents('php://input'), $data);
+        }
+        
         // Validar los datos de entrada
         if (!validateMovieData($data, true)) {
             http_response_code(400);
@@ -221,6 +238,18 @@ function updateMovie($id) {
         
         // Iniciar transacción
         $db->beginTransaction();
+        
+        // Normalizar URLs de video (asegurar que sean rutas relativas o absolutas válidas)
+        $videoUrl = !empty($data['video_url']) ? trim($data['video_url']) : null;
+        $trailerUrl = !empty($data['trailer_url']) ? trim($data['trailer_url']) : null;
+        
+        // Si la URL de video es relativa sin / al inicio, añadirla
+        if ($videoUrl && strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0 && strpos($videoUrl, '/') !== 0) {
+            $videoUrl = '/' . ltrim($videoUrl, '/');
+        }
+        if ($trailerUrl && strpos($trailerUrl, 'http://') !== 0 && strpos($trailerUrl, 'https://') !== 0 && strpos($trailerUrl, '/') !== 0) {
+            $trailerUrl = '/' . ltrim($trailerUrl, '/');
+        }
         
         // Actualizar la película en la tabla content
         $query = "UPDATE content SET 
@@ -254,10 +283,10 @@ function updateMovie($id) {
             ':duration' => $data['duration'],
             ':rating' => $data['rating'] ?? null,
             ':age_rating' => $data['age_rating'] ?? null,
-            ':poster_url' => !empty($data['poster_url']) ? $data['poster_url'] : null,
-            ':backdrop_url' => !empty($data['backdrop_url']) ? $data['backdrop_url'] : null,
-            ':video_url' => !empty($data['video_url']) ? $data['video_url'] : null,
-            ':trailer_url' => !empty($data['trailer_url']) ? $data['trailer_url'] : null,
+            ':poster_url' => !empty($data['poster_url']) ? trim($data['poster_url']) : null,
+            ':backdrop_url' => !empty($data['backdrop_url']) ? trim($data['backdrop_url']) : null,
+            ':video_url' => $videoUrl,
+            ':trailer_url' => $trailerUrl,
             ':torrent_magnet' => $data['torrent_magnet'] ?? null,
             ':is_featured' => isset($data['is_featured']) ? (int)$data['is_featured'] : 0,
             ':is_trending' => isset($data['is_trending']) ? (int)$data['is_trending'] : 0,

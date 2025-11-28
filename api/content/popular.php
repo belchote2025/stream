@@ -4,6 +4,10 @@
  * GET /api/content/popular?type=movie&limit=10
  */
 
+// Desactivar mostrar errores en pantalla para APIs
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/image-helper.php';
@@ -16,6 +20,7 @@ try {
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
     $limit = max(1, min($limit, 50)); // Entre 1 y 50
     $source = isset($_GET['source']) ? strtolower(trim($_GET['source'])) : null;
+    $sort = isset($_GET['sort']) ? strtolower(trim($_GET['sort'])) : 'popular';
     
     // Construir consulta
     $query = "
@@ -55,8 +60,9 @@ try {
     }
 
     if ($source === 'imdb') {
-        // Filtrar contenido con rating de IMDb (rating >= 6.0 para destacados, más flexible)
-        $query .= " AND (c.rating IS NOT NULL AND c.rating >= 6.0)";
+        // Filtrar contenido con rating de IMDb (rating >= 5.0 para destacados, más flexible)
+        // Si no hay suficiente contenido con rating >= 6.0, mostrar con rating >= 5.0
+        $query .= " AND (c.rating IS NOT NULL AND c.rating >= 5.0)";
         $orderBy = "c.rating DESC, c.views DESC, c.release_year DESC";
     } elseif ($source === 'local') {
         // Filtrar videos locales (subidos al servidor)
@@ -67,6 +73,10 @@ try {
     } elseif ($sort === 'recent') {
         // Ordenar por más recientes
         $orderBy = "COALESCE(c.updated_at, c.added_date, c.created_at) DESC, c.views DESC";
+    } elseif ($sort === 'trending') {
+        // Ordenar por trending
+        $query .= " AND c.is_trending = 1";
+        $orderBy = "c.views DESC, c.rating DESC, COALESCE(c.updated_at, c.added_date, c.created_at) DESC";
     }
     
     $query .= "
@@ -121,15 +131,23 @@ try {
     
 } catch (PDOException $e) {
     http_response_code(500);
+    header('Content-Type: application/json');
+    error_log('Error en popular.php: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Error al obtener contenido popular: ' . $e->getMessage()
+        'error' => 'Error al obtener contenido popular',
+        'message' => 'Error de base de datos'
     ]);
+    exit;
 } catch (Exception $e) {
     http_response_code(500);
+    header('Content-Type: application/json');
+    error_log('Error en popular.php: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Error: ' . $e->getMessage()
+        'error' => 'Error al obtener contenido',
+        'message' => $e->getMessage()
     ]);
+    exit;
 }
 

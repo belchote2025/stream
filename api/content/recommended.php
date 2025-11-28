@@ -3,6 +3,10 @@
  * API Endpoint: Recomendaciones personalizadas
  */
 
+// Desactivar mostrar errores en pantalla para APIs
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/image-helper.php';
@@ -97,15 +101,23 @@ try {
 
 } catch (PDOException $e) {
     http_response_code(500);
+    header('Content-Type: application/json');
+    error_log('Error en recommended.php: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Error al obtener recomendaciones: ' . $e->getMessage()
+        'error' => 'Error al obtener recomendaciones',
+        'message' => 'Error de base de datos'
     ]);
+    exit;
 } catch (Exception $e) {
     http_response_code(500);
+    header('Content-Type: application/json');
+    error_log('Error en recommended.php: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Error: ' . $e->getMessage()
+        'error' => 'Error al obtener recomendaciones',
+        'message' => $e->getMessage()
     ]);
+    exit;
 }
 

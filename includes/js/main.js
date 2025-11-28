@@ -302,11 +302,18 @@ async function loadDynamicRow(container) {
         const result = await response.json();
         console.log(`[${containerId}] Datos recibidos:`, result);
         
+        // Verificar si hay error en la respuesta
+        if (!result.success && result.error) {
+            console.error(`[${containerId}] Error en respuesta:`, result.error);
+            container.innerHTML = `<p class="no-content" style="padding: 2rem; text-align: center; color: #e50914;">Error: ${result.error || 'Error desconocido'}</p>`;
+            return;
+        }
+        
         const items = result.data || result;
 
         if (!Array.isArray(items)) {
             console.error(`[${containerId}] Los datos no son un array:`, result);
-            container.innerHTML = '<p class="no-content">Error en el formato de datos.</p>';
+            container.innerHTML = '<p class="no-content" style="padding: 2rem; text-align: center; color: #e50914;">Error en el formato de datos.</p>';
             return;
         }
 
@@ -318,11 +325,11 @@ async function loadDynamicRow(container) {
 
         if (!items.length) {
             const message = source === 'imdb' 
-                ? 'No hay películas destacadas en IMDb disponibles (rating >= 7.0).' 
+                ? 'No hay películas destacadas en IMDb disponibles (rating >= 5.0). Puedes añadir contenido con rating desde el panel de administración.' 
                 : source === 'local'
                 ? 'No hay videos locales disponibles.'
                 : 'Sin contenido disponible.';
-            container.innerHTML = `<p class="no-content">${message}</p>`;
+            container.innerHTML = `<p class="no-content" style="padding: 2rem; text-align: center; color: #999;">${message}</p>`;
             console.warn(`[${containerId}] Sin resultados para mostrar`);
             return;
         }
@@ -355,7 +362,14 @@ async function loadDynamicRow(container) {
     } catch (error) {
         console.error(`[${containerId}] Error cargando fila dinámica:`, error);
         const errorMessage = error.message || 'Error desconocido';
-        container.innerHTML = `<p class="no-content" style="color: #e50914;">Error: ${errorMessage}<br><small>Revisa la consola para más detalles.</small></p>`;
+        
+        // Si el error es de JSON, mostrar mensaje más amigable
+        let displayMessage = errorMessage;
+        if (errorMessage.includes('JSON') || errorMessage.includes('HTML')) {
+            displayMessage = 'Error al cargar el contenido. El servidor devolvió una respuesta inválida.';
+        }
+        
+        container.innerHTML = `<p class="no-content" style="color: #e50914; padding: 2rem; text-align: center;">${displayMessage}<br><small>Revisa la consola para más detalles.</small></p>`;
     }
 }
 

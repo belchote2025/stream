@@ -1,4 +1,22 @@
 <?php
+// Configuración de seguridad
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_secure', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on');
+ini_set('session.cookie_samesite', 'Lax');
+
+// Configuración de reporte de errores
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/error.log');
+
+// Crear directorio de logs si no existe
+if (!file_exists(__DIR__ . '/../logs')) {
+    mkdir(__DIR__ . '/../logs', 0755, true);
+}
+
+// Cargar variables de entorno
 $projectRoot = dirname(__DIR__);
 $envFile = $projectRoot . '/.env';
 
@@ -14,9 +32,18 @@ if (file_exists($envFile) && is_readable($envFile)) {
         }
         list($key, $value) = explode('=', $line, 2);
         $key = trim($key);
-        $value = trim($value);
+        $value = trim($value, "'\" \t\n\r\0\x0B"); // Eliminar comillas y espacios
+        
+        // Validar valores sensibles
+        if (in_array($key, ['DB_PASS', 'API_KEY', 'SECRET_KEY'])) {
+            if (empty($value)) {
+                error_log("Advertencia: Valor vacío para la variable sensible: $key");
+            }
+        }
+        
         putenv("$key=$value");
         $_ENV[$key] = $value;
+        $_SERVER[$key] = $value;
     }
 }
 
@@ -27,18 +54,19 @@ $appEnv = getenv('APP_ENV') ?: (($isCli || $isLocalHost) ? 'local' : 'production
 $appEnv = strtolower($appEnv) === 'local' ? 'local' : 'production';
 define('APP_ENV', $appEnv);
 
+// Configuración de base de datos - Las credenciales reales deben estar en .env
 $dbDefaults = [
     'local' => [
-        'host' => '127.0.0.1',
-        'user' => 'root',
-        'pass' => '',
-        'name' => 'streaming_platform',
+        'host' => getenv('DB_HOST') ?: '127.0.0.1',
+        'user' => getenv('DB_USER') ?: 'root',
+        'pass' => getenv('DB_PASS') ?: '',
+        'name' => getenv('DB_NAME') ?: 'streaming_platform',
     ],
     'production' => [
-        'host' => 'localhost',
-        'user' => 'u6O0265163_HAggBlS0j_belchote',
-        'pass' => 'Belchote1@',
-        'name' => 'u6O0265163_HAggBlS0j_streamingplatform',
+        'host' => getenv('DB_HOST') ?: 'localhost',
+        'user' => getenv('DB_USER') ?: '',
+        'pass' => getenv('DB_PASS') ?: '',
+        'name' => getenv('DB_NAME') ?: '',
     ],
 ];
 $currentDbDefaults = $dbDefaults[APP_ENV] ?? $dbDefaults['production'];
@@ -120,20 +148,17 @@ if (ENVIRONMENT === 'development') {
     ini_set('display_errors', 0);
 }
 
-// Función para conectar a la base de datos
+/**
+ * Establece una conexión segura a la base de datos
+ * @return mysqli
+ * @throws Exception Si la conexión falla
+ */
 function getDbConnection() {
-    static $conn;
+    static $conn = null;
     
-    if (!isset($conn)) {
-        try {
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
-            $options = [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-                PDO::ATTR_PERSISTENT => false,
-            ];
-            
+    // Si ya hay una conexión activa, devolverla
+    if ($conn !== null && $conn->ping()) {
+        return $conn;
             $conn = new PDO($dsn, DB_USER, DB_PASS, $options);
         } catch (PDOException $e) {
             // En producción, registrar el error en un archivo de log

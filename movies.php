@@ -33,6 +33,12 @@ include __DIR__ . '/includes/header.php';
     font-size: clamp(2rem, 4vw, 3.5rem);
     font-weight: 900;
     margin-bottom: 1rem;
+    background: linear-gradient(135deg, #ffffff 0%, #e50914 50%, #f5f5f5 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 2px 10px rgba(229, 9, 20, 0.3);
+    color: #fff;
 }
 
 .movies-grid {

@@ -348,20 +348,102 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <!-- Video Player Modal -->
-<div class="modal fade" id="videoPlayerModal" tabindex="-1" aria-labelledby="videoPlayerModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-fullscreen">
-        <div class="modal-content bg-black">
-            <div class="modal-header border-0">
+<div class="modal fade video-player-overlay" id="videoPlayerModal" tabindex="-1" aria-labelledby="videoPlayerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl video-player-dialog">
+        <div class="modal-content bg-black text-white">
+            <div class="modal-header border-0 justify-content-end">
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
-            <div class="modal-body p-0 d-flex align-items-center justify-content-center">
-                <video id="contentPlayer" class="w-100" controls autoplay>
-                    Tu navegador no soporta el elemento de video.
-                </video>
+            <div class="modal-body pt-0 pb-4 px-4">
+                <div class="video-player-header d-flex flex-wrap justify-content-between align-items-start gap-3">
+                    <div>
+                        <h3 class="mb-1" id="videoPlayerTitle">Reproduciendo...</h3>
+                        <div class="video-player-meta text-muted" id="videoPlayerMeta">Preparando video</div>
+                    </div>
+                    <div class="d-flex gap-2 video-player-actions">
+                        <button type="button" class="btn btn-sm btn-outline-light" id="videoOpenPageBtn">
+                            <i class="fas fa-info-circle me-1"></i> Ver ficha completa
+                        </button>
+                    </div>
+                </div>
+                <div class="video-player-wrapper">
+                    <div class="video-player-loading" id="videoPlayerLoading">
+                        <div class="spinner-border text-light" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mt-2 mb-0">Cargando video...</p>
+                    </div>
+                    <video id="contentPlayer" controls autoplay playsinline controlslist="nodownload" preload="metadata">
+                        Tu navegador no soporta el elemento de video.
+                    </video>
+                </div>
+                <p class="video-player-description text-muted mt-3" id="videoPlayerDescription"></p>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .video-player-overlay .modal-dialog {
+        max-width: min(1200px, 92vw);
+    }
+    .video-player-dialog .modal-content {
+        border-radius: 12px;
+        background: linear-gradient(180deg, #050505 0%, #101010 100%);
+        box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+    }
+    .video-player-wrapper {
+        position: relative;
+        width: 100%;
+        padding-top: 56.25%;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #000;
+    }
+    .video-player-wrapper video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+        border-radius: 10px;
+    }
+    .video-player-header h3 {
+        font-weight: 600;
+    }
+    .video-player-meta {
+        font-size: 0.95rem;
+    }
+    .video-player-description {
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+    .video-player-loading {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 0.75rem;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 2;
+    }
+    .video-player-loading p {
+        margin: 0;
+        font-weight: 500;
+    }
+    @media (max-width: 768px) {
+        .video-player-dialog .modal-content {
+            border-radius: 0;
+        }
+        .video-player-wrapper {
+            padding-top: 56.25%;
+        }
+    }
+</style>
 
 <?php
 // Include footer

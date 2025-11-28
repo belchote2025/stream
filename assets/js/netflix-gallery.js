@@ -25,7 +25,13 @@ document.addEventListener('DOMContentLoaded', function() {
             modal: '#contentModal',
             modalTitle: '#contentModalLabel',
             modalBody: '.modal-body',
-            modalPlayer: '#contentPlayer'
+            modalPlayer: '#contentPlayer',
+            videoModal: '#videoPlayerModal',
+            videoTitle: '#videoPlayerTitle',
+            videoMeta: '#videoPlayerMeta',
+            videoDescription: '#videoPlayerDescription',
+            videoLoading: '#videoPlayerLoading',
+            videoAction: '#videoOpenPageBtn'
         },
         defaultBackdrop: FALLBACK_BACKDROP,
         defaultPoster: FALLBACK_POSTER,
@@ -40,7 +46,11 @@ document.addEventListener('DOMContentLoaded', function() {
         heroItems: [],
         autoPlayInterval: null,
         isLoading: false,
-        currentVideo: null
+        currentVideo: null,
+        currentContentId: null,
+        currentContentType: null,
+        currentContentData: null,
+        lastProgressSave: null
     };
 
     // DOM Elements
@@ -81,6 +91,42 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             // Los selectores opcionales se ignoran silenciosamente (no mostrar warnings)
             // Solo mostrar warning si es un selector crítico que debería existir
+        }
+
+        // Preparar modal de video si existe
+        if (elements.videoModal) {
+            // Limpiar video al cerrar el modal
+            elements.videoModal.addEventListener('hidden.bs.modal', () => {
+                resetVideoPlayer();
+            });
+            
+            // Cerrar con tecla Escape
+            elements.videoModal.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    const modalInstance = bootstrap.Modal.getInstance(elements.videoModal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+            });
+        }
+
+        // Botón "Ver ficha completa"
+        if (elements.videoAction) {
+            elements.videoAction.addEventListener('click', () => {
+                const contentId = elements.videoAction.dataset.id;
+                if (contentId) {
+                    // Cerrar modal primero
+                    const modalInstance = bootstrap.Modal.getInstance(elements.videoModal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                    // Redirigir después de un pequeño delay para que el modal se cierre suavemente
+                    setTimeout(() => {
+                        window.location.href = `${BASE_URL}/content.php?id=${contentId}`;
+                    }, 300);
+                }
+            });
         }
 
         // Solo inicializar hero si los elementos existen
@@ -515,6 +561,43 @@ document.addEventListener('DOMContentLoaded', function() {
         elements.modal?.addEventListener('hidden.bs.modal', () => {
             stopCurrentVideo();
         });
+        
+        // Event listeners para el modal de video
+        if (elements.videoModal) {
+            // Cerrar con clic fuera del modal
+            elements.videoModal.addEventListener('click', (e) => {
+                if (e.target === elements.videoModal) {
+                    const modalInstance = bootstrap.Modal.getInstance(elements.videoModal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+            });
+            
+            // Prevenir cierre accidental con teclas
+            elements.videoModal.addEventListener('keydown', (e) => {
+                // Permitir Escape para cerrar
+                if (e.key === 'Escape') {
+                    const modalInstance = bootstrap.Modal.getInstance(elements.videoModal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+                // Prevenir que el espacio pause/reproduzca cuando se está escribiendo
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+                // Espacio para play/pause
+                if (e.key === ' ' && state.currentVideo) {
+                    e.preventDefault();
+                    if (state.currentVideo.paused) {
+                        state.currentVideo.play();
+                    } else {
+                        state.currentVideo.pause();
+                    }
+                }
+            });
+        }
     }
 
     // Initialize Intersection Observer for lazy loading
@@ -547,38 +630,110 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        const hasVideoModal = elements.videoModal && elements.modalPlayer;
+        if (!hasVideoModal) {
+            window.location.href = `${BASE_URL}/watch.php?id=${contentId}`;
+            return;
+        }
+
         try {
-            // Stop any currently playing video
             stopCurrentVideo();
-            
-            // In a real app, you would fetch the actual video URL from your API
-            const videoUrl = `/content/stream/${contentType}/${contentId}`;
-            
-            // Update the modal with video player
-            if (elements.modal) {
-                const modal = new bootstrap.Modal(elements.modal);
-                elements.modalTitle.textContent = 'Reproduciendo...';
-                elements.modalBody.innerHTML = `
-                    <div class="ratio ratio-16x9">
-                        <video id="contentPlayer" class="w-100" controls autoplay>
-                            <source src="${videoUrl}" type="video/mp4">
-                            Tu navegador no soporta el elemento de video.
-                        </video>
-                    </div>
-                `;
-                modal.show();
-                
-                // Store reference to the video element
-                state.currentVideo = document.getElementById('contentPlayer');
-                
-                // Handle video end
-                state.currentVideo.addEventListener('ended', () => {
-                    // You could implement "Next episode" or "Play next in series" logic here
-                });
+            showVideoLoading('Preparando reproducción...');
+
+            let contentData = null;
+            try {
+                const response = await fetch(`${config.api.contentDetails}${contentId}`);
+                const apiData = await response.json();
+                if (apiData.success && apiData.data) {
+                    contentData = apiData.data;
+                } else if (apiData.data) {
+                    contentData = apiData;
+                }
+            } catch (error) {
+                console.error('Error fetching content details:', error);
             }
+
+            if (!contentData) {
+                redirectToWatch(contentId);
+                return;
+            }
+
+            updateVideoModalInfo(contentData, contentType);
+            const playbackUrl = resolvePlaybackUrl(contentData);
+            if (!playbackUrl) {
+                showVideoLoading('Abriendo reproductor avanzado...');
+                redirectToWatch(contentId);
+                return;
+            }
+
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(elements.videoModal);
+            modalInstance.show();
+
+            const videoEl = elements.modalPlayer;
+            videoEl.pause();
+            videoEl.removeAttribute('src');
+            videoEl.load();
+
+            const normalizedUrl = normalizeVideoUrl(playbackUrl);
+            videoEl.src = normalizedUrl;
+            if (contentData.poster_url) {
+                videoEl.setAttribute('poster', contentData.poster_url);
+            } else {
+                videoEl.removeAttribute('poster');
+            }
+
+            // Guardar referencia al contenido actual para eventos
+            state.currentContentId = contentId;
+            state.currentContentType = contentType;
+            state.currentContentData = contentData;
+
+            // Eventos del video
+            videoEl.onloadeddata = () => {
+                hideVideoLoading();
+                videoEl.play().catch(() => {});
+            };
+
+            videoEl.onplay = () => {
+                hideVideoLoading();
+            };
+
+            videoEl.onpause = () => {
+                // Guardar progreso al pausar
+                savePlaybackProgress(contentId, videoEl.currentTime, videoEl.duration);
+            };
+
+            videoEl.ontimeupdate = () => {
+                // Guardar progreso cada 5 segundos
+                if (!state.lastProgressSave || Date.now() - state.lastProgressSave > 5000) {
+                    savePlaybackProgress(contentId, videoEl.currentTime, videoEl.duration);
+                    state.lastProgressSave = Date.now();
+                }
+            };
+
+            videoEl.onended = () => {
+                // Marcar como completado
+                markContentAsCompleted(contentId);
+                // Ocultar loading si está visible
+                hideVideoLoading();
+            };
+
+            videoEl.onerror = () => {
+                console.error('Video error, abriendo página completa');
+                showVideoLoading('Redirigiendo al reproductor completo...');
+                redirectToWatch(contentId);
+            };
+
+            // Cargar progreso guardado si existe
+            loadPlaybackProgress(contentId).then(progress => {
+                if (progress && progress > 0 && videoEl.readyState >= 2) {
+                    videoEl.currentTime = progress;
+                }
+            });
+
+            state.currentVideo = videoEl;
         } catch (error) {
             console.error('Error playing content:', error);
-            alert('No se pudo reproducir el contenido. Por favor, inténtalo de nuevo.');
+            redirectToWatch(contentId);
         }
     }
 
@@ -668,12 +823,193 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function updateVideoModalInfo(content, contentType) {
+        if (elements.videoTitle) {
+            elements.videoTitle.textContent = content.title || 'Reproduciendo';
+        }
+
+        if (elements.videoMeta) {
+            const parts = [];
+            if (content.release_year) parts.push(content.release_year);
+            if (content.duration) {
+                const durationLabel = contentType === 'series'
+                    ? `${content.duration} min`
+                    : `${content.duration} min`;
+                parts.push(durationLabel);
+            }
+            if (content.rating) parts.push(`⭐ ${parseFloat(content.rating).toFixed(1)}`);
+            elements.videoMeta.textContent = parts.join(' • ') || 'Preparando video';
+        }
+
+        if (elements.videoDescription) {
+            elements.videoDescription.textContent = content.description || '';
+            // Mostrar/ocultar descripción según si tiene contenido
+            if (elements.videoDescription) {
+                elements.videoDescription.style.display = content.description ? 'block' : 'none';
+            }
+        }
+
+        if (elements.videoAction) {
+            elements.videoAction.dataset.id = content.id || '';
+            // Habilitar/deshabilitar botón según si hay ID
+            if (content.id) {
+                elements.videoAction.disabled = false;
+                elements.videoAction.style.opacity = '1';
+                elements.videoAction.style.cursor = 'pointer';
+            } else {
+                elements.videoAction.disabled = true;
+                elements.videoAction.style.opacity = '0.5';
+                elements.videoAction.style.cursor = 'not-allowed';
+            }
+        }
+    }
+
+    function resolvePlaybackUrl(content) {
+        if (content.video_url) return content.video_url;
+        if (content.preview_url) return content.preview_url;
+        if (content.trailer_url && isDirectVideo(content.trailer_url)) return content.trailer_url;
+        return null;
+    }
+
+    function normalizeVideoUrl(url) {
+        if (!url) return '';
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        if (url.startsWith('//')) return `${window.location.protocol}${url}`;
+        if (url.startsWith('/')) return `${window.location.origin}${url}`;
+        return `${window.location.origin}/${url.replace(/^\/+/, '')}`;
+    }
+
+    function isDirectVideo(url) {
+        return /\.(mp4|webm|ogg|mov|mkv)(\?.*)?$/i.test(url || '');
+    }
+
+    function redirectToWatch(contentId) {
+        window.location.href = `${BASE_URL}/watch.php?id=${contentId}`;
+    }
+
+    function showVideoLoading(message = 'Cargando video...') {
+        if (elements.videoLoading) {
+            elements.videoLoading.style.display = 'flex';
+            const text = elements.videoLoading.querySelector('p');
+            if (text) text.textContent = message;
+        }
+    }
+
+    function hideVideoLoading() {
+        if (elements.videoLoading) {
+            elements.videoLoading.style.display = 'none';
+        }
+    }
+
     // Stop currently playing video
     function stopCurrentVideo() {
         if (state.currentVideo) {
+            // Guardar progreso antes de detener
+            if (state.currentContentId && state.currentVideo.currentTime > 0) {
+                savePlaybackProgress(state.currentContentId, state.currentVideo.currentTime, state.currentVideo.duration);
+            }
             state.currentVideo.pause();
             state.currentVideo.currentTime = 0;
+            state.currentVideo.removeAttribute('src');
+            state.currentVideo.load();
             state.currentVideo = null;
+        }
+        // Limpiar referencias
+        state.currentContentId = null;
+        state.currentContentType = null;
+        state.currentContentData = null;
+        state.lastProgressSave = null;
+        hideVideoLoading();
+    }
+
+    // Reset video player completamente
+    function resetVideoPlayer() {
+        stopCurrentVideo();
+        // Limpiar información del modal
+        if (elements.videoTitle) elements.videoTitle.textContent = 'Reproduciendo...';
+        if (elements.videoMeta) elements.videoMeta.textContent = '';
+        if (elements.videoDescription) elements.videoDescription.textContent = '';
+        if (elements.videoAction) elements.videoAction.dataset.id = '';
+    }
+
+    // Guardar progreso de reproducción
+    async function savePlaybackProgress(contentId, currentTime, totalDuration) {
+        if (!contentId || !currentTime || !totalDuration) return;
+        
+        try {
+            const progressPercent = (currentTime / totalDuration) * 100;
+            // Solo guardar si se ha visto al menos 5 segundos y menos del 90% (para no marcar como completado)
+            if (currentTime < 5 || progressPercent >= 90) return;
+
+            const response = await fetch(`${BASE_URL}/api/playback/save.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    content_id: contentId,
+                    progress: currentTime,
+                    duration: totalDuration
+                })
+            });
+
+            if (!response.ok) {
+                console.warn('No se pudo guardar el progreso');
+            }
+        } catch (error) {
+            console.error('Error guardando progreso:', error);
+        }
+    }
+
+    // Cargar progreso guardado
+    async function loadPlaybackProgress(contentId) {
+        if (!contentId) return null;
+        
+        try {
+            const response = await fetch(`${BASE_URL}/api/playback/get-progress.php?content_id=${contentId}`, {
+                credentials: 'same-origin'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.progress) {
+                    return parseFloat(data.progress);
+                }
+            }
+        } catch (error) {
+            console.error('Error cargando progreso:', error);
+        }
+        return null;
+    }
+
+    // Marcar contenido como completado
+    async function markContentAsCompleted(contentId) {
+        if (!contentId) return;
+        
+        try {
+            // Usar el endpoint de save con progreso >= 90% para marcar como completado
+            const response = await fetch(`${BASE_URL}/api/playback/save.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    content_id: contentId,
+                    progress: 999999, // Valor alto para forzar completed = 1
+                    duration: 1
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    console.log('Contenido marcado como completado');
+                }
+            }
+        } catch (error) {
+            console.error('Error marcando como completado:', error);
         }
     }
 

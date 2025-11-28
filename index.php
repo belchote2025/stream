@@ -3,6 +3,7 @@
 require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/gallery-functions.php';
 require_once __DIR__ . '/includes/image-helper.php';
+require_once __DIR__ . '/includes/imdb-helper.php';
 
 // Set page title
 $pageTitle = 'Inicio - ' . SITE_NAME;
@@ -29,6 +30,15 @@ $popularSeries = getMostViewed($db, 'series', 10);
 // Additional curated sections
 $imdbMovies = getImdbTopContent($db, 10);
 $localVideos = getLocalUploadedVideos($db, 10);
+
+// Añadir imágenes de IMDB a todo el contenido
+$featuredContent = addImdbImagesToContent($featuredContent);
+$recentMovies = addImdbImagesToContent($recentMovies);
+$recentSeries = addImdbImagesToContent($recentSeries);
+$popularMovies = addImdbImagesToContent($popularMovies);
+$popularSeries = addImdbImagesToContent($popularSeries);
+$imdbMovies = addImdbImagesToContent($imdbMovies);
+$localVideos = addImdbImagesToContent($localVideos);
 
 // Include header
 include __DIR__ . '/includes/header.php';

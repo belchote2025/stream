@@ -34,7 +34,7 @@ function getImageUrl($url, $default = '/assets/img/default-poster.svg') {
     $url = trim($url);
     
     // Si es una URL externa que necesita proxy
-    if (preg_match('/^https?:\/\/(image\.tmdb\.org|via\.placeholder\.com|images\.unsplash\.com)/', $url)) {
+    if (preg_match('/^https?:\/\/(image\.tmdb\.org|via\.placeholder\.com|images\.unsplash\.com|m\.media-amazon\.com|ia\.media-imdb\.com|imdb\.com)/i', $url)) {
         return buildAbsoluteUrl('/api/image-proxy.php?url=' . urlencode($url));
     }
     

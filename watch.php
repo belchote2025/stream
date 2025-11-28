@@ -6,6 +6,20 @@
 require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/gallery-functions.php';
 
+// Verificar si los archivos de JavaScript existen
+$jsFiles = [
+    '/js/video-player.js',
+    '/js/webtorrent.min.js',
+    '/js/webtorrent.min.js.map',
+    '/js/webtorrent-video.min.js'
+];
+
+foreach ($jsFiles as $jsFile) {
+    if (!file_exists(__DIR__ . $jsFile)) {
+        error_log("Archivo no encontrado: " . __DIR__ . $jsFile);
+    }
+}
+
 $contentId = $_GET['id'] ?? 0;
 $episodeId = $_GET['episode_id'] ?? null;
 $contentId = (int)$contentId;
@@ -430,7 +444,23 @@ include __DIR__ . '/includes/header.php';
         ?>
         
         <?php if ($hasVideo): ?>
-            <div id="unifiedVideoContainer"></div>
+            <!-- Reproductor de video -->
+<div id="unifiedVideoContainer">
+    <div class="video-loading">
+        <i class="fas fa-spinner"></i>
+        <p>Cargando reproductor...</p>
+    </div>
+</div>
+
+<!-- Mensaje de error (oculto por defecto) -->
+<div id="videoError" class="video-error" style="display: none;">
+    <i class="fas fa-exclamation-triangle"></i>
+    <h3>Error al cargar el video</h3>
+    <p id="errorMessage">No se pudo cargar el reproductor de video.</p>
+    <button class="btn btn-primary" onclick="window.location.reload()">
+        <i class="fas fa-sync-alt"></i> Reintentar
+    </button>
+</div>
         <?php else: ?>
             <div class="no-video-message">
                 <div class="no-video-content">
@@ -518,7 +548,33 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <script>
+// Configuración global
 const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+
+// Verificar si WebTorrent está disponible
+if (typeof WebTorrent === 'undefined') {
+    console.error('WebTorrent no está disponible');
+    showVideoError('El reproductor de video no pudo cargarse correctamente. Por favor, recarga la página.');
+}
+
+// Función para mostrar errores de video
+function showVideoError(message) {
+    const errorDiv = document.getElementById('videoError');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    if (errorDiv && errorMessage) {
+        errorMessage.textContent = message || 'Ocurrió un error al cargar el video.';
+        errorDiv.style.display = 'flex';
+        
+        // Ocultar el indicador de carga
+        const loadingDiv = document.querySelector('.video-loading');
+        if (loadingDiv) {
+            loadingDiv.style.display = 'none';
+        }
+    }
+    
+    console.error('Error en el reproductor:', message);
+}
 const contentId = <?php echo $contentId; ?>;
 const episodeId = <?php echo $episodeId ? $episodeId : 'null'; ?>;
 const duration = <?php echo $episode ? ($episode['duration'] * 60) : ($content['duration'] * 60); ?>;

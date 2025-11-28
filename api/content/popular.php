@@ -64,6 +64,9 @@ try {
         $params[':localRelative'] = '/uploads/%';
         $params[':localAbsolute'] = '%/uploads/%';
         $orderBy = "COALESCE(c.updated_at, c.added_date, c.created_at) DESC";
+    } elseif ($sort === 'recent') {
+        // Ordenar por más recientes
+        $orderBy = "COALESCE(c.updated_at, c.added_date, c.created_at) DESC, c.views DESC";
     }
     
     $query .= "

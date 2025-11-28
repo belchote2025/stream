@@ -4744,6 +4744,76 @@ function closeVideoPreview() {
     }
 }
 
+// Función para manejar clic en poster (buscar torrents)
+function handlePosterClick(id, title, year, type) {
+    if (typeof showTorrentModal === 'function') {
+        showTorrentModal(id, title, year || null, type);
+    } else {
+        // Fallback: abrir modal de búsqueda de torrents
+        handleSearchTorrent(null, { title, year, type, contentId: id });
+    }
+}
+
+// Función para cargar información de IMDb
+async function loadIMDbInfo(id, title, year, type) {
+    const imdbElement = document.querySelector(`.imdb-info[data-id="${id}"]`);
+    if (!imdbElement) return;
+    
+    const originalHTML = imdbElement.innerHTML;
+    imdbElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+    imdbElement.style.pointerEvents = 'none';
+    
+    try {
+        const baseUrl = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+        const url = `${baseUrl}/api/imdb/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year || '')}&type=${encodeURIComponent(type)}`;
+        
+        const response = await fetch(url, { credentials: 'same-origin' });
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            const info = data.data;
+            const rating = info.imdb_rating || 'N/A';
+            const source = info.source || 'imdb';
+            
+            imdbElement.innerHTML = `<i class="fab fa-imdb"></i> ${rating} (${source})`;
+            imdbElement.title = `Rating: ${rating} | Fuente: ${source}`;
+            
+            // Actualizar rating en la base de datos si es diferente
+            if (rating !== 'N/A' && parseFloat(rating) > 0) {
+                updateContentRating(id, parseFloat(rating));
+            }
+        } else {
+            imdbElement.innerHTML = '<i class="fab fa-imdb"></i> N/A';
+            imdbElement.title = 'No se encontró información';
+        }
+    } catch (error) {
+        console.error('Error cargando información de IMDb:', error);
+        imdbElement.innerHTML = originalHTML;
+        showNotification('Error al cargar información de IMDb', 'error');
+    } finally {
+        imdbElement.style.pointerEvents = 'auto';
+    }
+}
+
+// Función para actualizar rating en la base de datos
+async function updateContentRating(id, rating) {
+    try {
+        const baseUrl = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+        const response = await fetch(`${baseUrl}/api/movies/index.php?id=${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ id: parseInt(id), rating: rating })
+        });
+        
+        if (response.ok) {
+            console.log(`Rating actualizado para contenido ${id}: ${rating}`);
+        }
+    } catch (error) {
+        console.error('Error actualizando rating:', error);
+    }
+}
+
 async function handleSearchTorrent(event, presetQuery = null) {
     if (event) {
         event.preventDefault();

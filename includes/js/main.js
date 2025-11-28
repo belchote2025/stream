@@ -233,12 +233,18 @@ function initCarouselControls() {
 async function loadPopularContent() {
     const dynamicContainers = document.querySelectorAll('.row-content[data-dynamic="true"]');
     if (!dynamicContainers.length) {
+        console.log('No se encontraron contenedores dinámicos');
         return;
     }
 
-    dynamicContainers.forEach(container => {
-        loadDynamicRow(container);
-    });
+    console.log(`Encontrados ${dynamicContainers.length} contenedores dinámicos`);
+    
+    // Cargar cada contenedor de forma secuencial para evitar sobrecarga
+    for (const container of dynamicContainers) {
+        await loadDynamicRow(container);
+        // Pequeña pausa entre cargas para no sobrecargar el servidor
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
 }
 
 async function loadDynamicRow(container) {
@@ -253,14 +259,12 @@ async function loadDynamicRow(container) {
     const containerId = container.id || 'sin-id';
     console.log(`Iniciando carga para: ${containerId}`, { type, source, sort, limit });
     
-    const loadingMessage = document.createElement('div');
-    loadingMessage.className = 'row-loading';
-    loadingMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
-    
-    // Solo limpiar si no tiene contenido ya cargado
-    if (!container.querySelector('.content-card')) {
-        container.innerHTML = '';
-        container.appendChild(loadingMessage);
+    // Verificar si ya tiene contenido cargado
+    const hasContent = container.querySelector('.content-card');
+    if (!hasContent) {
+        // Limpiar y mostrar mensaje de carga
+        const loadingText = container.querySelector('.loading-placeholder')?.textContent || 'Cargando...';
+        container.innerHTML = `<div class="row-loading" style="padding: 2rem; text-align: center; color: #999;"><i class="fas fa-spinner fa-spin"></i> ${loadingText}</div>`;
     }
 
     try {
@@ -338,6 +342,15 @@ async function loadDynamicRow(container) {
         // Mejorar tarjetas después de añadirlas
         enhanceExistingContentCards();
         
+        // Asegurar que el hover funcione en las nuevas tarjetas
+        container.querySelectorAll('.content-card').forEach(card => {
+            const trailerUrl = card.dataset.trailerUrl || '';
+            if (trailerUrl && !card.dataset.trailerHoverSetup) {
+                setupTrailerHover(card, trailerUrl);
+                card.dataset.trailerHoverSetup = 'true';
+            }
+        });
+        
         console.log(`[${containerId}] Carga completada exitosamente`);
     } catch (error) {
         console.error(`[${containerId}] Error cargando fila dinámica:`, error);
@@ -369,7 +382,7 @@ function createContentCard(item, type) {
     
     card.innerHTML = `
         <div class="content-card-media">
-            <img src="${item.poster_url || 'assets/images/placeholder-poster.png'}" alt="${titleEscaped}" class="content-poster-clickable" style="cursor: pointer;">
+            <img src="${item.poster_url || 'assets/images/placeholder-poster.png'}" alt="${titleEscaped}" class="content-poster-clickable" style="cursor: pointer;" data-trailer-url="${item.trailer_url || ''}">
             <div class="content-trailer-container" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;">
                 <div class="content-trailer-wrapper"></div>
             </div>
@@ -600,22 +613,61 @@ function enhanceCardWithIMDb(card, item, contentType) {
         return;
     }
     
+    // Si el item ya tiene rating, usarlo directamente
+    if (item.rating && parseFloat(item.rating) > 0) {
+        badge.textContent = `IMDb: ${parseFloat(item.rating).toFixed(1)}`;
+        badge.parentElement.title = `Rating: ${item.rating} (local)`;
+        return;
+    }
+    
     const cacheKey = `${contentType}:${title.toLowerCase()}:${year}`;
     if (appState.imdbCache[cacheKey]) {
         const info = appState.imdbCache[cacheKey];
-        badge.textContent = info && info.imdb_rating ? `IMDb: ${info.imdb_rating}` : 'IMDb: N/A';
+        const rating = info && info.imdb_rating ? info.imdb_rating : null;
+        const source = info && info.source ? info.source : 'imdb';
+        
+        if (rating) {
+            badge.textContent = `IMDb: ${rating}`;
+            badge.parentElement.title = `Rating: ${rating} (${source})`;
+        } else {
+            badge.textContent = 'IMDb: N/A';
+            badge.parentElement.title = 'No disponible';
+        }
         return;
     }
     
     badge.textContent = 'IMDb: ...';
     
-    fetchImdbData(title, year, contentType)
+    // Intentar obtener datos con timeout
+    const fetchPromise = fetchImdbData(title, year, contentType);
+    const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => resolve(null), 5000); // Timeout de 5 segundos
+    });
+    
+    Promise.race([fetchPromise, timeoutPromise])
         .then(info => {
-            appState.imdbCache[cacheKey] = info;
-            badge.textContent = info && info.imdb_rating ? `IMDb: ${info.imdb_rating}` : 'IMDb: N/A';
+            if (info) {
+                appState.imdbCache[cacheKey] = info;
+                const rating = info.imdb_rating || null;
+                const source = info.source || 'imdb';
+                
+                if (rating) {
+                    badge.textContent = `IMDb: ${rating}`;
+                    badge.parentElement.title = `Rating: ${rating} (${source})`;
+                } else {
+                    badge.textContent = 'IMDb: N/A';
+                    badge.parentElement.title = 'No disponible';
+                }
+            } else {
+                // Timeout o sin datos
+                badge.textContent = 'IMDb: N/A';
+                badge.parentElement.title = 'No disponible o timeout';
+            }
         })
-        .catch(() => {
+        .catch((error) => {
+            console.warn(`Error mejorando tarjeta con IMDb para "${title}":`, error);
             badge.textContent = 'IMDb: N/A';
+            badge.parentElement.title = 'No disponible (usando datos locales)';
         });
 }
 
@@ -656,15 +708,37 @@ async function fetchImdbData(title, year = '', type = 'movie') {
     const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
     const url = `${baseUrl}/api/imdb/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year || '')}&type=${encodeURIComponent(type)}`;
     
-    const response = await fetch(url, { credentials: 'same-origin' });
-    const data = await response.json();
-    
-    if (data.success && data.data) {
-        appState.imdbCache[cacheKey] = data.data;
-        return data.data;
+    try {
+        const response = await fetch(url, { 
+            credentials: 'same-origin',
+            timeout: 5000 // Timeout de 5 segundos
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            appState.imdbCache[cacheKey] = data.data;
+            return data.data;
+        }
+        
+        // Si no hay éxito pero hay datos básicos, usarlos
+        if (data.data && (data.data.title || data.data.imdb_rating)) {
+            appState.imdbCache[cacheKey] = data.data;
+            return data.data;
+        }
+        
+        // Retornar null en lugar de lanzar error para que no rompa la UI
+        console.warn(`No se encontró información para: ${title} (${year})`);
+        return null;
+    } catch (error) {
+        console.warn(`Error al buscar información de IMDb para "${title}":`, error.message);
+        // Retornar null en lugar de lanzar error
+        return null;
     }
-    
-    throw new Error(data.error || 'Sin resultados de IMDb');
 }
 
 async function fetchTorrentResults(title, year = '', type = 'movie') {
@@ -726,14 +800,35 @@ function openTorrentModal(content) {
         elements.torrentResultsContainer.style.display = 'none';
     }
     
-    fetchImdbData(content.title, content.year, content.type)
-        .then(info => renderImdbInfo(info))
-        .catch(() => {
+    // Cargar información de IMDb con timeout y manejo de errores mejorado
+    const imdbPromise = fetchImdbData(content.title, content.year, content.type);
+    const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => resolve(null), 5000);
+    });
+    
+    Promise.race([imdbPromise, timeoutPromise])
+        .then(info => {
+            if (info) {
+                renderImdbInfo(info);
+            } else {
+                // Mostrar información básica si IMDb falla
+                if (elements.torrentIMDbContainer) {
+                    elements.torrentIMDbContainer.innerHTML = `
+                        <div class="torrent-imdb-info">
+                            <h3>${content.title}${content.year ? ` (${content.year})` : ''}</h3>
+                            <p>Información de IMDb no disponible. Puedes buscar torrents igualmente.</p>
+                        </div>
+                    `;
+                }
+            }
+        })
+        .catch((error) => {
+            console.warn('Error cargando IMDb en modal:', error);
             if (elements.torrentIMDbContainer) {
                 elements.torrentIMDbContainer.innerHTML = `
                     <div class="torrent-imdb-loading error">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <p>No se pudo cargar la información de IMDb.</p>
+                        <p>No se pudo cargar la información de IMDb. Puedes buscar torrents igualmente.</p>
                     </div>
                 `;
             }
@@ -761,6 +856,19 @@ function openTorrentModal(content) {
             }
         });
 }
+
+// Alias para compatibilidad
+function showTorrentModal(id, title, year, type) {
+    openTorrentModal({
+        id: id,
+        title: title,
+        year: year,
+        type: type || 'movie'
+    });
+}
+
+// Hacer disponible globalmente
+window.showTorrentModal = showTorrentModal;
 
 function renderImdbInfo(info) {
     if (!elements.torrentIMDbContainer) return;
@@ -2215,7 +2323,7 @@ function enhanceExistingContentCards() {
                 }
             }
             
-            if (mediaContainer) {
+            if (mediaContainer && trailerUrl) {
                 setupTrailerHover(card, trailerUrl);
                 card.dataset.trailerHoverSetup = 'true';
             }

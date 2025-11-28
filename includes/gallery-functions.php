@@ -310,18 +310,33 @@ function createContentCard($item) {
     $premiumBadge = $isPremium ? '<span class="premium-badge">PREMIUM</span>' : '';
     $torrentBadge = $hasTorrent ? '<span class="torrent-badge" title="Disponible por Torrent"><i class="fas fa-magnet"></i></span>' : '';
     
-    $html = '<div class="content-card" data-id="' . $id . '" data-type="' . $type . '" data-detail-url="' . $detailUrlEscaped . '" onclick="if(!event.target.closest(\'.action-btn\')){window.location.href=this.dataset.detailUrl;}">';
-    $html .= '<img src="' . htmlspecialchars($posterUrl, ENT_QUOTES, 'UTF-8') . '" alt="' . $title . '" loading="lazy">';
+    // Preparar datos para handlers de torrent e IMDb
+    $titleEscaped = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+    $yearEscaped = htmlspecialchars($releaseYear, ENT_QUOTES, 'UTF-8');
+    $onclickHandler = "if(!event.target.closest('.action-btn')){window.location.href=this.dataset.detailUrl;}";
+    
+    $trailerUrlEscaped = htmlspecialchars($item['trailer_url'] ?? '', ENT_QUOTES, 'UTF-8');
+    $html = '<div class="content-card" data-id="' . $id . '" data-type="' . $type . '" data-detail-url="' . $detailUrlEscaped . '" data-title="' . $titleEscaped . '" data-year="' . $yearEscaped . '" data-trailer-url="' . $trailerUrlEscaped . '" onclick="' . htmlspecialchars($onclickHandler, ENT_QUOTES, 'UTF-8') . '">';
+    $html .= '<div class="content-card-media">';
+    $html .= '<img src="' . htmlspecialchars($posterUrl, ENT_QUOTES, 'UTF-8') . '" alt="' . $titleEscaped . '" loading="lazy" class="content-poster-clickable" style="cursor: pointer;" onclick="event.stopPropagation(); if(typeof showTorrentModal === \'function\'){showTorrentModal(' . $id . ', \'' . addslashes($title) . '\', ' . ($releaseYear ?: 'null') . ', \'' . $type . '\');} else {window.location.href=\'' . $detailUrlEscaped . '\';}">';
+    $html .= '<div class="content-trailer-container" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;"><div class="content-trailer-wrapper"></div></div>';
+    $html .= '</div>';
     if ($premiumBadge || $torrentBadge) {
         $html .= '<div class="content-badges">' . $premiumBadge . $torrentBadge . '</div>';
     }
     $html .= '<div class="content-info">';
-    $html .= '<h3 class="content-title">' . $title . '</h3>';
+    $html .= '<h3 class="content-title">' . $titleEscaped . '</h3>';
     $html .= $metaHtml;
+    // Badge de IMDb
+    $html .= '<div class="imdb-badge" data-id="' . $id . '" style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0.4rem 0; padding: 0.2rem 0.6rem; border-radius: 4px; background: rgba(245,197,24,0.15); color: #f5c518; font-weight: 600; font-size: 0.85rem;">';
+    $html .= '<i class="fab fa-imdb"></i>';
+    $html .= '<span class="imdb-text">IMDb: —</span>';
+    $html .= '</div>';
     $html .= '<div class="content-actions">';
     $html .= '<button class="action-btn" data-action="play" data-id="' . $id . '" title="Reproducir"><i class="fas fa-play"></i></button>';
     $html .= '<button class="action-btn" data-action="add" data-id="' . $id . '" title="Añadir a Mi lista"><i class="fas fa-plus"></i></button>';
     $html .= '<button class="action-btn" data-action="info" data-id="' . $id . '" title="Más información"><i class="fas fa-info-circle"></i></button>';
+    $html .= '<button class="action-btn torrent-btn" data-action="torrent" data-id="' . $id . '" data-title="' . urlencode($title) . '" data-year="' . $yearEscaped . '" data-type="' . $type . '" title="Buscar torrents"><i class="fas fa-magnet"></i></button>';
     $html .= '</div>'; // content-actions
     $html .= '</div>'; // content-info
     $html .= '</div>'; // content-card

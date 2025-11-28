@@ -753,12 +753,49 @@ body {
     background: var(--netflix-black-light);
 }
 
+.content-card-media {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.content-trailer-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.content-trailer-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.content-trailer-wrapper iframe,
+.content-trailer-wrapper video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: none;
+}
+
+.content-card-media img {
+    transition: opacity 0.3s ease;
+}
+
 .content-card:hover {
     transform: scale(1.15) translateY(-10px);
     z-index: 10;
 }
 
-.content-card img {
+.content-card-media img {
     width: 100%;
     height: auto;
     display: block;
@@ -772,13 +809,13 @@ body {
     visibility: visible !important;
 }
 
-.content-card img[src=""],
-.content-card img:not([src]),
-.content-card img[src*="default-poster"] {
+.content-card-media img[src=""],
+.content-card-media img:not([src]),
+.content-card-media img[src*="default-poster"] {
     background: linear-gradient(135deg, var(--netflix-black-light) 0%, var(--netflix-black-lighter) 100%);
 }
 
-.content-card:hover img {
+.content-card:hover .content-card-media img {
     transform: scale(1.1);
 }
 

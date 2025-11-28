@@ -249,46 +249,38 @@ include __DIR__ . '/includes/header.php';
     </div>
 
     <!-- IMDb Highlighted Movies -->
-    <?php if (!empty($imdbMovies)): ?>
-        <div class="row-container">
-            <div class="row-header">
-                <h2 class="row-title">Películas destacadas en IMDb</h2>
-                <a href="/movies/imdb" class="row-link">Ver todo</a>
-            </div>
-            <div class="row-nav prev">
-                <i class="fas fa-chevron-left"></i>
-            </div>
-            <div class="row-content" id="imdb-movies">
-                <?php foreach ($imdbMovies as $movie): ?>
-                    <?php echo createContentCard($movie); ?>
-                <?php endforeach; ?>
-            </div>
-            <div class="row-nav next">
-                <i class="fas fa-chevron-right"></i>
-            </div>
+    <div class="row-container">
+        <div class="row-header">
+            <h2 class="row-title">Películas destacadas en IMDb</h2>
+            <a href="/movies/imdb" class="row-link">Ver todo</a>
         </div>
-    <?php endif; ?>
+        <div class="row-nav prev">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="row-content" id="imdb-movies" data-dynamic="true" data-type="movie" data-source="imdb" data-sort="popular" data-limit="12" data-cache-key="imdb-movies">
+            <p class="loading-placeholder">Cargando películas destacadas en IMDb...</p>
+        </div>
+        <div class="row-nav next">
+            <i class="fas fa-chevron-right"></i>
+        </div>
+    </div>
 
     <!-- Local Uploaded Videos -->
-    <?php if (!empty($localVideos)): ?>
-        <div class="row-container">
-            <div class="row-header">
-                <h2 class="row-title">Videos locales</h2>
-                <a href="/videos/local" class="row-link">Ver todo</a>
-            </div>
-            <div class="row-nav prev">
-                <i class="fas fa-chevron-left"></i>
-            </div>
-            <div class="row-content" id="local-videos">
-                <?php foreach ($localVideos as $item): ?>
-                    <?php echo createContentCard($item); ?>
-                <?php endforeach; ?>
-            </div>
-            <div class="row-nav next">
-                <i class="fas fa-chevron-right"></i>
-            </div>
+    <div class="row-container">
+        <div class="row-header">
+            <h2 class="row-title">Videos locales</h2>
+            <a href="/videos/local" class="row-link">Ver todo</a>
         </div>
-    <?php endif; ?>
+        <div class="row-nav prev">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="row-content" id="local-videos" data-dynamic="true" data-type="movie" data-source="local" data-sort="recent" data-limit="12" data-cache-key="local-videos">
+            <p class="loading-placeholder">Cargando videos locales...</p>
+        </div>
+        <div class="row-nav next">
+            <i class="fas fa-chevron-right"></i>
+        </div>
+    </div>
 
     <!-- Recent Movies -->
     <div class="row-container">

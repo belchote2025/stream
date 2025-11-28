@@ -348,6 +348,49 @@
     <?php endif; ?>
     
     <script>
+        // Suprimir warnings informativos de librerías de terceros
+        (function() {
+            // Suprimir warnings de asm.js (WebTorrent) - ejecutar antes que cualquier otro script
+            if (typeof console !== 'undefined' && console.warn) {
+                const originalWarn = console.warn.bind(console);
+                console.warn = function(...args) {
+                    const message = String(args[0] || '');
+                    if (message.includes('Invalid asm.js') || 
+                        message.includes('Unexpected token') ||
+                        message.includes('asm.js')) {
+                        // Suprimir este warning específico
+                        return;
+                    }
+                    originalWarn.apply(console, args);
+                };
+            }
+            
+            // Suprimir errores de postMessage (YouTube iframe, WebTorrent)
+            const errorHandler = function(event) {
+                if (event.message && (
+                    event.message.includes('postMessage') ||
+                    event.message.includes('target origin') ||
+                    event.message.includes('DOMWindow') ||
+                    event.message.includes('Failed to execute')
+                )) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation();
+                    return false;
+                }
+            };
+            
+            // Añadir listener con capture para interceptar antes que otros
+            window.addEventListener('error', errorHandler, true);
+            
+            // También capturar errores no capturados
+            window.addEventListener('unhandledrejection', function(event) {
+                if (event.reason && String(event.reason).includes('postMessage')) {
+                    event.preventDefault();
+                }
+            });
+        })();
+        
         // Inicializar tooltips de Bootstrap
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {

@@ -55,9 +55,11 @@ try {
     }
 
     if ($source === 'imdb') {
-        $query .= " AND (c.rating IS NOT NULL AND c.rating > 0)";
+        // Filtrar contenido con rating de IMDb (rating >= 6.0 para destacados, más flexible)
+        $query .= " AND (c.rating IS NOT NULL AND c.rating >= 6.0)";
         $orderBy = "c.rating DESC, c.views DESC, c.release_year DESC";
     } elseif ($source === 'local') {
+        // Filtrar videos locales (subidos al servidor)
         $query .= " AND c.video_url IS NOT NULL AND c.video_url <> '' AND (c.video_url LIKE :localRelative OR c.video_url LIKE :localAbsolute)";
         $params[':localRelative'] = '/uploads/%';
         $params[':localAbsolute'] = '%/uploads/%';

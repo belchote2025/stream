@@ -50,24 +50,31 @@ const elements = {
 
 // Inicialización de la aplicación
 function init() {
-    // Cargar contenido inicial solo si los elementos existen
-    if (elements.carouselInner) {
-        loadCarousel();
-    }
-    
-    const hasDynamicRows = document.querySelector('.row-content[data-dynamic="true"]');
-    if (hasDynamicRows) {
-        loadPopularContent();
-    }
+    try {
+        // Cargar contenido inicial solo si los elementos existen
+        if (elements.carouselInner) {
+            loadCarousel();
+        }
+        
+        const hasDynamicRows = document.querySelector('.row-content[data-dynamic="true"]');
+        if (hasDynamicRows) {
+            // Cargar contenido dinámico con un pequeño delay para asegurar que el DOM esté listo
+            setTimeout(() => {
+                loadPopularContent();
+            }, 100);
+        }
 
-    // Configurar event listeners
-    setupEventListeners();
-    
-    // Inicializar controles del reproductor de video
-    initVideoPlayerControls();
-    
-    // Simular inicio de sesión (en un entorno real, esto vendría de una autenticación real)
-    simulateLogin();
+        // Configurar event listeners
+        setupEventListeners();
+        
+        // Inicializar controles del reproductor de video
+        initVideoPlayerControls();
+        
+        // Simular inicio de sesión (en un entorno real, esto vendría de una autenticación real)
+        simulateLogin();
+    } catch (error) {
+        console.error('Error en init():', error);
+    }
 }
 
 // Configurar event listeners
@@ -242,11 +249,19 @@ async function loadDynamicRow(container) {
     const cacheKey = container.dataset.cacheKey || '';
     const endpoint = container.dataset.endpoint || '/api/content/popular.php';
 
+    // Mostrar mensaje de carga
+    const containerId = container.id || 'sin-id';
+    console.log(`Iniciando carga para: ${containerId}`, { type, source, sort, limit });
+    
     const loadingMessage = document.createElement('div');
     loadingMessage.className = 'row-loading';
     loadingMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
-    container.innerHTML = '';
-    container.appendChild(loadingMessage);
+    
+    // Solo limpiar si no tiene contenido ya cargado
+    if (!container.querySelector('.content-card')) {
+        container.innerHTML = '';
+        container.appendChild(loadingMessage);
+    }
 
     try {
         const params = new URLSearchParams({ limit: limit.toString() });
@@ -254,10 +269,42 @@ async function loadDynamicRow(container) {
         if (source) params.append('source', source);
         if (sort && sort !== 'popular') params.append('sort', sort);
 
-        const response = await fetch(`${APP_BASE_URL}${endpoint}?${params.toString()}`);
-        if (!response.ok) throw new Error('Error al cargar contenido');
+        const url = `${APP_BASE_URL}${endpoint}?${params.toString()}`;
+        console.log(`[${containerId}] Cargando desde:`, url);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            },
+            credentials: 'same-origin'
+        });
+        
+        console.log(`[${containerId}] Respuesta HTTP:`, response.status, response.statusText);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[${containerId}] Error HTTP ${response.status}:`, errorText.substring(0, 200));
+            throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+        }
+        
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error(`[${containerId}] Respuesta no es JSON (${contentType}):`, text.substring(0, 300));
+            throw new Error('El servidor devolvió HTML en lugar de JSON');
+        }
+        
         const result = await response.json();
+        console.log(`[${containerId}] Datos recibidos:`, result);
+        
         const items = result.data || result;
+
+        if (!Array.isArray(items)) {
+            console.error(`[${containerId}] Los datos no son un array:`, result);
+            container.innerHTML = '<p class="no-content">Error en el formato de datos.</p>';
+            return;
+        }
 
         if (cacheKey && Array.isArray(items)) {
             appState.contentCache[cacheKey] = items;
@@ -266,17 +313,36 @@ async function loadDynamicRow(container) {
         container.innerHTML = '';
 
         if (!items.length) {
-            container.innerHTML = '<p class="no-content">Sin contenido disponible.</p>';
+            const message = source === 'imdb' 
+                ? 'No hay películas destacadas en IMDb disponibles (rating >= 7.0).' 
+                : source === 'local'
+                ? 'No hay videos locales disponibles.'
+                : 'Sin contenido disponible.';
+            container.innerHTML = `<p class="no-content">${message}</p>`;
+            console.warn(`[${containerId}] Sin resultados para mostrar`);
             return;
         }
 
-        items.forEach(item => {
-            const cardType = item.type || type || 'movie';
-            container.appendChild(createContentCard(item, cardType));
+        console.log(`[${containerId}] Cargando ${items.length} items`);
+        
+        items.forEach((item, index) => {
+            try {
+                const cardType = item.type || type || 'movie';
+                const card = createContentCard(item, cardType);
+                container.appendChild(card);
+            } catch (cardError) {
+                console.error(`[${containerId}] Error creando tarjeta ${index}:`, cardError, item);
+            }
         });
+        
+        // Mejorar tarjetas después de añadirlas
+        enhanceExistingContentCards();
+        
+        console.log(`[${containerId}] Carga completada exitosamente`);
     } catch (error) {
-        console.error('Error cargando fila dinámica:', error);
-        container.innerHTML = '<p class="no-content">No se pudo cargar el contenido.</p>';
+        console.error(`[${containerId}] Error cargando fila dinámica:`, error);
+        const errorMessage = error.message || 'Error desconocido';
+        container.innerHTML = `<p class="no-content" style="color: #e50914;">Error: ${errorMessage}<br><small>Revisa la consola para más detalles.</small></p>`;
     }
 }
 
@@ -286,6 +352,10 @@ function createContentCard(item, type) {
     card.className = 'content-card';
     card.dataset.id = item.id;
     card.dataset.type = type;
+    card.dataset.title = item.title || '';
+    card.dataset.year = item.release_year || '';
+    card.dataset.detailUrl = `/content.php?id=${item.id}`;
+    card.dataset.trailerUrl = item.trailer_url || '';
     
     const isPremium = item.is_premium ? '<span class="premium-badge">PREMIUM</span>' : '';
     const hasTorrent = item.torrent_magnet ? '<span class="torrent-badge" title="Disponible por Torrent"><i class="fas fa-magnet"></i></span>' : '';
@@ -295,15 +365,21 @@ function createContentCard(item, type) {
         : (item.seasons ? `${item.seasons} Temporada${item.seasons > 1 ? 's' : ''}` : 'Serie');
     const rating = item.rating ? `<span>•</span><span>⭐ ${parseFloat(item.rating).toFixed(1)}</span>` : '';
     const contentType = type === 'movie' ? 'movie' : 'series';
+    const titleEscaped = (item.title || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     
     card.innerHTML = `
-        <img src="${item.poster_url || 'assets/images/placeholder-poster.png'}" alt="${item.title}">
+        <div class="content-card-media">
+            <img src="${item.poster_url || 'assets/images/placeholder-poster.png'}" alt="${titleEscaped}" class="content-poster-clickable" style="cursor: pointer;">
+            <div class="content-trailer-container" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;">
+                <div class="content-trailer-wrapper"></div>
+            </div>
+        </div>
         <div class="content-badges">
             ${isPremium}
             ${hasTorrent}
         </div>
         <div class="content-info">
-            <h3 class="content-title">${item.title}</h3>
+            <h3 class="content-title">${titleEscaped}</h3>
             <div class="content-meta">
                 ${year}
                 ${year ? '<span>•</span>' : ''}
@@ -324,7 +400,7 @@ function createContentCard(item, type) {
                 <button class="action-btn" data-action="info" data-id="${item.id}" title="Más información">
                     <i class="fas fa-info-circle"></i>
                 </button>
-                <button class="action-btn torrent-btn" data-action="torrent" data-id="${item.id}" title="Buscar torrents" data-title="${encodeURIComponent(item.title)}" data-year="${item.release_year || ''}" data-type="${contentType}">
+                <button class="action-btn torrent-btn" data-action="torrent" data-id="${item.id}" title="Buscar torrents" data-title="${encodeURIComponent(item.title || '')}" data-year="${item.release_year || ''}" data-type="${contentType}">
                     <i class="fas fa-magnet"></i>
                 </button>
             </div>
@@ -333,16 +409,184 @@ function createContentCard(item, type) {
     
     // Redirigir a detalles cuando se hace clic fuera de los botones
     card.addEventListener('click', (event) => {
-        if (event.target.closest('.action-btn')) {
+        if (event.target.closest('.action-btn') || event.target.closest('.content-trailer-container')) {
             return;
         }
         window.location.href = `/content.php?id=${item.id}`;
     });
     
+    // Añadir handler al poster para buscar torrents
+    const poster = card.querySelector('.content-poster-clickable');
+    if (poster) {
+        poster.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof showTorrentModal === 'function') {
+                showTorrentModal(item.id, item.title || '', item.release_year || null, contentType);
+            } else {
+                window.location.href = `/content.php?id=${item.id}`;
+            }
+        });
+    }
+    
+    // Añadir funcionalidad de hover para mostrar trailer
+    if (item.trailer_url) {
+        setupTrailerHover(card, item.trailer_url);
+    }
+    
     enhanceCardWithIMDb(card, item, contentType);
     attachTorrentHandlers(card, item, contentType);
     
     return card;
+}
+
+// Configurar hover para mostrar trailer
+function setupTrailerHover(card, trailerUrl) {
+    let trailerPlayer = null;
+    let hoverTimeout = null;
+    let isHovering = false;
+    
+    const trailerContainer = card.querySelector('.content-trailer-container');
+    const trailerWrapper = card.querySelector('.content-trailer-wrapper');
+    const poster = card.querySelector('.content-poster-clickable') || card.querySelector('img');
+    
+    if (!trailerContainer || !trailerWrapper || !poster) return;
+    
+    // Detectar si es YouTube
+    const isYouTube = /youtube\.com|youtu\.be/.test(trailerUrl);
+    
+    card.addEventListener('mouseenter', () => {
+        isHovering = true;
+        hoverTimeout = setTimeout(() => {
+            if (!isHovering) return;
+            
+            if (isYouTube) {
+                loadYouTubeTrailer(trailerUrl, trailerWrapper, () => {
+                    if (isHovering && poster) {
+                        poster.style.opacity = '0';
+                        poster.style.transition = 'opacity 0.3s ease';
+                        trailerContainer.style.display = 'block';
+                    }
+                });
+            } else {
+                const video = loadVideoTrailer(trailerUrl, trailerWrapper, () => {
+                    if (isHovering && poster) {
+                        poster.style.opacity = '0';
+                        poster.style.transition = 'opacity 0.3s ease';
+                        trailerContainer.style.display = 'block';
+                    }
+                });
+                trailerPlayer = video;
+            }
+        }, 500); // Delay de 500ms antes de cargar
+    });
+    
+    card.addEventListener('mouseleave', () => {
+        isHovering = false;
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = null;
+        }
+        
+        // Ocultar trailer y mostrar poster
+        if (poster) {
+            poster.style.opacity = '1';
+            poster.style.transition = 'opacity 0.3s ease';
+        }
+        trailerContainer.style.display = 'none';
+        
+        // Detener reproducción
+        if (trailerPlayer) {
+            if (trailerPlayer.pause && typeof trailerPlayer.pause === 'function') {
+                trailerPlayer.pause();
+            } else if (trailerPlayer.stopVideo && typeof trailerPlayer.stopVideo === 'function') {
+                trailerPlayer.stopVideo();
+            }
+            trailerPlayer = null;
+        }
+        
+        // Limpiar contenedor
+        trailerWrapper.innerHTML = '';
+    });
+}
+
+// Cargar trailer de YouTube
+function loadYouTubeTrailer(url, container, onReady) {
+    try {
+        // Extraer ID de YouTube
+        let videoId = '';
+        if (url.includes('youtube.com/watch?v=')) {
+            videoId = url.split('v=')[1].split('&')[0];
+        } else if (url.includes('youtu.be/')) {
+            videoId = url.split('youtu.be/')[1].split('?')[0];
+        } else if (url.includes('youtube.com/embed/')) {
+            videoId = url.split('embed/')[1].split('?')[0];
+        } else if (/^[\w-]{11}$/.test(url)) {
+            videoId = url;
+        }
+        
+        if (!videoId) {
+            console.warn('No se pudo extraer el ID de YouTube:', url);
+            return;
+        }
+        
+        // Crear iframe de YouTube
+        const iframe = document.createElement('iframe');
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${window.location.origin}`;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.allow = 'autoplay; encrypted-media';
+        iframe.allowFullscreen = true;
+        
+        container.innerHTML = '';
+        container.appendChild(iframe);
+        
+        if (onReady) onReady();
+    } catch (error) {
+        console.error('Error cargando trailer de YouTube:', error);
+    }
+}
+
+// Cargar video directo (MP4, etc.)
+function loadVideoTrailer(url, container, onReady) {
+    try {
+        // Normalizar URL
+        let normalizedUrl = url;
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            if (url.startsWith('/')) {
+                normalizedUrl = window.location.origin + url;
+            } else {
+                normalizedUrl = window.location.origin + '/' + url;
+            }
+        }
+        
+        const video = document.createElement('video');
+        video.src = normalizedUrl;
+        video.autoplay = true;
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
+        
+        video.addEventListener('loadeddata', () => {
+            if (onReady) onReady();
+        });
+        
+        video.addEventListener('error', (e) => {
+            console.error('Error cargando video trailer:', e);
+        });
+        
+        container.innerHTML = '';
+        container.appendChild(video);
+        
+        // Retornar el video para que pueda ser detenido
+        return video;
+    } catch (error) {
+        console.error('Error cargando trailer de video:', error);
+        return null;
+    }
 }
 
 function enhanceCardWithIMDb(card, item, contentType) {
@@ -1865,6 +2109,122 @@ async function playContent(id, type, videoData = null) {
 }
 
 // Inicialización de la aplicación cuando el DOM esté listo
+// Función para mejorar tarjetas existentes en el DOM
+function enhanceExistingContentCards() {
+    document.querySelectorAll('.content-card:not([data-enhanced])').forEach(card => {
+        const id = card.dataset.id;
+        const title = card.dataset.title || card.querySelector('.content-title')?.textContent || '';
+        const year = card.dataset.year || '';
+        const type = card.dataset.type || 'movie';
+        
+        if (!id) return;
+        
+        // Añadir atributos si no existen
+        if (!card.dataset.title && title) card.dataset.title = title;
+        if (!card.dataset.year && year) card.dataset.year = year;
+        if (!card.dataset.detailUrl) card.dataset.detailUrl = `/content.php?id=${id}`;
+        
+        // Añadir badge de IMDb si no existe
+        let imdbBadge = card.querySelector('.imdb-badge');
+        if (!imdbBadge) {
+            const contentInfo = card.querySelector('.content-info');
+            if (contentInfo) {
+                const meta = contentInfo.querySelector('.content-meta');
+                if (meta && meta.nextElementSibling && !meta.nextElementSibling.classList.contains('imdb-badge')) {
+                    imdbBadge = document.createElement('div');
+                    imdbBadge.className = 'imdb-badge';
+                    imdbBadge.setAttribute('data-id', id);
+                    imdbBadge.style.cssText = 'display: inline-flex; align-items: center; gap: 0.35rem; margin: 0.4rem 0; padding: 0.2rem 0.6rem; border-radius: 4px; background: rgba(245,197,24,0.15); color: #f5c518; font-weight: 600; font-size: 0.85rem;';
+                    imdbBadge.innerHTML = '<i class="fab fa-imdb"></i><span class="imdb-text">IMDb: —</span>';
+                    meta.insertAdjacentElement('afterend', imdbBadge);
+                }
+            }
+        }
+        
+        // Mejorar con IMDb si hay badge
+        if (imdbBadge) {
+            const badgeText = imdbBadge.querySelector('.imdb-text');
+            if (badgeText && (badgeText.textContent.includes('—') || badgeText.textContent.includes('IMDb: —'))) {
+                enhanceCardWithIMDb(card, {id, title, release_year: year}, type);
+            }
+        }
+        
+        // Añadir botón de torrent si no existe
+        let torrentBtn = card.querySelector('.torrent-btn');
+        const actionsContainer = card.querySelector('.content-actions');
+        if (!torrentBtn && actionsContainer) {
+            torrentBtn = document.createElement('button');
+            torrentBtn.className = 'action-btn torrent-btn';
+            torrentBtn.setAttribute('data-action', 'torrent');
+            torrentBtn.setAttribute('data-id', id);
+            torrentBtn.setAttribute('data-title', encodeURIComponent(title));
+            torrentBtn.setAttribute('data-year', year);
+            torrentBtn.setAttribute('data-type', type);
+            torrentBtn.setAttribute('title', 'Buscar torrents');
+            torrentBtn.innerHTML = '<i class="fas fa-magnet"></i>';
+            actionsContainer.appendChild(torrentBtn);
+        }
+        
+        // Añadir handlers de torrent
+        const poster = card.querySelector('img');
+        
+        if (poster && !poster.dataset.torrentHandler) {
+            poster.classList.add('content-poster-clickable');
+            poster.style.cursor = 'pointer';
+            poster.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (typeof showTorrentModal === 'function') {
+                    showTorrentModal(id, title, year || null, type);
+                } else {
+                    window.location.href = card.dataset.detailUrl || `/content.php?id=${id}`;
+                }
+            });
+            poster.dataset.torrentHandler = 'true';
+        }
+        
+        if (torrentBtn && !torrentBtn.dataset.torrentHandler) {
+            torrentBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (typeof showTorrentModal === 'function') {
+                    showTorrentModal(id, title, year || null, type);
+                }
+            });
+            torrentBtn.dataset.torrentHandler = 'true';
+        }
+        
+        // Añadir funcionalidad de hover para mostrar trailer si existe
+        const trailerUrl = card.dataset.trailerUrl || '';
+        if (trailerUrl && !card.dataset.trailerHoverSetup) {
+            // Asegurar que existe el contenedor de trailer
+            let mediaContainer = card.querySelector('.content-card-media');
+            if (!mediaContainer) {
+                const img = card.querySelector('img');
+                if (img) {
+                    mediaContainer = document.createElement('div');
+                    mediaContainer.className = 'content-card-media';
+                    img.parentNode.insertBefore(mediaContainer, img);
+                    mediaContainer.appendChild(img);
+                    
+                    const trailerContainer = document.createElement('div');
+                    trailerContainer.className = 'content-trailer-container';
+                    trailerContainer.style.cssText = 'display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;';
+                    const trailerWrapper = document.createElement('div');
+                    trailerWrapper.className = 'content-trailer-wrapper';
+                    trailerContainer.appendChild(trailerWrapper);
+                    mediaContainer.appendChild(trailerContainer);
+                }
+            }
+            
+            if (mediaContainer) {
+                setupTrailerHover(card, trailerUrl);
+                card.dataset.trailerHoverSetup = 'true';
+            }
+        }
+        
+        card.dataset.enhanced = 'true';
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Inicializar WebTorrent si está disponible
     initWebTorrent();
@@ -1884,6 +2244,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Inicializar controles del reproductor
     initVideoPlayerControls();
+    
+    // Mejorar tarjetas existentes que fueron cargadas desde PHP
+    enhanceExistingContentCards();
+    
+    // Observar nuevas tarjetas añadidas dinámicamente
+    const observer = new MutationObserver(() => {
+        enhanceExistingContentCards();
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
     
 }); // Cierre del evento DOMContentLoaded
 

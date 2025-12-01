@@ -4,9 +4,17 @@
  * GET /api/content/recent?type=series&limit=10
  */
 
-header('Content-Type: application/json');
+// Permitir CORS
+header('Access-Control-Allow-Origin: *');
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Methods: GET');
+
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/image-helper.php';
+
+// Habilitar reporte de errores para depuración
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 try {
     $db = getDbConnection();

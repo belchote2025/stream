@@ -5,6 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' . SITE_NAME : SITE_NAME; ?></title>
+    
+    <!-- Estilos del carrusel -->
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/carousel.css">
+    
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script>
         window.__APP_BASE_URL = window.__APP_BASE_URL || '<?php echo rtrim(SITE_URL, '/'); ?>';
     </script>

@@ -290,6 +290,9 @@
         }
     </style>
 
+    <!-- Script de inicialización del carrusel -->
+    <script src="<?php echo $baseUrl; ?>/assets/js/init-carousel.js"></script>
+    
     <!-- Bootstrap JS y dependencias -->
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
@@ -305,6 +308,9 @@
     <script src="<?php echo $baseUrl; ?>/js/hero-optimizer.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/hero-trailer-player.js"></script>
     <script src="<?php echo $baseUrl; ?>/assets/js/netflix-gallery.js"></script>
+    
+    <!-- Dynamic Rows Loader -->
+    <script src="<?php echo $baseUrl; ?>/assets/js/dynamic-rows.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/netflix-enhancements.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/animations.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/notifications.js"></script>

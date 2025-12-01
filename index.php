@@ -1,4 +1,7 @@
 <?php
+// Start output buffering
+ob_start();
+
 // Include configuration and database connection
 require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/gallery-functions.php';
@@ -12,33 +15,86 @@ $pageTitle = 'Inicio - ' . SITE_NAME;
 $db = getDbConnection();
 $baseUrl = rtrim(SITE_URL, '/');
 
-// Get content for the hero section - últimas novedades con trailers
-$featuredContent = getLatestWithTrailers($db, 5);
-// Si no hay contenido con trailers, usar featured como fallback
-if (empty($featuredContent)) {
-    $featuredContent = getFeaturedContent($db, 5);
+// Enable GZIP compression if not already enabled
+if (!headers_sent() && !in_array('ob_gzhandler', ob_list_handlers())) {
+    ob_start('ob_gzhandler');
 }
 
-// Get recently added content
-$recentMovies = getRecentlyAdded($db, 'movie', 10);
-$recentSeries = getRecentlyAdded($db, 'series', 10);
+// Start measuring execution time
+$startTime = microtime(true);
 
-// Get most viewed content
-$popularMovies = getMostViewed($db, 'movie', 10);
-$popularSeries = getMostViewed($db, 'series', 10);
+// Function to get content with caching
+function getCachedContent($callback, $cacheKey, $params = [], $ttl = 3600) {
+    $cacheFile = __DIR__ . '/cache/' . md5($cacheKey) . '.cache';
+    
+    // Check if cache exists and is still valid
+    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
+        $cachedData = file_get_contents($cacheFile);
+        $decoded = json_decode($cachedData, true);
+        
+        // Validar que la decodificación fue exitosa y que el contenido es válido
+        if ($decoded !== null && json_last_error() === JSON_ERROR_NONE) {
+            return $decoded;
+        }
+        // Si el cache está corrupto, eliminarlo
+        @unlink($cacheFile);
+    }
+    
+    // If not, generate new content
+    $content = call_user_func_array($callback, $params);
+    
+    // Cache the result
+    if (!is_dir(__DIR__ . '/cache')) {
+        mkdir(__DIR__ . '/cache', 0755, true);
+    }
+    file_put_contents($cacheFile, json_encode($content));
+    
+    return $content;
+}
 
-// Additional curated sections
-$imdbMovies = getImdbTopContent($db, 10);
-$localVideos = getLocalUploadedVideos($db, 10);
+// Get all content in parallel using caching
+$contentTypes = [
+    'featured' => function() use ($db) {
+        $content = getLatestWithTrailers($db, 5);
+        return empty($content) ? getFeaturedContent($db, 5) : $content;
+    },
+    'recentMovies' => fn() => getRecentlyAdded($db, 'movie', 10),
+    'recentSeries' => fn() => getRecentlyAdded($db, 'series', 10),
+    'popularMovies' => fn() => getMostViewed($db, 'movie', 10),
+    'popularSeries' => fn() => getMostViewed($db, 'series', 10),
+    'imdbMovies' => fn() => getImdbTopContent($db, 10),
+    'localVideos' => fn() => getLocalUploadedVideos($db, 10)
+];
 
-// Añadir imágenes de IMDB a todo el contenido
-$featuredContent = addImdbImagesToContent($featuredContent);
-$recentMovies = addImdbImagesToContent($recentMovies);
-$recentSeries = addImdbImagesToContent($recentSeries);
-$popularMovies = addImdbImagesToContent($popularMovies);
-$popularSeries = addImdbImagesToContent($popularSeries);
-$imdbMovies = addImdbImagesToContent($imdbMovies);
-$localVideos = addImdbImagesToContent($localVideos);
+$results = [];
+foreach ($contentTypes as $key => $callback) {
+    $results[$key] = getCachedContent($callback, $key . '_' . date('Y-m-d-H'));
+}
+
+extract($results);
+
+// Add IMDB images in a single batch
+$allContent = array_merge(
+    $featuredContent ?? [],
+    $recentMovies ?? [],
+    $recentSeries ?? [],
+    $popularMovies ?? [],
+    $popularSeries ?? [],
+    $imdbMovies ?? [],
+    $localVideos ?? []
+);
+
+// Process all content in a single batch
+$allContent = addImdbImagesToContent($allContent);
+
+// Reassign variables with processed content
+$featuredContent = array_slice($allContent, 0, count($featuredContent ?? []));
+$recentMovies = array_slice($allContent, count($featuredContent ?? []), count($recentMovies ?? []));
+$recentSeries = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []), count($recentSeries ?? []));
+$popularMovies = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []) + count($recentSeries ?? []), count($popularMovies ?? []));
+$popularSeries = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []) + count($recentSeries ?? []) + count($popularMovies ?? []), count($popularSeries ?? []));
+$imdbMovies = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []) + count($recentSeries ?? []) + count($popularMovies ?? []) + count($popularSeries ?? []), count($imdbMovies ?? []));
+$localVideos = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []) + count($recentSeries ?? []) + count($popularMovies ?? []) + count($popularSeries ?? []) + count($imdbMovies ?? []), count($localVideos ?? []));
 
 // Include header
 include __DIR__ . '/includes/header.php';
@@ -47,30 +103,38 @@ include __DIR__ . '/includes/header.php';
 <!-- Hero Section -->
 <section class="hero">
     <?php if (!empty($featuredContent)): ?>
-        <?php foreach ($featuredContent as $index => $content): ?>
-            <div class="hero-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>" data-trailer="<?php echo htmlspecialchars($content['trailer_url'] ?? ''); ?>">
-                <?php 
-                $backdropUrl = getImageUrl($content['backdrop_url'] ?? $content['poster_url'] ?? '', '/assets/img/default-backdrop.svg');
-                ?>
-                <!-- Video trailer -->
-                <div class="hero-video-container">
-                    <?php if (!empty($content['trailer_url'])): ?>
-                        <?php
-                        // Detectar si es YouTube
-                        $trailerUrl = $content['trailer_url'];
-                        $isYouTube = preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $trailerUrl, $matches);
-                        if ($isYouTube && isset($matches[1])) {
-                            $youtubeId = $matches[1];
-                        ?>
-                            <div class="hero-video-wrapper">
-                                <div class="hero-youtube-player" data-video-id="<?php echo htmlspecialchars($youtubeId); ?>" data-index="<?php echo $index; ?>"></div>
-                            </div>
-                        <?php } else { ?>
-                            <video class="hero-trailer-video" muted loop playsinline data-index="<?php echo $index; ?>" preload="metadata">
-                                <source src="<?php echo htmlspecialchars($trailerUrl); ?>" type="video/mp4">
-                            </video>
-                        <?php } ?>
-                    <?php endif; ?>
+        <?php foreach ($featuredContent as $index => $content): 
+            $backdropUrl = htmlspecialchars($content['backdrop_url'] ?? $content['poster_url'] ?? '');
+            $posterUrl = htmlspecialchars($content['poster_url'] ?? $backdropUrl);
+            $title = htmlspecialchars($content['title'] ?? '');
+            $overview = htmlspecialchars(substr($content['overview'] ?? '', 0, 200) . (strlen($content['overview'] ?? '') > 200 ? '...' : ''));
+            $trailerUrl = htmlspecialchars($content['trailer_url'] ?? '');
+            $contentId = $content['id'] ?? '';
+        ?>
+            <div class="hero-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>" data-trailer="<?php echo $trailerUrl; ?>">
+                <div class="hero-backdrop">
+                    <img 
+                        class="lazyload" 
+                        data-src="<?php echo $backdropUrl; ?>" 
+                        alt="<?php echo $title; ?>"
+                        loading="lazy"
+                        width="1920" 
+                        height="1080"
+                        style="opacity: 0; transition: opacity 0.3s;"
+                        onload="this.style.opacity=1"
+                    >
+                </div>
+                <div class="hero-content">
+                    <h1 class="hero-title"><?php echo $title; ?></h1>
+                    <p class="hero-description"><?php echo $overview; ?></p>
+                    <div class="hero-actions">
+                        <a href="<?php echo $baseUrl; ?>/watch.php?id=<?php echo $contentId; ?>" class="btn btn-primary" aria-label="Reproducir <?php echo $title; ?>">
+                            <i class="fas fa-play" aria-hidden="true"></i> Reproducir
+                        </a>
+                        <button class="btn btn-outline" data-action="info" data-id="<?php echo $contentId; ?>" aria-label="Más información sobre <?php echo $title; ?>">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i> Más información
+                        </button>
+                    </div>
                 </div>
                 <!-- Fallback backdrop image -->
                 <div class="hero-backdrop" style="background-image: url('<?php echo htmlspecialchars($backdropUrl); ?>');"></div>
@@ -81,34 +145,6 @@ include __DIR__ . '/includes/header.php';
             <div class="hero-backdrop" style="background-image: url('<?php echo $baseUrl; ?>/assets/img/default-backdrop.svg'); background-size: cover;"></div>
         </div>
     <?php endif; ?>
-    
-    <div class="hero-content">
-        <?php if (!empty($featuredContent)): ?>
-            <?php $firstContent = reset($featuredContent); ?>
-            <h1 class="hero-title"><?php echo htmlspecialchars($firstContent['title']); ?></h1>
-            <p class="hero-description"><?php echo htmlspecialchars(mb_strimwidth($firstContent['description'], 0, 200, '...')); ?></p>
-            <div class="hero-actions">
-                <button class="btn btn-primary" data-action="play" data-id="<?php echo $firstContent['id']; ?>">
-                    <i class="fas fa-play"></i> Reproducir
-                </button>
-                <button class="btn btn-secondary" data-action="info" data-id="<?php echo $firstContent['id']; ?>">
-                    <i class="fas fa-info-circle"></i> Más información
-                </button>
-            </div>
-        <?php else: ?>
-            <h1 class="hero-title">Bienvenido a <?php echo SITE_NAME; ?></h1>
-            <p class="hero-description">Disfruta de las mejores películas y series en un solo lugar.</p>
-            <div class="hero-actions">
-                <a href="<?php echo $baseUrl; ?>/register" class="btn btn-primary">
-                    <i class="fas fa-user-plus"></i> Regístrate
-                </a>
-                <a href="<?php echo $baseUrl; ?>/login" class="btn btn-secondary">
-                    <i class="fas fa-sign-in-alt"></i> Iniciar sesión
-                </a>
-            </div>
-        <?php endif; ?>
-    </div>
-    
     <div class="hero-overlay"></div>
 </section>
 
@@ -211,7 +247,7 @@ include __DIR__ . '/includes/header.php';
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Películas populares</h2>
-            <a href="/movies/popular" class="row-link">Ver todo</a>
+            <a href="<?php echo $baseUrl; ?>/movies.php?sort=popular" class="row-link">Ver todo</a>
         </div>
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
@@ -228,7 +264,7 @@ include __DIR__ . '/includes/header.php';
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Series recientes</h2>
-            <a href="/series/recent" class="row-link">Ver todo</a>
+            <a href="<?php echo $baseUrl; ?>/series.php?sort=recent" class="row-link">Ver todo</a>
         </div>
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
@@ -245,7 +281,7 @@ include __DIR__ . '/includes/header.php';
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Series populares</h2>
-            <a href="/series/popular" class="row-link">Ver todo</a>
+            <a href="<?php echo $baseUrl; ?>/series.php?sort=popular" class="row-link">Ver todo</a>
         </div>
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
@@ -262,7 +298,7 @@ include __DIR__ . '/includes/header.php';
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Películas destacadas en IMDb</h2>
-            <a href="/movies/imdb" class="row-link">Ver todo</a>
+            <a href="<?php echo $baseUrl; ?>/movies.php?source=imdb" class="row-link">Ver todo</a>
         </div>
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
@@ -279,7 +315,7 @@ include __DIR__ . '/includes/header.php';
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Videos locales</h2>
-            <a href="/videos/local" class="row-link">Ver todo</a>
+            <a href="<?php echo $baseUrl; ?>/content.php?source=local" class="row-link">Ver todo</a>
         </div>
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
@@ -296,7 +332,7 @@ include __DIR__ . '/includes/header.php';
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Películas recientes</h2>
-            <a href="/movies/recent" class="row-link">Ver todo</a>
+            <a href="<?php echo $baseUrl; ?>/movies.php?sort=recent" class="row-link">Ver todo</a>
         </div>
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>

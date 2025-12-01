@@ -40,23 +40,38 @@ function init() {
     if (elements.carouselInner) {
         loadCarousel();
     }
-    
+
     if (elements.popularMovies || elements.popularSeries) {
         loadPopularContent();
     }
 
     // Configurar event listeners
     setupEventListeners();
-    
+
     // Inicializar controles del reproductor de video
     initVideoPlayerControls();
-    
-    // Simular inicio de sesión (en un entorno real, esto vendría de una autenticación real)
-    simulateLogin();
+
+    // NOTA: La autenticación se maneja del lado del servidor
+    // No se debe simular login en el cliente
 }
 
 // Configurar event listeners
 function setupEventListeners() {
+    // Handle play button clicks
+    document.addEventListener('click', (e) => {
+        const playButton = e.target.closest('.action-btn[data-action="play"]');
+        if (playButton) {
+            e.preventDefault();
+            const id = playButton.dataset.id;
+            const type = playButton.closest('[data-type]')?.dataset.type || 'movie';
+            if (id) {
+                playContent(id, type);
+            } else {
+                console.error('No se pudo obtener el ID del contenido');
+            }
+        }
+    });
+
     // Navegación
     if (elements.navLinks && elements.navLinks.length > 0) {
         elements.navLinks.forEach(link => {
@@ -67,17 +82,17 @@ function setupEventListeners() {
             });
         });
     }
-    
+
     // Menú de usuario
     if (elements.userMenu) {
         elements.userMenu.addEventListener('click', toggleDropdown);
     }
-    
+
     // Cerrar sesión
     if (elements.logoutBtn) {
         elements.logoutBtn.addEventListener('click', logout);
     }
-    
+
     // Controles del carrusel
     if (elements.carouselPrev) {
         elements.carouselPrev.addEventListener('click', prevSlide);
@@ -85,34 +100,34 @@ function setupEventListeners() {
     if (elements.carouselNext) {
         elements.carouselNext.addEventListener('click', nextSlide);
     }
-    
+
     // Búsqueda
     if (elements.searchInput) {
         elements.searchInput.addEventListener('input', handleSearch);
     }
-    
+
     // Cerrar reproductor de video
     if (elements.closeVideo) {
         elements.closeVideo.addEventListener('click', closeVideoPlayer);
     }
-    
+
     // Cerrar modal al hacer clic fuera
     window.addEventListener('click', (e) => {
         if (elements.loginModal && e.target === elements.loginModal) {
             closeLoginModal();
         }
     });
-    
+
     // Cerrar modal con botón si existe
     if (elements.closeModal) {
         elements.closeModal.addEventListener('click', closeLoginModal);
     }
-    
+
     // Enviar formulario de inicio de sesión
     if (elements.loginForm) {
         elements.loginForm.addEventListener('submit', handleLogin);
     }
-    
+
     // Cambiar el estilo de la barra de navegación al hacer scroll
     window.addEventListener('scroll', handleScroll);
 }
@@ -123,7 +138,7 @@ async function loadCarousel() {
         console.warn('Elemento carousel-inner no encontrado');
         return;
     }
-    
+
     console.log('Cargando carrusel...');
     elements.carouselInner.innerHTML = '';
 
@@ -131,7 +146,7 @@ async function loadCarousel() {
         // Usar el endpoint de featured que no requiere autenticación
         const response = await fetch(`${APP_BASE_URL}/api/content/featured.php?limit=5`);
         if (!response.ok) throw new Error('Error al cargar el contenido del carrusel');
-        
+
         // Verificar que la respuesta sea JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
@@ -139,7 +154,7 @@ async function loadCarousel() {
             console.error('Respuesta no es JSON:', text.substring(0, 200));
             throw new Error('El servidor devolvió HTML en lugar de JSON');
         }
-        
+
         const result = await response.json();
         const content = result.data || result;
 
@@ -165,11 +180,11 @@ async function loadCarousel() {
 }
 
 function createCarouselSlide(item, index) {
-        const slide = document.createElement('div');
-        slide.className = index === 0 ? 'carousel-item active' : 'carousel-item';
-        slide.style.backgroundImage = `linear-gradient(to right, rgba(0, 0, 0, 0.8) 20%, transparent 100%), url('${item.backdrop_url || item.poster_url}')`;
+    const slide = document.createElement('div');
+    slide.className = index === 0 ? 'carousel-item active' : 'carousel-item';
+    slide.style.backgroundImage = `linear-gradient(to right, rgba(0, 0, 0, 0.8) 20%, transparent 100%), url('${item.backdrop_url || item.poster_url}')`;
 
-        slide.innerHTML = `
+    slide.innerHTML = `
             <div class="carousel-content">
                 <h1>${item.title}</h1>
                 <p>${item.description}</p>
@@ -211,7 +226,7 @@ async function loadPopularContent() {
     if (elements.popularSeries) {
         elements.popularSeries.innerHTML = '';
     }
-    
+
     // Si no hay contenedores, salir
     if (!elements.popularMovies && !elements.popularSeries) {
         console.warn('Contenedores de contenido popular no encontrados');
@@ -223,7 +238,7 @@ async function loadPopularContent() {
         try {
             const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=movie&limit=8`);
             if (!response.ok) throw new Error('Error al cargar películas');
-            
+
             // Verificar que la respuesta sea JSON
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
@@ -231,7 +246,7 @@ async function loadPopularContent() {
                 console.error('Respuesta no es JSON:', text.substring(0, 200));
                 throw new Error('El servidor devolvió HTML en lugar de JSON');
             }
-            
+
             const result = await response.json();
             const movies = result.data || result;
 
@@ -255,7 +270,7 @@ async function loadPopularContent() {
         try {
             const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=series&limit=8`);
             if (!response.ok) throw new Error('Error al cargar series');
-            
+
             // Verificar que la respuesta sea JSON
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
@@ -263,7 +278,7 @@ async function loadPopularContent() {
                 console.error('Respuesta no es JSON:', text.substring(0, 200));
                 throw new Error('El servidor devolvió HTML en lugar de JSON');
             }
-            
+
             const result = await response.json();
             const series = result.data || result;
 
@@ -289,7 +304,7 @@ function createContentCard(item, type) {
     card.className = 'content-card';
     card.dataset.id = item.id;
     card.dataset.type = type;
-    
+
     const isPremium = item.is_premium ? '<span class="premium-badge">PREMIUM</span>' : '';
     const hasTorrent = item.torrent_magnet ? '<span class="torrent-badge" title="Disponible por Torrent"><i class="fas fa-magnet"></i></span>' : '';
     const year = item.release_year ? `<span>${item.release_year}</span>` : '';
@@ -297,7 +312,7 @@ function createContentCard(item, type) {
         ? `${item.duration || 'N/D'} min`
         : (item.seasons ? `${item.seasons} Temporada${item.seasons > 1 ? 's' : ''}` : 'Serie');
     const rating = item.rating ? `<span>•</span><span>⭐ ${parseFloat(item.rating).toFixed(1)}</span>` : '';
-    
+
     card.innerHTML = `
         <img src="${item.poster_url || 'assets/images/placeholder-poster.png'}" alt="${item.title}">
         <div class="content-badges">
@@ -325,7 +340,7 @@ function createContentCard(item, type) {
             </div>
         </div>
     `;
-    
+
     // Redirigir a detalles cuando se hace clic fuera de los botones
     card.addEventListener('click', (event) => {
         if (event.target.closest('.action-btn')) {
@@ -333,7 +348,7 @@ function createContentCard(item, type) {
         }
         window.location.href = `/content.php?id=${item.id}`;
     });
-    
+
     return card;
 }
 
@@ -346,12 +361,12 @@ function navigateTo(section) {
             link.classList.add('active');
         }
     });
-    
+
     // Actualizar contenido según la sección
     if (section === 'peliculas' || section === 'series') {
         appState.currentContent = section === 'peliculas' ? 'movies' : 'series';
         loadCarousel();
-        
+
         // Desplazarse a la sección de contenido
         document.querySelector(`#${section}`)?.scrollIntoView({ behavior: 'smooth' });
     } else if (section === 'inicio') {
@@ -378,14 +393,14 @@ function prevSlide() {
 function updateCarousel() {
     const items = document.querySelectorAll('.carousel-item');
     const heroSlides = document.querySelectorAll('.hero-slide');
-    
+
     // Actualizar carousel items si existen
     if (items.length > 0) {
         items.forEach((item, index) => {
             item.classList.toggle('active', index === appState.currentSlide);
         });
     }
-    
+
     // Actualizar hero slides si existen y usar optimizador
     if (heroSlides.length > 0) {
         // Usar el optimizador del hero si está disponible
@@ -403,57 +418,63 @@ function updateCarousel() {
 // Búsqueda
 function handleSearch(e) {
     const query = e.target.value.toLowerCase();
-    
+
     if (query.length < 2) {
         loadPopularContent();
         return;
     }
-    
+
     // Filtrar contenido cacheado
     const filteredMovies = appState.contentCache.movies.filter(movie =>
         movie.title.toLowerCase().includes(query)
     );
-    
+
     const filteredSeries = appState.contentCache.series.filter(series =>
         series.title.toLowerCase().includes(query)
     );
 
     // Aquí se podría añadir una llamada a la API para una búsqueda más completa
     // fetch(`/api/search?q=${query}`).then(...)
-    
+
     // Actualizar la interfaz con los resultados
     updateSearchResults(filteredMovies, filteredSeries);
 }
 
 function updateSearchResults(movies, series) {
+    // Validar que los elementos existan antes de manipularlos
+    if (!elements.popularMovies || !elements.popularSeries) {
+        console.warn('Elementos de resultados de búsqueda no encontrados');
+        return;
+    }
+
     // Limpiar resultados anteriores
     elements.popularMovies.innerHTML = '';
     elements.popularSeries.innerHTML = '';
-    
+
     // Mostrar películas encontradas
-    if (movies.length > 0) {
-        const title = document.createElement('h2>');
+    if (movies.length > 0 && elements.popularMovies) {
+        const title = document.createElement('h2');
         title.textContent = 'Películas';
         elements.popularMovies.appendChild(title);
-        
+
         movies.forEach(movie => {
             elements.popularMovies.appendChild(createContentCard(movie, 'movie'));
         });
     }
-    
+
     // Mostrar series encontradas
-    if (series.length > 0) {
-        const title = document.createElement('h2>');
+    if (series.length > 0 && elements.popularSeries) {
+        const title = document.createElement('h2');
         title.textContent = 'Series';
         elements.popularSeries.appendChild(title);
-        
+
         series.forEach(series => {
             elements.popularSeries.appendChild(createContentCard(series, 'series'));
         });
     }
-    
+
     // Mostrar mensaje si no hay resultados
-    if (movies.length === 0 && series.length === 0) {
+    if (movies.length === 0 && series.length === 0 && elements.popularMovies) {
         elements.popularMovies.innerHTML = '<p class="no-results">No se encontraron resultados para tu búsqueda.</p>';
     }
 }
@@ -478,13 +499,13 @@ function login(user) {
     appState.currentUser = user;
     appState.isLoggedIn = true;
     appState.isAdmin = user.role === 'admin';
-    
+
     // Actualizar interfaz de usuario
     updateUIAfterLogin();
-    
+
     // Cerrar modal de inicio de sesión
     closeLoginModal();
-    
+
     // Mostrar mensaje de bienvenida
     showNotification(`¡Bienvenido, ${user.name}!`);
 }
@@ -494,15 +515,18 @@ function logout() {
     appState.currentUser = null;
     appState.isLoggedIn = false;
     appState.isAdmin = false;
-    
+
     // Actualizar interfaz de usuario
     updateUIAfterLogout();
-    
+
     // Mostrar mensaje de despedida
     showNotification('Has cerrado sesión correctamente.');
 }
 
-// Simular inicio de sesión (en un entorno real, esto vendría de un formulario)
+// FUNCIÓN DESHABILITADA POR SEGURIDAD
+// Esta función creaba automáticamente un usuario administrador sin autenticación
+// NO DEBE SER USADA EN PRODUCCIÓN
+/*
 function simulateLogin() {
     // Simular un usuario administrador
     const adminUser = {
@@ -516,21 +540,22 @@ function simulateLogin() {
     
     login(adminUser);
 }
+*/
 
 // Manejador de inicio de sesión
 function handleLogin(e) {
     e.preventDefault();
-    
+
     // En un entorno real, aquí se validarían las credenciales con el servidor
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-    
+
     // Validación básica
     if (!email || !password) {
         showNotification('Por favor, completa todos los campos.', 'error');
         return;
     }
-    
+
     // Simular autenticación exitosa
     const user = {
         id: 2,
@@ -540,26 +565,26 @@ function handleLogin(e) {
         subscription: 'free',
         avatar: 'assets/images/avatar.png'
     };
-    
+
     login(user);
 }
 
 // Actualizar interfaz después del inicio de sesión
 function updateUIAfterLogin() {
     const user = appState.currentUser;
-    
+
     // Actualizar avatar
     const avatar = document.querySelector('.avatar');
     if (avatar) {
         avatar.src = user.avatar;
         avatar.alt = user.name;
     }
-    
+
     // Mostrar opciones de administrador si es necesario
     if (appState.isAdmin) {
         // Aquí podrías agregar un enlace al panel de administración
     }
-    
+
     // Actualizar botones de suscripción
     updateSubscriptionUI();
 }
@@ -572,9 +597,9 @@ function updateUIAfterLogout() {
         avatar.src = 'assets/images/avatar.png';
         avatar.alt = 'Perfil';
     }
-    
+
     // Ocultar opciones de administrador si las hay
-    
+
     // Mostrar botón de inicio de sesión
     showLoginModal();
 }
@@ -583,7 +608,7 @@ function updateUIAfterLogout() {
 function updateSubscriptionUI() {
     const user = appState.currentUser;
     if (!user) return;
-    
+
     // Actualizar elementos de la interfaz según el tipo de suscripción
     const premiumElements = document.querySelectorAll('.premium-content');
     premiumElements.forEach(el => {
@@ -600,19 +625,19 @@ function showNotification(message, type = 'success') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
-    
+
     // Agregar al documento
     document.body.appendChild(notification);
-    
+
     // Mostrar con animación
     setTimeout(() => {
         notification.classList.add('show');
     }, 100);
-    
+
     // Ocultar después de 3 segundos
     setTimeout(() => {
         notification.classList.remove('show');
-        
+
         // Eliminar después de la animación
         setTimeout(() => {
             notification.remove();
@@ -665,14 +690,15 @@ function getActiveVideoElement() {
     if (window.player && typeof window.player.getCurrentTime === 'function') {
         return null; // YouTube player se maneja diferente
     }
-    return torrentVideo;
+    // Si torrentVideo existe pero no está visible, retornarlo; si no existe, retornar null
+    return torrentVideo && torrentVideo.style.display === 'none' ? torrentVideo : null;
 }
 
 // Inicializar controles del reproductor
 function initVideoPlayerControls() {
     const videoPlayer = document.querySelector('.video-player');
     if (!videoPlayer) return;
-    
+
     const playPauseBtn = document.querySelector('.play-pause');
     const volumeBtn = document.querySelector('.volume');
     const volumeSlider = document.querySelector('.volume-slider');
@@ -695,7 +721,7 @@ function initVideoPlayerControls() {
     if (playPauseBtn) {
         playPauseBtn.addEventListener('click', togglePlayPause);
     }
-    
+
     const videoWrapper = document.querySelector('.video-wrapper');
     if (videoWrapper) {
         videoWrapper.addEventListener('click', (e) => {
@@ -704,7 +730,7 @@ function initVideoPlayerControls() {
             }
         });
     }
-    
+
     document.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && videoPlayer.classList.contains('active')) {
             e.preventDefault();
@@ -716,7 +742,7 @@ function initVideoPlayerControls() {
     if (volumeBtn) {
         volumeBtn.addEventListener('click', toggleMute);
     }
-    
+
     if (volumeSlider) {
         volumeSlider.addEventListener('input', (e) => {
             videoPlayerState.volume = parseFloat(e.target.value);
@@ -751,7 +777,7 @@ function initVideoPlayerControls() {
     if (fullscreenBtn) {
         fullscreenBtn.addEventListener('click', toggleFullscreen);
     }
-    
+
     document.addEventListener('fullscreenchange', () => {
         videoPlayerState.isFullscreen = !!document.fullscreenElement;
         updateFullscreenUI();
@@ -761,7 +787,7 @@ function initVideoPlayerControls() {
     if (closeVideoBtn) {
         closeVideoBtn.addEventListener('click', closeVideoPlayer);
     }
-    
+
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && videoPlayer.classList.contains('active')) {
             closeVideoPlayer();
@@ -816,7 +842,7 @@ function initVideoPlayerControls() {
     // Atajos de teclado
     document.addEventListener('keydown', (e) => {
         if (!videoPlayer.classList.contains('active')) return;
-        
+
         switch (e.key.toLowerCase()) {
             case ' ':
                 e.preventDefault();
@@ -858,7 +884,7 @@ function closeVideoPlayer() {
         currentTorrent.destroy();
         currentTorrent = null;
     }
-    
+
     // Detener el reproductor de video
     const video = document.getElementById('torrent-player');
     if (video) {
@@ -866,24 +892,24 @@ function closeVideoPlayer() {
         video.src = '';
         video.load();
     }
-    
+
     // Detener el reproductor de YouTube si está en uso
     if (window.player && typeof window.player.pauseVideo === 'function') {
         window.player.pauseVideo();
     }
-    
+
     // Limpiar intervalo de progreso de YouTube
     if (window.youtubeProgressInterval) {
         clearInterval(window.youtubeProgressInterval);
         window.youtubeProgressInterval = null;
     }
-    
+
     const videoPlayer = document.querySelector('.video-player');
     if (videoPlayer) {
         videoPlayer.classList.remove('active');
         document.body.style.overflow = '';
     }
-    
+
     // Resetear estado
     videoPlayerState.isPlaying = false;
     videoPlayerState.isFullscreen = false;
@@ -953,10 +979,10 @@ function changeVolume(delta) {
 function updateVolumeUI() {
     const volumeBtn = document.querySelector('.volume');
     if (!volumeBtn) return;
-    
+
     const volumeIcon = volumeBtn.querySelector('i');
     const volumeSlider = document.querySelector('.volume-slider');
-    
+
     if (volumeIcon) {
         if (videoPlayerState.isMuted || videoPlayerState.volume === 0) {
             volumeIcon.className = 'fas fa-volume-mute';
@@ -966,7 +992,7 @@ function updateVolumeUI() {
             volumeIcon.className = 'fas fa-volume-up';
         }
     }
-    
+
     if (volumeSlider) {
         volumeSlider.value = videoPlayerState.volume;
     }
@@ -977,10 +1003,10 @@ function updateProgressBar() {
     const progress = document.querySelector('.progress-bar .progress');
     const currentTimeEl = document.querySelector('.current-time');
     const timeElapsed = document.querySelector('.time-elapsed');
-    
+
     let currentTime = 0;
     let duration = 0;
-    
+
     if (videoElement && videoElement.duration) {
         currentTime = videoElement.currentTime;
         duration = videoElement.duration;
@@ -990,12 +1016,12 @@ function updateProgressBar() {
     } else {
         return;
     }
-    
+
     if (isNaN(duration) || !isFinite(duration) || duration === 0) return;
-    
+
     const percent = (currentTime / duration) * 100;
     if (progress) progress.style.width = percent + '%';
-    
+
     if (currentTimeEl) currentTimeEl.textContent = formatTime(currentTime);
     if (timeElapsed) timeElapsed.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
 }
@@ -1003,7 +1029,7 @@ function updateProgressBar() {
 function updateBufferBar() {
     const videoElement = getActiveVideoElement();
     const buffer = document.querySelector('.progress-bar .buffer');
-    
+
     if (videoElement && videoElement.buffered && videoElement.buffered.length > 0) {
         const bufferedEnd = videoElement.buffered.end(videoElement.buffered.length - 1);
         const duration = videoElement.duration;
@@ -1017,10 +1043,10 @@ function updateBufferBar() {
 function updatePlayPauseUI() {
     const playPauseBtn = document.querySelector('.play-pause');
     if (!playPauseBtn) return;
-    
+
     const icon = playPauseBtn.querySelector('i');
     if (!icon) return;
-    
+
     if (videoPlayerState.isPlaying) {
         icon.className = 'fas fa-pause';
     } else {
@@ -1030,7 +1056,7 @@ function updatePlayPauseUI() {
 
 function toggleFullscreen() {
     const videoPlayer = document.querySelector('.video-player');
-    
+
     if (!document.fullscreenElement) {
         if (videoPlayer.requestFullscreen) {
             videoPlayer.requestFullscreen();
@@ -1048,7 +1074,7 @@ function toggleFullscreen() {
             document.msExitFullscreen();
         }
     }
-    
+
     videoPlayerState.isFullscreen = !videoPlayerState.isFullscreen;
     updateFullscreenUI();
 }
@@ -1056,7 +1082,7 @@ function toggleFullscreen() {
 function updateFullscreenUI() {
     const fullscreenBtn = document.querySelector('.fullscreen');
     const icon = fullscreenBtn.querySelector('i');
-    
+
     if (videoPlayerState.isFullscreen) {
         icon.className = 'fas fa-compress';
     } else {
@@ -1067,11 +1093,11 @@ function updateFullscreenUI() {
 function showVideoControls() {
     const videoPlayer = document.querySelector('.video-player');
     videoPlayer.classList.remove('hidden-controls');
-    
+
     if (videoPlayerState.hideControlsTimeout) {
         clearTimeout(videoPlayerState.hideControlsTimeout);
     }
-    
+
     if (videoPlayerState.isPlaying) {
         startHideControlsTimer();
     }
@@ -1079,11 +1105,11 @@ function showVideoControls() {
 
 function startHideControlsTimer() {
     const videoPlayer = document.querySelector('.video-player');
-    
+
     if (videoPlayerState.hideControlsTimeout) {
         clearTimeout(videoPlayerState.hideControlsTimeout);
     }
-    
+
     videoPlayerState.hideControlsTimeout = setTimeout(() => {
         if (videoPlayerState.isPlaying) {
             videoPlayer.classList.add('hidden-controls');
@@ -1094,16 +1120,16 @@ function startHideControlsTimer() {
 function updateTimeDisplay() {
     const durationEl = document.querySelector('.duration');
     if (!durationEl) return;
-    
+
     const videoElement = getActiveVideoElement();
     let duration = 0;
-    
+
     if (videoElement && videoElement.duration) {
         duration = videoElement.duration;
     } else if (window.player && typeof window.player.getDuration === 'function') {
         duration = window.player.getDuration();
     }
-    
+
     if (duration > 0) {
         durationEl.textContent = formatTime(duration);
     }
@@ -1114,7 +1140,7 @@ function formatTime(seconds) {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
-    
+
     if (hours > 0) {
         return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
@@ -1144,14 +1170,14 @@ function handlePlaybackError(error) {
 function showKeyboardShortcut(message) {
     const keyboardShortcut = document.querySelector('.keyboard-shortcut');
     if (!keyboardShortcut) return;
-    
+
     keyboardShortcut.innerHTML = message;
     keyboardShortcut.classList.add('show');
-    
+
     if (keyboardShortcut.timeout) {
         clearTimeout(keyboardShortcut.timeout);
     }
-    
+
     keyboardShortcut.timeout = setTimeout(() => {
         keyboardShortcut.classList.remove('show');
     }, 2000);
@@ -1160,15 +1186,15 @@ function showKeyboardShortcut(message) {
 function loadRecommendations(contentId, type) {
     // En un entorno real, aquí se haría una llamada a la API
     // para obtener recomendaciones basadas en el contenido actual
-    const recommendations = type === 'movie' 
+    const recommendations = type === 'movie'
         ? sampleContent.movies.filter(m => m.id !== contentId).slice(0, 5)
         : sampleContent.series.filter(s => s.id !== contentId).slice(0, 5);
-    
+
     const recommendationsList = document.querySelector('.recommendations-list');
     if (!recommendationsList) return;
-    
+
     recommendationsList.innerHTML = '';
-    
+
     recommendations.forEach(item => {
         const recommendationItem = document.createElement('div');
         recommendationItem.className = 'recommendation-item';
@@ -1179,11 +1205,11 @@ function loadRecommendations(contentId, type) {
                 <p>${item.year} • ${item.category}</p>
             </div>
         `;
-        
+
         recommendationItem.addEventListener('click', () => {
             playContent(item.id, type);
         });
-        
+
         recommendationsList.appendChild(recommendationItem);
     });
 }
@@ -1208,7 +1234,7 @@ function playTorrent(magnetLink, content, playButton = null, originalButtonHTML 
 
     // Ocultar reproductor de YouTube si está visible
     if (youtubePlayer) youtubePlayer.style.display = 'none';
-    
+
     // Mostrar el reproductor de torrent
     if (video) video.style.display = 'block';
 
@@ -1225,10 +1251,10 @@ function playTorrent(magnetLink, content, playButton = null, originalButtonHTML 
     currentTorrent = torrentClient.add(magnetLink, torrent => {
         // El torrent ha sido descargado
         console.log('Torrent descargado:', torrent);
-        
+
         // Buscar el archivo de video en el torrent
         const file = torrent.files.find(file => file.name.endsWith('.mp4') || file.name.endsWith('.webm') || file.name.endsWith('.mkv'));
-        
+
         if (!file) {
             console.error('No se encontró ningún archivo de video en el torrent');
             hideLoadingIndicator(playButton, originalButtonHTML);
@@ -1247,16 +1273,16 @@ function playTorrent(magnetLink, content, playButton = null, originalButtonHTML 
                 showNotification('Error al reproducir el video', 'error');
                 return;
             }
-            
+
             console.log('Reproduciendo video del torrent');
             hideLoadingIndicator(playButton, originalButtonHTML);
-            
+
             // Actualizar la interfaz
             const videoTitle = document.querySelector('.video-title');
             if (videoTitle && content) {
                 videoTitle.textContent = content.title || 'Reproduciendo desde torrent';
             }
-            
+
             // Enfocar el reproductor
             video.focus();
         });
@@ -1296,7 +1322,7 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 // Reproducir contenido
-async function playContent(id, type, videoData = null) {
+window.playContent = async function (id, type, videoData = null) {
     const playButton = document.querySelector(`.play-btn[data-id="${id}"][data-type="${type}"]`);
     const originalButtonHTML = playButton?.innerHTML;
     const videoPlayer = document.querySelector('.video-player');
@@ -1305,6 +1331,7 @@ async function playContent(id, type, videoData = null) {
     const loadingIndicator = document.querySelector('.loading-indicator');
     const errorMessage = document.querySelector('.error-message');
     const recommendationsList = document.querySelector('.recommendations-list');
+    let videoId = null; // Declare videoId at the beginning of the function
 
     const showLoading = (message = 'Cargando contenido...') => {
         if (playButton) {
@@ -1349,7 +1376,7 @@ async function playContent(id, type, videoData = null) {
         try {
             const response = await fetch(`${APP_BASE_URL}/api/content/index.php?id=${id}`);
             if (!response.ok) throw new Error('Contenido no encontrado en el servidor');
-            
+
             // Verificar que la respuesta sea JSON
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
@@ -1357,7 +1384,7 @@ async function playContent(id, type, videoData = null) {
                 console.error('Respuesta no es JSON:', text.substring(0, 200));
                 throw new Error('El servidor devolvió HTML en lugar de JSON');
             }
-            
+
             const result = await response.json();
             content = result.data;
         } catch (error) {
@@ -1393,7 +1420,7 @@ async function playContent(id, type, videoData = null) {
         showLoading('Cargando video...');
         try {
             let trailerUrl = String(content.trailer_url || '').trim();
-            
+
             if (!trailerUrl) {
                 throw new Error('URL vacía');
             }
@@ -1422,7 +1449,7 @@ async function playContent(id, type, videoData = null) {
                 if (!videoId) {
                     try {
                         const url = new URL(trailerUrl);
-                        
+
                         // Extraer el ID de diferentes formatos de URL de YouTube
                         if (url.hostname.includes('youtube.com')) {
                             if (url.pathname.startsWith('/embed/')) {
@@ -1443,7 +1470,7 @@ async function playContent(id, type, videoData = null) {
                     }
                 }
             }
-            
+
             // Limpiar el ID del video
             if (videoId) {
                 videoId = videoId.split(/[?&#]/)[0];
@@ -1465,20 +1492,20 @@ async function playContent(id, type, videoData = null) {
                             'enablejsapi': 1, 'origin': window.location.origin
                         },
                         events: {
-                            'onReady': function(event) {
+                            'onReady': function (event) {
                                 console.log('Reproductor de YouTube listo');
                                 event.target.playVideo();
                                 hideLoading();
                                 videoPlayerState.isPlaying = true;
                                 updatePlayPauseUI();
-                                
+
                                 // Actualizar duración
                                 const duration = event.target.getDuration();
                                 if (duration) {
                                     videoPlayerState.duration = duration;
                                     updateTimeDisplay();
                                 }
-                                
+
                                 // Iniciar actualización periódica de la barra de progreso
                                 const progressInterval = setInterval(() => {
                                     if (window.player && typeof window.player.getCurrentTime === 'function') {
@@ -1496,11 +1523,11 @@ async function playContent(id, type, videoData = null) {
                                         clearInterval(progressInterval);
                                     }
                                 }, 250);
-                                
+
                                 // Guardar referencia al intervalo para limpiarlo después
                                 window.youtubeProgressInterval = progressInterval;
                             },
-                            'onStateChange': function(event) {
+                            'onStateChange': function (event) {
                                 console.log('Estado del reproductor:', event.data);
                                 if (event.data === YT.PlayerState.PLAYING) {
                                     hideLoading();
@@ -1519,7 +1546,7 @@ async function playContent(id, type, videoData = null) {
                                     }
                                 }
                             },
-                            'onError': function(event) {
+                            'onError': function (event) {
                                 console.error('Error en el reproductor de YouTube:', event.data);
                                 showError(`Error al cargar el video (${event.data})`);
                                 if (window.youtubeProgressInterval) {
@@ -1552,7 +1579,7 @@ async function playContent(id, type, videoData = null) {
                     }
                 } else {
                     const previousReady = window.onYouTubeIframeAPIReady;
-                    window.onYouTubeIframeAPIReady = function() {
+                    window.onYouTubeIframeAPIReady = function () {
                         if (typeof previousReady === 'function') {
                             previousReady();
                         }
@@ -1598,10 +1625,10 @@ async function playContent(id, type, videoData = null) {
 document.addEventListener('DOMContentLoaded', () => {
     // Inicializar WebTorrent si está disponible
     initWebTorrent();
-    
+
     // Inicializar la aplicación
     init();
-    
+
     // Cargar la API de YouTube
     if (window.YouTubeAPIManager && typeof window.YouTubeAPIManager.ensureScriptLoaded === 'function') {
         window.YouTubeAPIManager.ensureScriptLoaded();
@@ -1611,10 +1638,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const firstScriptTag = document.getElementsByTagName('script')[0];
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
-    
+
     // Inicializar controles del reproductor
     initVideoPlayerControls();
-    
+
 }); // Cierre del evento DOMContentLoaded
 
 // Mostrar modal de inicio de sesión

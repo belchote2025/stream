@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba de Reproductor de Video</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .player-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto 20px;
+            background: #000;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        #videoPlayer {
+            width: 100%;
+            height: 450px;
+        }
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .source-buttons {
+            margin: 15px 0;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .error {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>Prueba del Reproductor de Video</h1>
+    
+    <div class="test-container">
+        <h2>1. Selecciona un tipo de fuente de video</h2>
+        <div class="source-buttons">
+            <button onclick="testLocalVideo()">Video Local</button>
+            <button onclick="testYouTubeVideo()">Video de YouTube</button>
+            <button onclick="testExternalVideo()">Video Externo (URL)</button>
+            <button onclick="testTorrent()">Torrent (magnet link)</button>
+        </div>
+        
+        <div id="customSource" style="margin: 15px 0; display: none;">
+            <input type="text" id="customSourceInput" placeholder="Ingresa la URL o magnet link" style="width: 70%; padding: 8px;">
+            <button onclick="loadCustomSource()">Cargar</button>
+        </div>
+        
+        <div class="player-container">
+            <div id="videoPlayer"></div>
+        </div>
+        
+        <div class="test-buttons">
+            <button onclick="player.play()">Reproducir</button>
+            <button onclick="player.pause()">Pausar</button>
+            <button onclick="player.toggleMute()">Silenciar/Desilenciar</button>
+            <button onclick="player.setVolume(0.5)">Volumen 50%</button>
+            <button onclick="player.seek(30)">Ir a 0:30</button>
+            <button onclick="player.setPlaybackRate(1.5)">Velocidad 1.5x</button>
+            <button onclick="player.setPlaybackRate(1)">Velocidad Normal</button>
+        </div>
+        
+        <div id="status" class="status">
+            Estado: Listo para probar. Selecciona un tipo de video.
+        </div>
+    </div>
+    
+    <div class="test-container">
+        <h2>2. Información del Reproductor</h2>
+        <div id="playerInfo">
+            <p><strong>Tipo de video:</strong> <span id="videoType">No cargado</span></p>
+            <p><strong>Duración:</strong> <span id="videoDuration">--:--</span></p>
+            <p><strong>Tiempo actual:</strong> <span id="currentTime">--:--</span></p>
+            <p><strong>Volumen:</strong> <span id="volume">100%</span></p>
+            <p><strong>Estado:</strong> <span id="playStatus">Detenido</span></p>
+            <p><strong>Eventos:</strong></p>
+            <div id="events" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                <!-- Los eventos se mostrarán aquí -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    <script src="js/video-player.js"></script>
+    <script>
+        let player;
+        
+        // Función para inicializar el reproductor
+        function initPlayer() {
+            // Si ya existe un reproductor, limpiarlo
+            if (player) {
+                try {
+                    if (typeof player.destroy === 'function') {
+                        player.destroy();
+                    }
+                } catch (e) {
+                    console.warn('Error al destruir el reproductor:', e);
+                }
+                player = null;
+            }
+            
+            // Crear nuevo reproductor
+            player = new UnifiedVideoPlayer('videoPlayer', {
+                autoplay: false,
+                controls: true,
+                onProgress: updateProgress,
+                onEnded: () => logEvent('Video finalizado'),
+                onError: (error) => {
+                    logEvent('Error en el reproductor: ' + (error.message || error), true);
+                    console.error('Error del reproductor:', error);
+                }
+            });
+            
+            return player;
+        }
+        
+        // Inicializar el reproductor cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            initPlayer();
+            // Actualizar información del reproductor periódicamente
+            setInterval(updatePlayerInfo, 500);
+        });
+        
+        // Funciones de prueba
+        function testLocalVideo() {
+            // Usar un video de prueba local (debe estar en el servidor)
+            // Usar una ruta absoluta desde la raíz del sitio
+            const testVideo = '/streaming-platform/videos/sample.mp4';
+            loadVideo('url', testVideo);
+            document.getElementById('customSource').style.display = 'block';
+            document.getElementById('customSourceInput').value = testVideo;
+        }
+        
+        function testYouTubeVideo() {
+            // Video de prueba de YouTube
+            const youtubeId = 'dQw4w9WgXcQ';
+            const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
+            document.getElementById('customSource').style.display = 'block';
+            document.getElementById('customSourceInput').placeholder = 'Ingresa una URL de YouTube';
+            document.getElementById('customSourceInput').value = youtubeUrl;
+            loadVideo('youtube', youtubeUrl);
+        }
+        
+        function testExternalVideo() {
+            // Video externo de prueba
+            const externalUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+            document.getElementById('customSource').style.display = 'block';
+            document.getElementById('customSourceInput').placeholder = 'Ingresa la URL del video';
+            document.getElementById('customSourceInput').value = externalUrl;
+            loadVideo('url', externalUrl);
+        }
+        
+        function testTorrent() {
+            // Torrent de prueba (video corto de Big Buck Bunny)
+            const magnetLink = 'magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10&dn=Sintel&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&ws=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2F&xs=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2Fsintel.torrent';
+            document.getElementById('customSource').style.display = 'block';
+            document.getElementById('customSourceInput').placeholder = 'Ingresa un enlace magnet o .torrent';
+            document.getElementById('customSourceInput').value = magnetLink;
+            loadVideo('torrent', magnetLink);
+        }
+        
+        function loadCustomSource() {
+            const sourceInput = document.getElementById('customSourceInput');
+            const source = sourceInput.value.trim();
+            if (!source) return;
+            
+            let type = 'url';
+            let videoSource = source;
+            
+            try {
+                // Detectar tipo de fuente
+                if (source.includes('youtube.com') || source.includes('youtu.be')) {
+                    type = 'youtube';
+                    // Extraer el ID de YouTube de la URL
+                    const youtubeMatch = source.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+                    if (youtubeMatch && youtubeMatch[1]) {
+                        videoSource = youtubeMatch[1];
+                        logEvent(`ID de YouTube detectado: ${videoSource}`, false, 'info');
+                    } else {
+                        throw new Error('No se pudo extraer el ID del video de YouTube');
+                    }
+                } else if (source.match(/^[a-zA-Z0-9_-]{11}$/)) {
+                    // Si parece un ID de YouTube (11 caracteres alfanuméricos)
+                    type = 'youtube';
+                    videoSource = source;
+                    logEvent(`ID de YouTube detectado: ${videoSource}`, false, 'info');
+                } else if (source.startsWith('magnet:') || source.endsWith('.torrent')) {
+                    type = 'torrent';
+                } else if (!/^https?:\/\//i.test(source)) {
+                    // Si no es una URL completa, asumir que es una ruta relativa
+                    videoSource = source.startsWith('/') ? source : '/' + source;
+                    logEvent(`Ruta relativa detectada: ${videoSource}`, false, 'info');
+                }
+                
+                loadVideo(type, videoSource);
+                
+            } catch (error) {
+                const errorMsg = `Error al procesar la fuente: ${error.message || 'Formato no reconocido'}`;
+                logEvent(errorMsg, true);
+                
+                // Mostrar mensaje de error en la interfaz
+                const errorElement = document.getElementById('videoError');
+                if (errorElement) {
+                    errorElement.style.display = 'flex';
+                    const errorMessage = errorElement.querySelector('#errorMessage');
+                    if (errorMessage) {
+                        errorMessage.textContent = errorMsg;
+                    }
+                }
+                
+                // Mostrar sugerencia para YouTube si parece un ID
+                if (source.match(/^[a-zA-Z0-9_-]+$/)) {
+                    logEvent('¿Intentabas usar un video de YouTube? Usa el formato completo: https://www.youtube.com/watch?v=ID', true);
+                }
+            }
+        }
+        
+        function loadVideo(type, source) {
+            logEvent(`Cargando video (${type}): ${source}`);
+            
+            // Mostrar indicador de carga
+            const loadingElement = document.getElementById('videoLoading');
+            if (loadingElement) loadingElement.style.display = 'flex';
+            
+            // Ocultar mensajes de error previos
+            const errorElement = document.getElementById('videoError');
+            if (errorElement) errorElement.style.display = 'none';
+            
+            // Función para manejar errores
+            const handleError = (error) => {
+                console.error('Error en loadVideo:', error);
+                logEvent(`Error: ${error.message || 'Error desconocido al cargar el video'}`, true);
+                if (loadingElement) loadingElement.style.display = 'none';
+                if (errorElement) {
+                    errorElement.style.display = 'flex';
+                    const errorMsg = errorElement.querySelector('#errorMessage');
+                    if (errorMsg) {
+                        errorMsg.textContent = error.message || 'Error desconocido al cargar el video';
+                    }
+                }
+            };
+            
+            try {
+                // Crear un nuevo reproductor si no existe
+                if (!player) {
+                    player = initPlayer();
+                } else {
+                    // Intentar limpiar el reproductor existente
+                    try {
+                        if (typeof player.pause === 'function') {
+                            player.pause();
+                        }
+                        
+                        // Si existe el método destroy, usarlo para limpiar
+                        if (typeof player.destroy === 'function') {
+                            player.destroy();
+                        }
+                        
+                        // Volver a inicializar el reproductor
+                        player = initPlayer();
+                    } catch (e) {
+                        console.warn('Error al limpiar el reproductor, creando uno nuevo:', e);
+                        player = initPlayer();
+                    }
+                }
+                
+                // Procesar la fuente según el tipo
+                let videoSource = source;
+                
+                if (type === 'youtube') {
+                    // Extraer el ID de YouTube de una URL
+                    let videoId = '';
+                    
+                    // Verificar si es una URL completa de YouTube
+                    const youtubeMatch = source.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+                    if (youtubeMatch && youtubeMatch[1]) {
+                        videoId = youtubeMatch[1];
+                    } 
+                    // Verificar si es solo un ID de YouTube (11 caracteres alfanuméricos)
+                    else if (source.match(/^[a-zA-Z0-9_-]{11}$/)) {
+                        videoId = source;
+                    }
+                    
+                    if (videoId) {
+                        videoSource = videoId;
+                        logEvent(`ID de YouTube detectado: ${videoId}`, false, 'success');
+                    } else {
+                        throw new Error('URL de YouTube no válida. Usa el formato: https://www.youtube.com/watch?v=ID_DEL_VIDEO o solo el ID del video');
+                    }
+                } else if (type === 'url') {
+                    // Si es una ruta relativa, convertirla a absoluta
+                    if (!/^https?:\/\//i.test(source)) {
+                        // Si no comienza con /, asumir que es relativa a la raíz del sitio
+                        videoSource = source.startsWith('/') ? source : '/' + source;
+                    }
+                }
+                
+                // Configurar manejadores de eventos
+                const onReady = () => {
+                    logEvent(`Reproductor listo. Tipo: ${type}`, false, 'success');
+                    if (loadingElement) loadingElement.style.display = 'none';
+                };
+                
+                const onError = (error) => {
+                    const errorMsg = error && error.message ? error.message : 'Error desconocido';
+                    logEvent(`Error en el reproductor: ${errorMsg}`, true);
+                    if (loadingElement) loadingElement.style.display = 'none';
+                    if (errorElement) {
+                        errorElement.style.display = 'flex';
+                        const errorMessage = errorElement.querySelector('#errorMessage');
+                        if (errorMessage) errorMessage.textContent = errorMsg;
+                    }
+                };
+                
+                try {
+                    // Cargar el video
+                    if (typeof player.loadVideo === 'function') {
+                        player.loadVideo(videoSource, type);
+                        
+                        // Configurar eventos
+                        if (player.on) {
+                            player.on('ready', onReady);
+                            player.on('error', onError);
+                        } else {
+                            console.warn('El reproductor no tiene el método on()');
+                            // Configurar eventos alternativos si es necesario
+                            if (player.addEventListener) {
+                                player.addEventListener('canplay', onReady);
+                                player.addEventListener('error', onError);
+                            }
+                        }
+                    } else {
+                        throw new Error('El reproductor no tiene el método loadVideo');
+                    }
+                } catch (e) {
+                    handleError(e);
+                }
+                
+            } catch (error) {
+                handleError(error);
+            }
+        }
+        
+        // Funciones de utilidad
+        function updateProgress(progress) {
+            document.getElementById('progressBar').style.width = (progress * 100) + '%';
+        }
+        
+        function updatePlayerInfo() {
+            if (!player) return;
+            
+            document.getElementById('videoType').textContent = player.videoType || 'No cargado';
+            document.getElementById('videoDuration').textContent = formatTime(player.duration);
+            document.getElementById('currentTime').textContent = formatTime(player.currentTime);
+            document.getElementById('volume').textContent = Math.round(player.volume * 100) + '%';
+            document.getElementById('playStatus').textContent = 
+                player.isPlaying ? 'Reproduciendo' : 'Pausado/Detenido';
+        }
+        
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '--:--';
+            const minutes = Math.floor(seconds / 60);
+            seconds = Math.floor(seconds % 60);
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        function logEvent(message, isError = false, type = '') {
+            const eventsDiv = document.getElementById('events');
+            const eventElement = document.createElement('div');
+            eventElement.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            
+            if (isError) {
+                eventElement.style.color = '#dc3545';
+            } else if (type === 'success') {
+                eventElement.style.color = '#28a745';
+            }
+            
+            eventsDiv.insertBefore(eventElement, eventsDiv.firstChild);
+            
+            // Actualizar el estado general
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + (isError ? 'error' : type === 'success' ? 'success' : '');
+        }
+    </script>
+</body>
+</html>

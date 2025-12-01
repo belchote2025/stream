@@ -15,7 +15,8 @@
 function getImdbImage($title, $type = 'movie', $year = null) {
     // Limpiar el título para la búsqueda
     $searchQuery = urlencode(trim($title) . ' ' . $year);
-    $searchUrl = "https://www.imdb.com/find?q={$searchQuery}&s=tt&ttype={$type == 'movie' ? 'ft' : 'tv'}";
+    $ttype = ($type == 'movie') ? 'ft' : 'tv';
+    $searchUrl = "https://www.imdb.com/find?q={$searchQuery}&s=tt&ttype={$ttype}";
     
     // Usar file_get_contents con un contexto que incluye un user-agent
     $context = stream_context_create([

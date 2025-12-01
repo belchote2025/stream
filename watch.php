@@ -6,19 +6,13 @@
 require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/gallery-functions.php';
 
-// Verificar si los archivos de JavaScript existen
-$jsFiles = [
-    '/js/video-player.js',
-    '/js/webtorrent.min.js',
-    '/js/webtorrent.min.js.map',
-    '/js/webtorrent-video.min.js'
+// Cargar configuración del reproductor
+$playerConfig = [
+    'autoplay' => true,
+    'controls' => true,
+    'preload' => 'metadata',
+    'startTime' => 0
 ];
-
-foreach ($jsFiles as $jsFile) {
-    if (!file_exists(__DIR__ . $jsFile)) {
-        error_log("Archivo no encontrado: " . __DIR__ . $jsFile);
-    }
-}
 
 $contentId = $_GET['id'] ?? 0;
 $episodeId = $_GET['episode_id'] ?? null;
@@ -395,10 +389,382 @@ include __DIR__ . '/includes/header.php';
 </style>
 
 <div class="watch-page">
-    <div class="video-container-full">
-        <?php
-        // Determinar la URL del video a reproducir
-        $videoUrl = null;
+    <div id="videoPlayer" class="video-player">
+    <!-- Contenedor principal del reproductor -->
+    <div class="video-container">
+        <!-- Contenedor para YouTube -->
+        <div id="youtubePlayerContainer" style="display: none;"></div>
+        
+        <!-- Contenedor para WebTorrent -->
+        <div id="torrentPlayerContainer" style="display: none;">
+            <video id="torrentPlayer" controls></video>
+        </div>
+        
+        <!-- Reproductor HTML5 nativo -->
+        <video id="html5Player" style="display: none;" controls></video>
+        
+        <!-- Indicador de carga -->
+        <div id="videoLoading" class="loading-indicator" style="display: none;">
+            <div class="spinner"></div>
+            <p>Cargando video...</p>
+        </div>
+        
+        <!-- Mensaje de error -->
+        <div id="videoError" class="error-message" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p id="errorMessage">Error al cargar el video</p>
+        </div>
+        
+        <!-- Controles personalizados -->
+        <div class="video-controls">
+            <!-- Barra de progreso -->
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="buffer"></div>
+                    <div class="progress"></div>
+                    <div class="hover-time">
+                        <div class="hover-time-text">0:00</div>
+                        <div class="hover-thumbnail"></div>
+                    </div>
+                </div>
+                <div class="time-display">
+                    <span class="current-time">0:00</span> / <span class="duration">0:00</span>
+                </div>
+            </div>
+            
+            <!-- Controles inferiores -->
+            <div class="controls-bottom">
+                <div class="controls-left">
+                    <button id="playPauseBtn" class="control-btn" title="Reproducir/Pausar">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="volume-control">
+                        <button id="volumeBtn" class="control-btn" title="Silenciar/Activar sonido">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                        <div class="volume-slider">
+                            <div class="slider-track">
+                                <div class="slider-fill" style="width: 100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="time-display">
+                        <span class="current-time">0:00</span> / <span class="duration">0:00</span>
+                    </div>
+                </div>
+                
+                <div class="controls-right">
+                    <div class="settings-menu">
+                        <button id="settingsBtn" class="control-btn" title="Ajustes">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <div id="settingsMenu" class="settings-dropdown">
+                            <div class="settings-section">
+                                <label>Velocidad de reproducción</label>
+                                <select id="playbackSpeed">
+                                    <option value="0.5">0.5x</option>
+                                    <option value="0.75">0.75x</option>
+                                    <option value="1" selected>Normal</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2">2x</option>
+                                </select>
+                            </div>
+                            <div class="settings-section">
+                                <label>Calidad</label>
+                                <select id="qualitySelector">
+                                    <option value="auto" selected>Auto</option>
+                                    <option value="1080">1080p</option>
+                                    <option value="720">720p</option>
+                                    <option value="480">480p</option>
+                                    <option value="360">360p</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="fullscreenBtn" class="control-btn" title="Pantalla completa">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenido adicional -->
+<div class="content-details">
+    <h1><?php echo htmlspecialchars($content['title']); ?></h1>
+    <?php if ($content['type'] === 'series' && $episode): ?>
+        <h2>Capítulo <?php echo $episode['episode_number'] . ': ' . htmlspecialchars($episode['title']); ?></h2>
+    <?php endif; ?>
+    
+    <div class="content-meta">
+        <?php if ($content['release_year']): ?>
+            <span class="meta-item"><?php echo $content['release_year']; ?></span>
+        <?php endif; ?>
+        
+        <?php if ($content['duration']): ?>
+            <span class="meta-item"><?php echo formatDuration($content['duration']); ?></span>
+        <?php endif; ?>
+        
+        <?php if ($content['rating']): ?>
+            <span class="meta-item">
+                <i class="fas fa-star"></i> <?php echo number_format($content['rating'], 1); ?>/10
+            </span>
+        <?php endif; ?>
+    </div>
+    
+    <div class="content-description">
+        <p><?php echo nl2br(htmlspecialchars($content['description'])); ?></p>
+    </div>
+    
+    <?php if ($content['type'] === 'series'): ?>
+        <div class="episodes-container">
+            <h3>Temporadas y Episodios</h3>
+            <?php
+            // Obtener todas las temporadas
+            $seasonsQuery = "SELECT DISTINCT season_number FROM episodes 
+                            WHERE series_id = :series_id 
+                            ORDER BY season_number ASC";
+            $seasonsStmt = $db->prepare($seasonsQuery);
+            $seasonsStmt->bindValue(':series_id', $contentId, PDO::PARAM_INT);
+            $seasonsStmt->execute();
+            $seasons = $seasonsStmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            foreach ($seasons as $season):
+                // Obtener episodios de esta temporada
+                $episodesQuery = "SELECT * FROM episodes 
+                                WHERE series_id = :series_id AND season_number = :season_number 
+                                ORDER BY episode_number ASC";
+                $episodesStmt = $db->prepare($episodesQuery);
+                $episodesStmt->bindValue(':series_id', $contentId, PDO::PARAM_INT);
+                $episodesStmt->bindValue(':season_number', $season, PDO::PARAM_INT);
+                $episodesStmt->execute();
+                $episodes = $episodesStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                if (count($episodes) > 0):
+            ?>
+                    <div class="season">
+                        <h4>Temporada <?php echo $season; ?></h4>
+                        <div class="episodes-list">
+                            <?php foreach ($episodes as $ep): ?>
+                                <a href="watch.php?id=<?php echo $contentId; ?>&episode_id=<?php echo $ep['id']; ?>" 
+                                   class="episode-card <?php echo ($episodeId == $ep['id']) ? 'active' : ''; ?>">
+                                    <div class="episode-number"><?php echo $ep['episode_number']; ?></div>
+                                    <div class="episode-info">
+                                        <div class="episode-title"><?php echo htmlspecialchars($ep['title']); ?></div>
+                                        <div class="episode-meta">
+                                            <?php if ($ep['duration']): ?>
+                                                <span><?php echo formatDuration($ep['duration']); ?></span>
+                                            <?php endif; ?>
+                                            <?php if ($ep['release_date']): ?>
+                                                <span><?php echo date('d M, Y', strtotime($ep['release_date'])); ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <?php if ($episodeId == $ep['id']): ?>
+                                        <div class="now-playing">
+                                            <i class="fas fa-play"></i> Reproduciendo
+                                        </div>
+                                    <?php endif; ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php
+                endif;
+            endforeach;
+            ?>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- Scripts del reproductor -->
+<script src="/js/player/config.js"></script>
+<script src="/js/player/main.js"></script>
+<script src="/js/player/init.js"></script>
+
+<script>
+// Inicializar el reproductor cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    // Obtener la URL del video desde PHP
+    const videoUrl = '<?php 
+        if ($content['type'] === 'series' && $episode) {
+            echo addslashes($episode['video_url']);
+        } else {
+            echo addslashes($content['video_url']);
+        }
+    ?>';
+    
+    // Determinar el tipo de video
+    let videoType = '<?php echo $content['video_type'] ?? 'local'; ?>';
+    
+    // Si no se especificó el tipo, intentar detectarlo
+    if (!videoType || videoType === 'auto') {
+        if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+            videoType = 'youtube';
+        } else if (videoUrl.startsWith('magnet:') || videoUrl.endsWith('.torrent')) {
+            videoType = 'torrent';
+        } else if (videoUrl.startsWith('http')) {
+            videoType = 'url';
+        } else {
+            videoType = 'local';
+        }
+    }
+    
+    // Inicializar el reproductor
+    if (window.videoPlayer && videoUrl) {
+        window.videoPlayer.loadVideo(videoUrl, videoType);
+        
+        // Configurar eventos
+        window.videoPlayer.on('ready', function() {
+            console.log('Reproductor listo');
+            // Ocultar indicador de carga
+            const loadingElement = document.getElementById('videoLoading');
+            if (loadingElement) loadingElement.style.display = 'none';
+        });
+        
+        window.videoPlayer.on('error', function(error) {
+            console.error('Error en el reproductor:', error);
+            // Mostrar mensaje de error
+            const errorElement = document.getElementById('videoError');
+            if (errorElement) {
+                const errorMessage = errorElement.querySelector('#errorMessage') || errorElement;
+                errorMessage.textContent = error.message || 'Error al cargar el video';
+                errorElement.style.display = 'flex';
+            }
+        });
+        
+        // Configurar controles personalizados
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const volumeBtn = document.getElementById('volumeBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const progressBar = document.querySelector('.progress-bar');
+        const progress = document.querySelector('.progress-bar .progress');
+        const currentTimeElement = document.querySelector('.time-display .current-time');
+        const durationElement = document.querySelector('.time-display .duration');
+        const volumeSlider = document.querySelector('.volume-slider .slider-track');
+        const playbackSpeed = document.getElementById('playbackSpeed');
+        
+        // Eventos de los controles
+        if (playPauseBtn) {
+            playPauseBtn.addEventListener('click', function() {
+                if (window.videoPlayer) {
+                    window.videoPlayer.togglePlayPause();
+                }
+            });
+        }
+        
+        if (volumeBtn) {
+            volumeBtn.addEventListener('click', function() {
+                if (window.videoPlayer) {
+                    window.videoPlayer.toggleMute();
+                }
+            });
+        }
+        
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', function() {
+                if (window.videoPlayer) {
+                    window.videoPlayer.toggleFullscreen();
+                }
+            });
+        }
+        
+        if (progressBar) {
+            progressBar.addEventListener('click', function(e) {
+                if (window.videoPlayer) {
+                    const rect = this.getBoundingClientRect();
+                    const pos = (e.clientX - rect.left) / rect.width;
+                    window.videoPlayer.seek(pos * window.videoPlayer.duration);
+                }
+            });
+        }
+        
+        if (volumeSlider) {
+            volumeSlider.addEventListener('click', function(e) {
+                if (window.videoPlayer) {
+                    const rect = this.getBoundingClientRect();
+                    let volume = (e.clientX - rect.left) / rect.width;
+                    volume = Math.max(0, Math.min(1, volume));
+                    window.videoPlayer.setVolume(volume);
+                }
+            });
+        }
+        
+        if (playbackSpeed) {
+            playbackSpeed.addEventListener('change', function() {
+                if (window.videoPlayer) {
+                    window.videoPlayer.setPlaybackRate(parseFloat(this.value));
+                }
+            });
+        }
+        
+        // Actualizar la interfaz de usuario cuando cambia el tiempo
+        window.videoPlayer.on('timeupdate', function(time) {
+            if (progress) {
+                const percentage = (time.currentTime / time.duration) * 100;
+                progress.style.width = percentage + '%';
+            }
+            
+            if (currentTimeElement) {
+                currentTimeElement.textContent = formatTime(time.currentTime);
+            }
+            
+            if (durationElement && time.duration) {
+                durationElement.textContent = formatTime(time.duration);
+            }
+        });
+        
+        // Actualizar el botón de reproducción/pausa
+        window.videoPlayer.on('play', function() {
+            if (playPauseBtn) {
+                playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                playPauseBtn.setAttribute('title', 'Pausar');
+            }
+        });
+        
+        window.videoPlayer.on('pause', function() {
+            if (playPauseBtn) {
+                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                playPauseBtn.setAttribute('title', 'Reproducir');
+            }
+        });
+        
+        // Actualizar el botón de volumen
+        window.videoPlayer.on('volumechange', function(volume) {
+            if (volumeBtn) {
+                if (volume.muted || volume.volume === 0) {
+                    volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                    volumeBtn.setAttribute('title', 'Activar sonido');
+                } else if (volume.volume < 0.5) {
+                    volumeBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
+                    volumeBtn.setAttribute('title', 'Silenciar');
+                } else {
+                    volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                    volumeBtn.setAttribute('title', 'Silenciar');
+                }
+            }
+            
+            if (volumeSlider) {
+                const fill = volumeSlider.querySelector('.slider-fill');
+                if (fill) {
+                    fill.style.width = (volume.volume * 100) + '%';
+                }
+            }
+        });
+        
+        // Función para formatear el tiempo
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '0:00';
+            
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+    }
+});
+</script>
         $hasVideo = false;
         $torrentMagnet = null;
         
@@ -588,11 +954,8 @@ let hasStartedPlaying = false;
 // Solo inicializar si hay video
 <?php if ($hasVideo): ?>
 // Esperar a que el reproductor esté disponible
-function initVideoPlayer() {
-    // Verificar que UnifiedVideoPlayer esté disponible
-    if (typeof UnifiedVideoPlayer === 'undefined') {
-        console.warn('UnifiedVideoPlayer no está disponible, reintentando...');
-        setTimeout(initVideoPlayer, 100);
+// Esta función ha sido reemplazada por el nuevo sistema de inicialización
+// en los archivos de configuración del reproductor
         return;
     }
     

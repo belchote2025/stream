@@ -157,14 +157,32 @@ function getDbConnection() {
     static $conn = null;
     
     // Si ya hay una conexión activa, devolverla
-    if ($conn !== null && $conn->ping()) {
-        return $conn;
-            $conn = new PDO($dsn, DB_USER, DB_PASS, $options);
+    if ($conn !== null) {
+        try {
+            // Verificar si la conexión sigue activa
+            $conn->query('SELECT 1');
+            return $conn;
         } catch (PDOException $e) {
-            // En producción, registrar el error en un archivo de log
-            error_log("Error de conexión: " . $e->getMessage());
-            die("PDOException: " . $e->getMessage());
+            // Si la conexión está inactiva, continuar para crear una nueva
+            $conn = null;
         }
+    }
+    
+    // Configuración de la conexión PDO
+    $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+    
+    try {
+        $conn = new PDO($dsn, DB_USER, DB_PASS, $options);
+        return $conn;
+    } catch (PDOException $e) {
+        // En producción, registrar el error en un archivo de log
+        error_log("Error de conexión: " . $e->getMessage());
+        die("Error de conexión a la base de datos. Por favor, inténtelo más tarde.");
     }
     
     return $conn;

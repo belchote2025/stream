@@ -450,85 +450,137 @@ class UnifiedVideoPlayer {
     
     async loadYouTube(url) {
         return new Promise((resolve, reject) => {
-            // Extraer ID de YouTube
-            let videoId = null;
-            const patterns = [
-                /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-                /youtube\.com\/watch\?.*v=([^&\n?#]+)/
-            ];
-            
-            for (const pattern of patterns) {
-                const match = url.match(pattern);
-                if (match) {
-                    videoId = match[1];
-                    break;
-                }
-            }
-            
-            if (!videoId) {
-                reject(new Error('ID de video de YouTube no válido'));
-                return;
-            }
-            
-            // Ocultar otros reproductores
-            this.videoElement.style.display = 'none';
-            document.getElementById('torrentPlayerContainer').style.display = 'none';
-            
-            const container = document.getElementById('youtubePlayerContainer');
-            container.style.display = 'block';
-            container.innerHTML = `<div id="youtubePlayer"></div>`;
-            
-            // Cargar API de YouTube si no está cargada
-            if (!window.YT || !window.YT.Player) {
-                const tag = document.createElement('script');
-                tag.src = 'https://www.youtube.com/iframe_api';
-                const firstScriptTag = document.getElementsByTagName('script')[0];
-                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            try {
+                // Extraer ID de YouTube o usar directamente si ya es un ID
+                let videoId = null;
                 
-                window.onYouTubeIframeAPIReady = () => {
-                    this.initYouTubePlayer(videoId, resolve, reject);
-                };
-            } else {
-                this.initYouTubePlayer(videoId, resolve, reject);
-            }
-        });
-    }
-    
-    initYouTubePlayer(videoId, resolve, reject) {
-        this.youtubePlayer = new YT.Player('youtubePlayer', {
-            height: '100%',
-            width: '100%',
-            videoId: videoId,
-            playerVars: {
-                autoplay: this.options.autoplay ? 1 : 0,
-                controls: 1,
-                rel: 0,
-                modestbranding: 1,
-                playsinline: 1
-            },
-            events: {
-                'onReady': (event) => {
-                    this.hideLoading();
-                    if (this.options.startTime > 0) {
-                        event.target.seekTo(this.options.startTime, true);
-                    }
-                    resolve();
-                },
-                'onError': (event) => {
-                    reject(new Error('Error al cargar video de YouTube'));
-                },
-                'onStateChange': (event) => {
-                    if (event.data === YT.PlayerState.PLAYING) {
-                        this.isPlaying = true;
-                    } else if (event.data === YT.PlayerState.PAUSED) {
-                        this.isPlaying = false;
-                    } else if (event.data === YT.PlayerState.ENDED) {
-                        this.isPlaying = false;
-                        if (this.options.onEnded) {
-                            this.options.onEnded();
+                // Si la URL parece ser un ID de YouTube (11 caracteres alfanuméricos)
+                if (url.match(/^[a-zA-Z0-9_-]{11}$/)) {
+                    videoId = url;
+                } else {
+                    // Intentar extraer el ID de una URL de YouTube
+                    const patterns = [
+                        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+                        /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+                    ];
+                    
+                    for (const pattern of patterns) {
+                        const match = url.match(pattern);
+                        if (match && match[1]) {
+                            videoId = match[1];
+                            // Limpiar parámetros adicionales en el ID
+                            videoId = videoId.split('&')[0].split('#')[0];
+                            break;
                         }
                     }
                 }
+                
+                if (!videoId) {
+                    throw new Error('ID de video de YouTube no válido. Usa el formato: https://www.youtube.com/watch?v=ID o solo el ID del video');
+                }
+                
+                // Mostrar contenedor de YouTube
+                if (this.videoElement) this.videoElement.style.display = 'none';
+                const torrentContainer = document.getElementById('torrentPlayerContainer');
+                if (torrentContainer) torrentContainer.style.display = 'none';
+                
+                const container = document.getElementById('youtubePlayerContainer');
+                if (!container) {
+                    throw new Error('No se encontró el contenedor de YouTube');
+                }
+                
+                container.style.display = 'block';
+                container.innerHTML = '<div id="youtubePlayer"></div>';
+                
+                // Función para inicializar el reproductor
+                const initPlayer = () => {
+                    try {
+                        if (!window.YT || !window.YT.Player) {
+                            throw new Error('La API de YouTube no está disponible');
+                        }
+                        
+                        this.youtubePlayer = new YT.Player('youtubePlayer', {
+                            height: '100%',
+                            width: '100%',
+                            videoId: videoId,
+                            playerVars: {
+                                autoplay: this.options.autoplay ? 1 : 0,
+                                controls: 1,
+                                rel: 0,
+                                modestbranding: 1,
+                                playsinline: 1
+                            },
+                            events: {
+                                'onReady': (event) => {
+                                    this.hideLoading();
+                                    if (this.options.startTime > 0) {
+                                        event.target.seekTo(this.options.startTime, true);
+                                    }
+                                    resolve();
+                                },
+                                'onError': (event) => {
+                                    reject(new Error('Error al cargar el video de YouTube'));
+                                },
+                                'onStateChange': (event) => {
+                                    if (event.data === YT.PlayerState.PLAYING) {
+                                        this.isPlaying = true;
+                                    } else if (event.data === YT.PlayerState.PAUSED) {
+                                        this.isPlaying = false;
+                                    } else if (event.data === YT.PlayerState.ENDED) {
+                                        this.isPlaying = false;
+                                        if (this.options.onEnded) {
+                                            this.options.onEnded();
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        reject(e);
+                    }
+                };
+                
+                // Cargar API de YouTube si es necesario
+                if (window.YT && window.YT.Player) {
+                    // La API ya está cargada
+                    initPlayer();
+                } else if (window.YT && window.YT.loaded) {
+                    // La API se está cargando, esperar a que esté lista
+                    const checkReady = setInterval(() => {
+                        if (window.YT && window.YT.Player) {
+                            clearInterval(checkReady);
+                            initPlayer();
+                        }
+                    }, 100);
+                    
+                    // Timeout después de 5 segundos
+                    setTimeout(() => {
+                        clearInterval(checkReady);
+                        if (!window.YT || !window.YT.Player) {
+                            reject(new Error('Tiempo de espera agotado al cargar la API de YouTube'));
+                        }
+                    }, 5000);
+                } else {
+                    // Cargar la API
+                    window.onYouTubeIframeAPIReady = () => {
+                        initPlayer();
+                    };
+                    
+                    const tag = document.createElement('script');
+                    tag.src = 'https://www.youtube.com/iframe_api';
+                    const firstScriptTag = document.getElementsByTagName('script')[0];
+                    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                    
+                    // Timeout después de 5 segundos
+                    setTimeout(() => {
+                        if (!window.YT || !window.YT.Player) {
+                            reject(new Error('Tiempo de espera agotado al cargar la API de YouTube'));
+                        }
+                    }, 5000);
+                }
+            } catch (error) {
+                console.error('Error en loadYouTube:', error);
+                reject(error);
             }
         });
     }

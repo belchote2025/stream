@@ -1,0 +1,128 @@
+/**
+ * Inicialización del reproductor de video unificado
+ * Este archivo se encarga de cargar todos los componentes necesarios
+ * y exponer la API del reproductor para su uso en la aplicación
+ */
+
+// Esperar a que el DOM esté completamente cargado
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar si el contenedor del reproductor existe
+    if (!document.getElementById('videoPlayer')) {
+        console.warn('No se encontró el contenedor del reproductor');
+        return;
+    }
+    
+    // Cargar estilos si no están ya cargados
+    if (!document.querySelector('link[href*="video-player.css"]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = '/css/video-player.css';
+        document.head.appendChild(link);
+    }
+    
+    // Inicializar el reproductor
+    window.videoPlayer = new UnifiedVideoPlayer('videoPlayer', {
+        autoplay: false,
+        controls: true,
+        onPlay: function() {
+            console.log('Reproduciendo video');
+        },
+        onPause: function() {
+            console.log('Video pausado');
+        },
+        onEnded: function() {
+            console.log('Video finalizado');
+        },
+        onError: function(error) {
+            console.error('Error en el reproductor:', error);
+        },
+        onTimeUpdate: function(time) {
+            // Actualizar la barra de progreso
+            const progressBar = document.querySelector('.progress-bar .progress');
+            if (progressBar) {
+                const percentage = (time.currentTime / time.duration) * 100;
+                progressBar.style.width = percentage + '%';
+            }
+            
+            // Actualizar el tiempo actual
+            const currentTimeElement = document.querySelector('.time-display .current-time');
+            if (currentTimeElement) {
+                currentTimeElement.textContent = formatTime(time.currentTime);
+            }
+        },
+        onVolumeChange: function(volume) {
+            // Actualizar el control de volumen
+            const volumeSlider = document.querySelector('.volume-slider .slider-fill');
+            if (volumeSlider) {
+                volumeSlider.style.width = (volume * 100) + '%';
+            }
+        }
+    });
+    
+    // Función auxiliar para formatear el tiempo
+    function formatTime(seconds) {
+        if (isNaN(seconds)) return '0:00';
+        
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // Exponer la API del reproductor globalmente
+    window.playVideo = function(source, type = null) {
+        if (window.videoPlayer) {
+            window.videoPlayer.loadVideo(source, type);
+            window.videoPlayer.play();
+        }
+    };
+    
+    console.log('Reproductor de video inicializado correctamente');
+});
+
+// Función para cargar la API de YouTube de forma asíncrona
+function loadYouTubeAPI() {
+    if (window.YT && window.YT.Player) {
+        return Promise.resolve();
+    }
+    
+    return new Promise((resolve) => {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        
+        window.onYouTubeIframeAPIReady = function() {
+            console.log('YouTube API cargada correctamente');
+            resolve();
+        };
+    });
+}
+
+// Cargar WebTorrent de forma asíncrona
+function loadWebTorrent() {
+    if (window.WebTorrent) {
+        return Promise.resolve();
+    }
+    
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js';
+        script.onload = () => {
+            console.log('WebTorrent cargado correctamente');
+            resolve();
+        };
+        script.onerror = (error) => {
+            console.error('Error al cargar WebTorrent:', error);
+            reject(error);
+        };
+        document.head.appendChild(script);
+    });
+}
+
+// Cargar dependencias
+Promise.all([
+    loadYouTubeAPI(),
+    loadWebTorrent()
+]).catch(error => {
+    console.error('Error al cargar dependencias del reproductor:', error);
+});

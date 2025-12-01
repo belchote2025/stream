@@ -1399,27 +1399,54 @@ async function playContent(id, type, videoData = null) {
             }
 
             // Normalizar URL si falta el esquema o solo recibe un ID de YouTube
-            if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trailerUrl)) {
-                if (trailerUrl.startsWith('//')) {
-                    trailerUrl = `${window.location.protocol}${trailerUrl}`;
-                } else if (trailerUrl.startsWith('www.')) {
-                    trailerUrl = `https://${trailerUrl}`;
-                } else if (/^[\w-]{11}$/.test(trailerUrl)) {
-                    trailerUrl = `https://www.youtube.com/watch?v=${trailerUrl}`;
-                } else {
-                    trailerUrl = `https://${trailerUrl}`;
-                }
+            if (!trailerUrl) {
+                throw new Error('La URL del video está vacía');
             }
 
-            const url = new URL(trailerUrl);
-            let videoId = '';
+            // Si es solo un ID de YouTube (11 caracteres alfanuméricos y guiones)
+            if (/^[\w-]{11}$/.test(trailerUrl)) {
+                videoId = trailerUrl;
+            } else {
+                // Asegurarse de que la URL tenga un esquema
+                if (!/^https?:\/\//i.test(trailerUrl)) {
+                    if (trailerUrl.startsWith('//')) {
+                        trailerUrl = window.location.protocol + trailerUrl;
+                    } else if (trailerUrl.startsWith('www.') || trailerUrl.startsWith('youtu.be')) {
+                        trailerUrl = 'https://' + trailerUrl;
+                    } else {
+                        // Asumir que es un ID corto de YouTube
+                        videoId = trailerUrl;
+                    }
+                }
 
-            if (url.pathname.startsWith('/embed/')) {
-                videoId = url.pathname.split('/')[2];
-            } else if (url.hostname.includes('youtube.com') && url.searchParams.has('v')) {
-                videoId = url.searchParams.get('v').split('&')[0];
-            } else if (url.hostname.includes('youtu.be')) {
-                videoId = url.pathname.split('/')[1].split('?')[0];
+                if (!videoId) {
+                    try {
+                        const url = new URL(trailerUrl);
+                        
+                        // Extraer el ID de diferentes formatos de URL de YouTube
+                        if (url.hostname.includes('youtube.com')) {
+                            if (url.pathname.startsWith('/embed/')) {
+                                videoId = url.pathname.split('/')[2];
+                            } else if (url.searchParams.has('v')) {
+                                videoId = url.searchParams.get('v').split('&')[0];
+                            }
+                        } else if (url.hostname.includes('youtu.be')) {
+                            videoId = url.pathname.split('/')[1].split('?')[0];
+                        }
+                    } catch (e) {
+                        console.warn('Error al analizar la URL del video:', e);
+                        // Intentar extraer el ID como último recurso
+                        const match = trailerUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+                        if (match && match[1]) {
+                            videoId = match[1];
+                        }
+                    }
+                }
+            }
+            
+            // Limpiar el ID del video
+            if (videoId) {
+                videoId = videoId.split(/[?&#]/)[0];
             }
 
             if (videoId) {

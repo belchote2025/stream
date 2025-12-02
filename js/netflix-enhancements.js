@@ -2,13 +2,15 @@
  * Mejoras estilo Netflix para la plataforma de streaming
  */
 
-(function() {
+(function () {
     'use strict';
-    
+
     const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL)
         ? window.__APP_BASE_URL
         : '';
-    const FALLBACK_POSTER = `${BASE_URL}/assets/img/default-poster.svg`;
+    const FALLBACK_POSTER = typeof getAssetUrl === 'function'
+        ? getAssetUrl('/assets/img/default-poster.svg')
+        : `${BASE_URL}/assets/img/default-poster.svg`;
 
     // ============================================
     // NAVBAR SCROLL EFFECT
@@ -20,13 +22,13 @@
         let lastScroll = 0;
         window.addEventListener('scroll', () => {
             const currentScroll = window.pageYOffset;
-            
+
             if (currentScroll > 50) {
                 navbar.classList.add('scrolled');
             } else {
                 navbar.classList.remove('scrolled');
             }
-            
+
             lastScroll = currentScroll;
         });
     }
@@ -40,7 +42,7 @@
         const searchToggle = document.getElementById('searchToggle');
         const searchClear = document.getElementById('searchClear');
         const autocompleteResults = document.getElementById('autocompleteResults');
-        
+
         if (!searchContainer || !searchInput) return;
 
         // Toggle search on icon click
@@ -87,7 +89,7 @@
         searchInput.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
             const query = e.target.value.trim();
-            
+
             if (query.length >= 2) {
                 searchTimeout = setTimeout(() => {
                     performSearch(query);
@@ -142,8 +144,12 @@
         if (!autocompleteResults) return;
 
         try {
-            const response = await fetch(`${BASE_URL}/api/search.php?q=${encodeURIComponent(query)}&limit=5`);
-            
+            const apiUrl = typeof getApiUrl === 'function'
+                ? getApiUrl(`/api/search.php?q=${encodeURIComponent(query)}&limit=5`)
+                : `${BASE_URL}/api/search.php?q=${encodeURIComponent(query)}&limit=5`;
+
+            const response = await fetch(apiUrl);
+
             // Verificar que la respuesta sea JSON
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
@@ -151,9 +157,9 @@
                 console.error('Respuesta no es JSON:', text.substring(0, 200));
                 throw new Error('El servidor devolvió HTML en lugar de JSON');
             }
-            
+
             const data = await response.json();
-            
+
             if (data.success && data.data && data.data.length > 0) {
                 displayAutocompleteResults(data.data);
             } else {
@@ -173,7 +179,7 @@
             const type = item.type === 'movie' ? 'Película' : 'Serie';
             const year = item.release_year || '';
             const poster = item.poster_url || FALLBACK_POSTER;
-            
+
             return `
                 <div class="result-item" onclick="window.location.href='${BASE_URL}/content-detail.php?id=${item.id}'">
                     <img src="${poster}" alt="${item.title}" onerror="this.src='${FALLBACK_POSTER}'">
@@ -216,7 +222,7 @@
         const searchContainer = document.getElementById('searchContainer');
         const searchInput = document.getElementById('searchInput');
         const searchClear = document.getElementById('searchClear');
-        
+
         if (searchContainer) {
             searchContainer.classList.remove('active');
         }
@@ -240,12 +246,12 @@
     // ============================================
     function initRowNavigation() {
         const rowContainers = document.querySelectorAll('.row-container');
-        
+
         rowContainers.forEach(container => {
             const rowContent = container.querySelector('.row-content');
             const prevBtn = container.querySelector('.row-nav.prev');
             const nextBtn = container.querySelector('.row-nav.next');
-            
+
             if (!rowContent || !prevBtn || !nextBtn) return;
 
             // Previous button
@@ -281,10 +287,10 @@
             function updateNavButtons() {
                 const isAtStart = rowContent.scrollLeft <= 10;
                 const isAtEnd = rowContent.scrollLeft >= rowContent.scrollWidth - rowContent.clientWidth - 10;
-                
+
                 prevBtn.style.opacity = isAtStart ? '0' : '1';
                 prevBtn.style.pointerEvents = isAtStart ? 'none' : 'auto';
-                
+
                 nextBtn.style.opacity = isAtEnd ? '0' : '1';
                 nextBtn.style.pointerEvents = isAtEnd ? 'none' : 'auto';
             }
@@ -299,7 +305,7 @@
     // ============================================
     function initContentCards() {
         const contentCards = document.querySelectorAll('.content-card');
-        
+
         contentCards.forEach(card => {
             // Play button
             const playBtn = card.querySelector('[data-action="play"]');
@@ -350,7 +356,7 @@
             window.playContent(id, type);
         } else {
             // Fallback: redirigir a página de reproducción
-        window.location.href = `${BASE_URL}/watch.php?id=${id}&type=${type}`;
+            window.location.href = `${BASE_URL}/watch.php?id=${id}&type=${type}`;
         }
     }
 
@@ -362,30 +368,30 @@
             },
             body: JSON.stringify({ content_id: id })
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                if (typeof window.showToast === 'function') {
-                    window.showToast('Añadido a Mi lista', 'success');
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('Añadido a Mi lista', 'success');
+                    } else {
+                        showNotification('Añadido a Mi lista', 'success');
+                    }
                 } else {
-                    showNotification('Añadido a Mi lista', 'success');
+                    if (typeof window.showToast === 'function') {
+                        window.showToast(data.message || 'Error al añadir', 'error');
+                    } else {
+                        showNotification(data.message || 'Error al añadir', 'error');
+                    }
                 }
-            } else {
+            })
+            .catch(error => {
+                console.error('Error:', error);
                 if (typeof window.showToast === 'function') {
-                    window.showToast(data.message || 'Error al añadir', 'error');
+                    window.showToast('Error al añadir a la lista', 'error');
                 } else {
-                    showNotification(data.message || 'Error al añadir', 'error');
+                    showNotification('Error al añadir a la lista', 'error');
                 }
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            if (typeof window.showToast === 'function') {
-                window.showToast('Error al añadir a la lista', 'error');
-            } else {
-                showNotification('Error al añadir a la lista', 'error');
-            }
-        });
+            });
     }
 
     function handleShowInfo(id, type) {
@@ -412,9 +418,9 @@
             z-index: 10000;
             animation: slideIn 0.3s ease;
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => notification.remove(), 300);
@@ -455,9 +461,9 @@
     function setupMobileMenu() {
         const mobileMenuToggle = document.getElementById('mobileMenuToggle');
         const navbarNav = document.getElementById('navbarNav');
-        
+
         if (mobileMenuToggle && navbarNav) {
-            mobileMenuToggle.addEventListener('click', function() {
+            mobileMenuToggle.addEventListener('click', function () {
                 navbarNav.classList.toggle('active');
                 this.classList.toggle('active');
                 const icon = this.querySelector('i');
@@ -471,7 +477,7 @@
                     document.body.style.overflow = '';
                 }
             });
-            
+
             // Cerrar menú al hacer clic en un enlace
             navbarNav.querySelectorAll('.nav-link').forEach(link => {
                 link.addEventListener('click', () => {
@@ -485,7 +491,7 @@
                     document.body.style.overflow = '';
                 });
             });
-            
+
             // Cerrar menú al hacer clic fuera
             document.addEventListener('click', (e) => {
                 if (navbarNav.classList.contains('active')) {
@@ -501,7 +507,7 @@
                     }
                 }
             });
-            
+
             // Cerrar menú con tecla Escape
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && navbarNav.classList.contains('active')) {
@@ -524,23 +530,23 @@
     function setupUserMenu() {
         const userMenu = document.getElementById('userMenu');
         if (!userMenu) return;
-        
+
         const userMenuToggle = userMenu.querySelector('.user-menu-toggle');
         const userDropdown = document.getElementById('userDropdown');
-        
+
         if (userMenuToggle && userDropdown) {
             userMenuToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
                 userMenu.classList.toggle('active');
             });
-            
+
             // Cerrar menú al hacer clic fuera
             document.addEventListener('click', (e) => {
                 if (!userMenu.contains(e.target)) {
                     userMenu.classList.remove('active');
                 }
             });
-            
+
             // Cerrar al hacer clic en un item
             userDropdown.querySelectorAll('.dropdown-item').forEach(item => {
                 item.addEventListener('click', () => {

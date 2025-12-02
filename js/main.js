@@ -144,7 +144,7 @@ async function loadCarousel() {
 
     try {
         // Usar el endpoint de featured que no requiere autenticación
-        const response = await fetch(`${APP_BASE_URL}/api/content/featured.php?limit=5`);
+        const response = await fetch(`${APP_BASE_URL}/api/content/featured?limit=5`);
         if (!response.ok) throw new Error('Error al cargar el contenido del carrusel');
 
         // Verificar que la respuesta sea JSON
@@ -236,7 +236,7 @@ async function loadPopularContent() {
     // Cargar películas populares
     if (elements.popularMovies) {
         try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=movie&limit=8`);
+            const response = await fetch(`${APP_BASE_URL}/api/content/popular?type=movie&limit=8`);
             if (!response.ok) throw new Error('Error al cargar películas');
 
             // Verificar que la respuesta sea JSON
@@ -268,7 +268,7 @@ async function loadPopularContent() {
     // Cargar series populares
     if (elements.popularSeries) {
         try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=series&limit=8`);
+            const response = await fetch(`${APP_BASE_URL}/api/content/popular?type=series&limit=8`);
             if (!response.ok) throw new Error('Error al cargar series');
 
             // Verificar que la respuesta sea JSON
@@ -686,12 +686,20 @@ function getActiveVideoElement() {
     if (torrentVideo && torrentVideo.style.display !== 'none') {
         return torrentVideo;
     }
+
     // Si hay un reproductor de YouTube activo, retornar null (se maneja diferente)
     if (window.player && typeof window.player.getCurrentTime === 'function') {
         return null; // YouTube player se maneja diferente
     }
-    // Si torrentVideo existe pero no está visible, retornarlo; si no existe, retornar null
-    return torrentVideo && torrentVideo.style.display === 'none' ? torrentVideo : null;
+
+    // Intentar obtener el video HTML5 estándar
+    const standardVideo = document.querySelector('.video-player video');
+    if (standardVideo) {
+        return standardVideo;
+    }
+
+    // Si no hay ningún video activo, retornar null
+    return null;
 }
 
 // Inicializar controles del reproductor
@@ -1374,7 +1382,7 @@ window.playContent = async function (id, type, videoData = null) {
     if (!content) {
         // Si no está en caché, buscar en la API
         try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/index.php?id=${id}`);
+            const response = await fetch(`${APP_BASE_URL}/api/content/${id}`);
             if (!response.ok) throw new Error('Contenido no encontrado en el servidor');
 
             // Verificar que la respuesta sea JSON

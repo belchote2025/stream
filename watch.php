@@ -70,9 +70,10 @@ if (isLoggedIn() && $content) {
 $pageTitle = 'Reproducir: ' . htmlspecialchars($content['title']) . ' - ' . SITE_NAME;
 
 include __DIR__ . '/includes/header.php';
+$baseUrl = rtrim(SITE_URL, '/');
 ?>
 
-<link rel="stylesheet" href="/css/unified-video-player.css">
+<link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/unified-video-player.css">
 
 <style>
 .watch-page {
@@ -580,21 +581,21 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <!-- Scripts del reproductor -->
-<script src="/js/player/config.js"></script>
-<script src="/js/player/main.js"></script>
-<script src="/js/player/init.js"></script>
+<script src="<?php echo $baseUrl; ?>/js/player/config.js"></script>
+<script src="<?php echo $baseUrl; ?>/js/player/main.js"></script>
+<script src="<?php echo $baseUrl; ?>/js/player/init.js"></script>
 
 <script>
 // Inicializar el reproductor cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
     // Obtener la URL del video desde PHP
-    const videoUrl = '<?php 
+    const videoUrl = <?php 
         if ($content['type'] === 'series' && $episode) {
-            echo addslashes($episode['video_url']);
+            echo json_encode($episode['video_url'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
         } else {
-            echo addslashes($content['video_url']);
+            echo json_encode($content['video_url'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
         }
-    ?>';
+    ?>;
     
     // Determinar el tipo de video
     let videoType = '<?php echo $content['video_type'] ?? 'local'; ?>';
@@ -944,8 +945,8 @@ function showVideoError(message) {
 const contentId = <?php echo $contentId; ?>;
 const episodeId = <?php echo $episodeId ? $episodeId : 'null'; ?>;
 const duration = <?php echo $episode ? ($episode['duration'] * 60) : ($content['duration'] * 60); ?>;
-const videoUrl = <?php echo ($hasVideo && $videoUrl) ? "'" . htmlspecialchars($videoUrl, ENT_QUOTES) . "'" : 'null'; ?>;
-const torrentMagnet = <?php echo ($hasVideo && $torrentMagnet) ? "'" . htmlspecialchars($torrentMagnet, ENT_QUOTES) . "'" : 'null'; ?>;
+const videoUrlGlobal = <?php echo ($hasVideo && $videoUrl) ? json_encode($videoUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
+const torrentMagnet = <?php echo ($hasVideo && $torrentMagnet) ? json_encode($torrentMagnet, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
 
 let player = null;
 let saveInterval;

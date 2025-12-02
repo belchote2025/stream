@@ -12,26 +12,10 @@ document.addEventListener('DOMContentLoaded', function () {
             // Mostrar indicador de carga
             recentSeriesContainer.innerHTML = '<div class="loading-skeleton" style="height: 300px; width: 100%;"></div>';
 
-            // Obtener la URL base correcta
-            // Usar la variable global si está disponible
-            let baseUrl = window.__APP_BASE_URL || '';
-
-            // Si no está definida, intentar detectarla
-            if (!baseUrl) {
-                baseUrl = window.location.origin;
-                const pathParts = window.location.pathname.split('/').filter(Boolean);
-
-                // Si estamos en una subcarpeta (como /streaming-platform/)
-                if (pathParts.length > 0 && pathParts[0] === 'streaming-platform') {
-                    baseUrl += '/streaming-platform';
-                } else if (pathParts.length > 0) {
-                    // Asumir que la primera parte es la carpeta del proyecto
-                    baseUrl += '/' + pathParts[0];
-                }
-            }
-
-            // Construir la URL de la API
-            const apiUrl = `${baseUrl}/api/content/recent.php?type=series&limit=12`;
+            // Construir la URL de la API usando el helper global
+            const apiUrl = typeof getApiUrl === 'function'
+                ? getApiUrl('/api/content/recent?type=series&limit=12')
+                : (window.__APP_BASE_URL || '') + '/api/content/recent?type=series&limit=12';
             console.log('Fetching from:', apiUrl);
 
             const response = await fetch(apiUrl, {
@@ -58,7 +42,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Generar el HTML de las series
-            const defaultPoster = baseUrl + '/assets/img/default-poster.svg';
+            const defaultPoster = typeof getAssetUrl === 'function'
+                ? getAssetUrl('/assets/img/default-poster.svg')
+                : (window.__APP_BASE_URL || '') + '/assets/img/default-poster.svg';
 
             const seriesHTML = data.map(series => {
                 const posterUrl = series.poster_url || defaultPoster;

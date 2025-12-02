@@ -1,6 +1,6 @@
 <?php
 /**
- * API: Estadísticas del dashboard de administración
+ * API: Estadísticas avanzadas del dashboard de administración
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/config.php';
@@ -9,6 +9,10 @@ requireAdmin();
 $db = getDbConnection();
 
 try {
+    // ============================================
+    // USUARIOS
+    // ============================================
+    
     // Usuarios totales
     $stmt = $db->query("SELECT COUNT(*) as total FROM users");
     $totalUsers = (int)$stmt->fetch()['total'];
@@ -22,7 +26,7 @@ try {
     ");
     $newUsersThisMonth = (int)$stmt->fetch()['total'];
     
-    // Usuarios el mes pasado (para calcular el cambio porcentual)
+    // Usuarios el mes pasado
     $stmt = $db->query("
         SELECT COUNT(*) as total 
         FROM users 
@@ -31,6 +35,37 @@ try {
     ");
     $lastMonthUsers = (int)$stmt->fetch()['total'];
     $usersChangePercent = $lastMonthUsers > 0 ? round((($newUsersThisMonth - $lastMonthUsers) / $lastMonthUsers) * 100) : 0;
+    
+    // Usuarios activos (últimos 7 días)
+    $stmt = $db->query("
+        SELECT COUNT(DISTINCT user_id) as total 
+        FROM playback_history 
+        WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    ");
+    $activeUsersWeek = (int)($stmt->fetch()['total'] ?? 0);
+    
+    // Usuarios premium
+    $stmt = $db->query("
+        SELECT COUNT(*) as total 
+        FROM users 
+        WHERE role = 'premium' OR role = 'admin'
+    ");
+    $premiumUsers = (int)$stmt->fetch()['total'];
+    
+    // Distribución por rol
+    $stmt = $db->query("
+        SELECT role, COUNT(*) as count 
+        FROM users 
+        GROUP BY role
+    ");
+    $usersByRole = [];
+    while ($row = $stmt->fetch()) {
+        $usersByRole[$row['role']] = (int)$row['count'];
+    }
+    
+    // ============================================
+    // CONTENIDO
+    // ============================================
     
     // Películas totales
     $stmt = $db->query("SELECT COUNT(*) as total FROM content WHERE type = 'movie'");
@@ -60,39 +95,69 @@ try {
     ");
     $newSeriesThisMonth = (int)$stmt->fetch()['total'];
     
-    // Contenido nuevo este mes (total)
+    // Contenido destacado
+    $stmt = $db->query("SELECT COUNT(*) as total FROM content WHERE is_featured = 1");
+    $featuredContent = (int)$stmt->fetch()['total'];
+    
+    // Contenido premium
+    $stmt = $db->query("SELECT COUNT(*) as total FROM content WHERE is_premium = 1");
+    $premiumContent = (int)$stmt->fetch()['total'];
+    
+    // ============================================
+    // VISTAS Y ENGAGEMENT
+    // ============================================
+    
+    // Vistas totales
+    $stmt = $db->query("SELECT SUM(view_count) as total FROM content");
+    $totalViews = (int)($stmt->fetch()['total'] ?? 0);
+    
+    // Vistas este mes
     $stmt = $db->query("
         SELECT COUNT(*) as total 
-        FROM content 
+        FROM playback_history 
         WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) 
         AND YEAR(created_at) = YEAR(CURRENT_DATE())
     ");
-    $newContentThisMonth = (int)$stmt->fetch()['total'];
+    $viewsThisMonth = (int)($stmt->fetch()['total'] ?? 0);
     
-    // Vistas totales
-    $stmt = $db->query("SELECT SUM(views) as total FROM content");
-    $totalViews = (int)($stmt->fetch()['total'] ?? 0);
+    // Vistas hoy
+    $stmt = $db->query("
+        SELECT COUNT(*) as total 
+        FROM playback_history 
+        WHERE DATE(created_at) = CURDATE()
+    ");
+    $viewsToday = (int)($stmt->fetch()['total'] ?? 0);
     
-    // Vistas este mes (desde la tabla views si existe)
-    $totalViewsThisMonth = 0;
-    try {
-        $stmt = $db->query("
-            SELECT COUNT(*) as total 
-            FROM views 
-            WHERE MONTH(viewed_at) = MONTH(CURRENT_DATE()) 
-            AND YEAR(viewed_at) = YEAR(CURRENT_DATE())
-        ");
-        $totalViewsThisMonth = (int)$stmt->fetch()['total'];
-    } catch (PDOException $e) {
-        // Si la tabla views no existe, usar 0
-        $totalViewsThisMonth = 0;
-    }
+    // Contenido más visto (últimos 30 días)
+    $stmt = $db->query("
+        SELECT c.id, c.title, c.type, COUNT(ph.id) as views
+        FROM content c
+        LEFT JOIN playback_history ph ON c.id = ph.content_id
+        WHERE ph.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        GROUP BY c.id
+        ORDER BY views DESC
+        LIMIT 5
+    ");
+    $topContent = $stmt->fetchAll();
     
-    // Ingresos mensuales (desde suscripciones si existe la tabla)
+    // Tiempo promedio de visualización (en minutos)
+    $stmt = $db->query("
+        SELECT AVG(progress / 60) as avg_minutes
+        FROM playback_history
+        WHERE progress > 0
+    ");
+    $avgWatchTime = round((float)($stmt->fetch()['avg_minutes'] ?? 0), 1);
+    
+    // ============================================
+    // INGRESOS (si existe tabla subscriptions)
+    // ============================================
+    
     $monthlyRevenue = 0;
     $revenueChangePercent = 0;
+    $totalRevenue = 0;
+    
     try {
-        // Intentar obtener ingresos de suscripciones activas
+        // Ingresos este mes
         $stmt = $db->query("
             SELECT SUM(price) as total 
             FROM subscriptions 
@@ -102,7 +167,15 @@ try {
         ");
         $monthlyRevenue = (float)($stmt->fetch()['total'] ?? 0);
         
-        // Ingresos del mes pasado
+        // Ingresos totales
+        $stmt = $db->query("
+            SELECT SUM(price) as total 
+            FROM subscriptions 
+            WHERE status = 'active'
+        ");
+        $totalRevenue = (float)($stmt->fetch()['total'] ?? 0);
+        
+        // Ingresos mes pasado
         $stmt = $db->query("
             SELECT SUM(price) as total 
             FROM subscriptions 
@@ -116,43 +189,74 @@ try {
             $revenueChangePercent = round((($monthlyRevenue - $lastMonthRevenue) / $lastMonthRevenue) * 100);
         }
     } catch (PDOException $e) {
-        // Si la tabla no existe, usar 0
-        $monthlyRevenue = 0;
+        // Tabla no existe
     }
     
-    // Usuarios activos (con login en los últimos 30 días)
-    $stmt = $db->query("
-        SELECT COUNT(DISTINCT user_id) as total 
-        FROM views 
-        WHERE viewed_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
-    ");
-    $activeUsers = (int)($stmt->fetch()['total'] ?? 0);
+    // ============================================
+    // TENDENCIAS (últimos 7 días)
+    // ============================================
     
-    // Usuarios premium
     $stmt = $db->query("
-        SELECT COUNT(*) as total 
-        FROM users 
-        WHERE role = 'premium' OR role = 'admin'
+        SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as views
+        FROM playback_history
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
     ");
-    $premiumUsers = (int)$stmt->fetch()['total'];
+    $viewsTrend = $stmt->fetchAll();
+    
+    $stmt = $db->query("
+        SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as users
+        FROM users
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+    ");
+    $usersTrend = $stmt->fetchAll();
+    
+    // ============================================
+    // RESPUESTA
+    // ============================================
     
     echo json_encode([
         'success' => true,
         'data' => [
+            // Usuarios
             'totalUsers' => $totalUsers,
             'newUsersThisMonth' => $newUsersThisMonth,
             'usersChangePercent' => $usersChangePercent,
+            'activeUsersWeek' => $activeUsersWeek,
+            'premiumUsers' => $premiumUsers,
+            'usersByRole' => $usersByRole,
+            
+            // Contenido
             'totalMovies' => $totalMovies,
             'newMoviesThisMonth' => $newMoviesThisMonth,
             'totalSeries' => $totalSeries,
             'newSeriesThisMonth' => $newSeriesThisMonth,
-            'newContentThisMonth' => $newContentThisMonth,
+            'newContentThisMonth' => $newMoviesThisMonth + $newSeriesThisMonth,
+            'featuredContent' => $featuredContent,
+            'premiumContent' => $premiumContent,
+            
+            // Vistas
             'totalViews' => $totalViews,
-            'totalViewsThisMonth' => $totalViewsThisMonth,
+            'viewsThisMonth' => $viewsThisMonth,
+            'viewsToday' => $viewsToday,
+            'avgWatchTime' => $avgWatchTime,
+            'topContent' => $topContent,
+            
+            // Ingresos
             'monthlyRevenue' => $monthlyRevenue,
+            'totalRevenue' => $totalRevenue,
             'revenueChangePercent' => $revenueChangePercent,
-            'activeUsers' => $activeUsers,
-            'premiumUsers' => $premiumUsers
+            
+            // Tendencias
+            'viewsTrend' => $viewsTrend,
+            'usersTrend' => $usersTrend
         ]
     ]);
     
@@ -163,4 +267,3 @@ try {
         'error' => 'Error al obtener estadísticas: ' . $e->getMessage()
     ]);
 }
-

@@ -258,6 +258,58 @@ class UnifiedVideoPlayer {
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
     }
     
+    // Crear estructura del reproductor
+    createPlayerStructure() {
+        if (!this.container) {
+            console.error('Container not found');
+            return;
+        }
+        
+        // Si el contenedor ya tiene contenido, no recrear
+        if (this.container.querySelector('video, #youtubePlayerContainer, #torrentPlayerContainer')) {
+            return;
+        }
+        
+        // Crear estructura básica si no existe
+        const wrapper = document.createElement('div');
+        wrapper.className = 'unified-video-wrapper';
+        wrapper.innerHTML = `
+            <div class="video-loading-overlay" id="videoLoading">
+                <div class="loading-spinner"></div>
+                <p>Cargando video...</p>
+            </div>
+            <div class="video-error-overlay" id="videoError" style="display: none;">
+                <div class="error-content">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error al cargar el video</h3>
+                    <p id="errorMessage">No se pudo cargar el video.</p>
+                </div>
+            </div>
+            <video id="unifiedVideoPlayer" class="video-player" controls playsinline preload="${this.options.preload || 'metadata'}" style="display: none;"></video>
+            <div id="youtubePlayerContainer" style="display: none;"></div>
+            <div id="torrentPlayerContainer" style="display: none;"></div>
+        `;
+        
+        this.container.appendChild(wrapper);
+        this.videoElement = document.getElementById('unifiedVideoPlayer');
+    }
+    
+    // Mostrar indicador de carga
+    showLoading() {
+        const loadingElement = this.container.querySelector('#videoLoading');
+        if (loadingElement) {
+            loadingElement.style.display = 'flex';
+        }
+    }
+    
+    // Ocultar indicador de carga
+    hideLoading() {
+        const loadingElement = this.container.querySelector('#videoLoading');
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+    }
+    
     // Manejo de errores
     handleError(error) {
         console.error('Error en el reproductor:', error);

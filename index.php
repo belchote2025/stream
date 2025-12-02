@@ -54,47 +54,38 @@ function getCachedContent($callback, $cacheKey, $params = [], $ttl = 3600) {
 
 // Get all content in parallel using caching
 $contentTypes = [
-    'featured' => function() use ($db) {
+    'featuredContent' => function() use ($db) {
         $content = getLatestWithTrailers($db, 5);
-        return empty($content) ? getFeaturedContent($db, 5) : $content;
+        $data = empty($content) ? getFeaturedContent($db, 5) : $content;
+        return addImdbImagesToContent($data);
     },
-    'recentMovies' => fn() => getRecentlyAdded($db, 'movie', 10),
-    'recentSeries' => fn() => getRecentlyAdded($db, 'series', 10),
-    'popularMovies' => fn() => getMostViewed($db, 'movie', 10),
-    'popularSeries' => fn() => getMostViewed($db, 'series', 10),
-    'imdbMovies' => fn() => getImdbTopContent($db, 10),
-    'localVideos' => fn() => getLocalUploadedVideos($db, 10)
+    'recentMovies' => function() use ($db) {
+        return addImdbImagesToContent(getRecentlyAdded($db, 'movie', 10));
+    },
+    'recentSeries' => function() use ($db) {
+        return addImdbImagesToContent(getRecentlyAdded($db, 'series', 10));
+    },
+    'popularMovies' => function() use ($db) {
+        return addImdbImagesToContent(getMostViewed($db, 'movie', 10));
+    },
+    'popularSeries' => function() use ($db) {
+        return addImdbImagesToContent(getMostViewed($db, 'series', 10));
+    },
+    'imdbMovies' => function() use ($db) {
+        return addImdbImagesToContent(getImdbTopContent($db, 10));
+    },
+    'localVideos' => function() use ($db) {
+        return addImdbImagesToContent(getLocalUploadedVideos($db, 10));
+    }
 ];
 
 $results = [];
 foreach ($contentTypes as $key => $callback) {
+    // Cache for 1 hour
     $results[$key] = getCachedContent($callback, $key . '_' . date('Y-m-d-H'));
 }
 
 extract($results);
-
-// Add IMDB images in a single batch
-$allContent = array_merge(
-    $featuredContent ?? [],
-    $recentMovies ?? [],
-    $recentSeries ?? [],
-    $popularMovies ?? [],
-    $popularSeries ?? [],
-    $imdbMovies ?? [],
-    $localVideos ?? []
-);
-
-// Process all content in a single batch
-$allContent = addImdbImagesToContent($allContent);
-
-// Reassign variables with processed content
-$featuredContent = array_slice($allContent, 0, count($featuredContent ?? []));
-$recentMovies = array_slice($allContent, count($featuredContent ?? []), count($recentMovies ?? []));
-$recentSeries = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []), count($recentSeries ?? []));
-$popularMovies = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []) + count($recentSeries ?? []), count($popularMovies ?? []));
-$popularSeries = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []) + count($recentSeries ?? []) + count($popularMovies ?? []), count($popularSeries ?? []));
-$imdbMovies = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []) + count($recentSeries ?? []) + count($popularMovies ?? []) + count($popularSeries ?? []), count($imdbMovies ?? []));
-$localVideos = array_slice($allContent, count($featuredContent ?? []) + count($recentMovies ?? []) + count($recentSeries ?? []) + count($popularMovies ?? []) + count($popularSeries ?? []) + count($imdbMovies ?? []), count($localVideos ?? []));
 
 // Include header
 include __DIR__ . '/includes/header.php';
@@ -107,7 +98,8 @@ include __DIR__ . '/includes/header.php';
             $backdropUrl = htmlspecialchars($content['backdrop_url'] ?? $content['poster_url'] ?? '');
             $posterUrl = htmlspecialchars($content['poster_url'] ?? $backdropUrl);
             $title = htmlspecialchars($content['title'] ?? '');
-            $overview = htmlspecialchars(substr($content['overview'] ?? '', 0, 200) . (strlen($content['overview'] ?? '') > 200 ? '...' : ''));
+            $description = $content['description'] ?? $content['overview'] ?? '';
+            $overview = htmlspecialchars(substr($description, 0, 200) . (strlen($description) > 200 ? '...' : ''));
             $trailerUrl = htmlspecialchars($content['trailer_url'] ?? '');
             $contentId = $content['id'] ?? '';
         ?>
@@ -142,7 +134,7 @@ include __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
     <?php else: ?>
         <div class="hero-slide active">
-            <div class="hero-backdrop" style="background-image: url('<?php echo $baseUrl; ?>/assets/img/default-backdrop.svg'); background-size: cover;"></div>
+            <div class="hero-backdrop" style="background-image: url('<?php echo $baseUrl; ?>/assets/img/default-backdrop.jpg.php'); background-size: cover;"></div>
         </div>
     <?php endif; ?>
     <div class="hero-overlay"></div>

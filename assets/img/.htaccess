@@ -1,13 +1,16 @@
-# Redirigir peticiones .jpg a .svg si no existen
+# Redirigir peticiones de imágenes faltantes
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    
+
+    # Si se solicita placeholder.png y no existe, usar default-poster.svg
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^placeholder\.png$ default-poster.svg [L]
+
     # Si se solicita default-poster.jpg y no existe, usar default-poster.svg
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^default-poster\.jpg$ default-poster.svg [L]
-    
+
     # Si se solicita default-backdrop.jpg y no existe, usar default-backdrop.svg
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^default-backdrop\.jpg$ default-backdrop.svg [L]
 </IfModule>
-

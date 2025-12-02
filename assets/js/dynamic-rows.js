@@ -6,17 +6,18 @@
 document.addEventListener('DOMContentLoaded', function () {
     // Configuration
     const config = {
-        // Get base URL from window.__APP_BASE_URL or detect from current location
-        apiBaseUrl: window.__APP_BASE_URL || window.location.origin +
-            (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : ''),
+        // Get base URL using global helper or fallback
+        apiBaseUrl: typeof getApiUrl === 'function'
+            ? getApiUrl('').replace(/\/$/, '') // Remove trailing slash if present
+            : (window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '')),
 
         // API endpoints - relative to apiBaseUrl
         endpoints: {
             content: '/api/content',
-            movies: '/api/content/movies.php',
-            series: '/api/content/series.php',
-            recent: '/api/content/recent.php',
-            popular: '/api/content/popular.php'
+            movies: '/api/content/movies',
+            series: '/api/content/series',
+            recent: '/api/content/recent',
+            popular: '/api/content/popular'
         },
 
         // Default number of items to load
@@ -68,8 +69,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Determine which API endpoint to use based on sort/source
             if (sort === 'popular' || source === 'popular') {
-                // Use popular.php endpoint
-                endpoint = `${config.apiBaseUrl}/api/content/popular.php`;
+                // Use popular endpoint
+                endpoint = `${config.apiBaseUrl}/api/content/popular`;
                 params.append('limit', limit);
 
                 // Add type if specified
@@ -78,8 +79,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
             } else if (sort === 'recent' || source === 'recent' || source === 'local') {
-                // Use recent.php endpoint
-                endpoint = `${config.apiBaseUrl}/api/content/recent.php`;
+                // Use recent endpoint
+                endpoint = `${config.apiBaseUrl}/api/content/recent`;
                 params.append('limit', limit);
 
                 // Add type if specified
@@ -88,8 +89,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
             } else if (source === 'imdb') {
-                // Use popular.php with type filter for IMDB content
-                endpoint = `${config.apiBaseUrl}/api/content/popular.php`;
+                // Use popular with type filter for IMDB content
+                endpoint = `${config.apiBaseUrl}/api/content/popular`;
                 params.append('limit', limit);
 
                 if (type && type !== 'content') {
@@ -97,8 +98,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
             } else {
-                // Fallback to recent.php
-                endpoint = `${config.apiBaseUrl}/api/content/recent.php`;
+                // Fallback to recent
+                endpoint = `${config.apiBaseUrl}/api/content/recent`;
                 params.append('limit', limit);
 
                 if (type && type !== 'content') {
@@ -177,22 +178,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const id = item.id || '';
         const type = item.type || 'content';
 
+        // Validar y sanitizar URLs
+        const safePosterUrl = posterUrl && posterUrl.trim() !== '' ? posterUrl : `${config.apiBaseUrl}/assets/img/default-poster.svg`;
+        const safeDefaultUrl = `${config.apiBaseUrl}/assets/img/default-poster.svg`;
+
         return `
             <div class="content-item" data-id="${id}" data-type="${type}">
                 <div class="content-card">
                     <div class="content-poster">
-                        <img 
-                            src="${config.apiBaseUrl}/assets/img/placeholder.png" 
-                            data-src="${posterUrl}" 
-                            alt="${title}" 
-                            class="lazyload"
-                            onerror="this.onerror=null; this.src='${config.apiBaseUrl}/assets/img/default-poster.svg'"
+                        <img
+                            src="${safePosterUrl}"
+                            alt="${title}"
+                            loading="lazy"
+                            onerror="this.onerror=null; this.src='${safeDefaultUrl}'; this.style.background='linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%)';"
+                            style="background: linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%);"
                         >
                         <div class="content-overlay">
-                            <button class="btn-play" data-action="play" data-id="${id}" data-type="${type}">
+                            <button class="btn-play action-btn" data-action="play" data-id="${id}" data-type="${type}" title="Reproducir">
                                 <i class="fas fa-play"></i>
                             </button>
-                            <button class="btn-info" data-action="info" data-id="${id}" data-type="${type}">
+                            <button class="btn-info action-btn" data-action="info" data-id="${id}" data-type="${type}" title="Más información">
                                 <i class="fas fa-info-circle"></i>
                             </button>
                         </div>

@@ -9,6 +9,7 @@ $pageTitle = 'Películas - ' . SITE_NAME;
 
 // Obtener conexión a la base de datos
 $db = getDbConnection();
+$baseUrl = rtrim(SITE_URL, '/');
 
 // Obtener películas
 $movies = getRecentlyAdded($db, 'movie', 50);
@@ -141,7 +142,7 @@ include __DIR__ . '/includes/header.php';
                 $duration = $movie['duration'] ?? '';
                 $rating = isset($movie['rating']) && $movie['rating'] > 0 ? number_format($movie['rating'], 1) : '';
             ?>
-                <div class="movie-card" onclick="window.location.href='/content.php?id=<?php echo $movie['id']; ?>'">
+                <div class="movie-card" onclick="window.location.href='<?php echo $baseUrl; ?>/content.php?id=<?php echo $movie['id']; ?>'">
                     <?php if ($isPremium): ?>
                         <span class="movie-badge premium">
                             <i class="fas fa-crown"></i> PREMIUM

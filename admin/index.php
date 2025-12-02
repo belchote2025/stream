@@ -646,7 +646,12 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
     <script>
         window.__APP_BASE_URL = '<?php echo $baseUrl; ?>';
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/utils.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/admin-charts.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/admin-enhanced.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/admin.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/notifications.js"></script>
 </body>
 </html>
 

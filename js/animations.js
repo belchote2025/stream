@@ -2,9 +2,11 @@
  * Animaciones y efectos mejorados estilo Netflix
  */
 
-(function() {
+(function () {
     const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
-    const FALLBACK_POSTER = `${BASE_URL}/assets/img/default-poster.svg`;
+    const FALLBACK_POSTER = typeof getAssetUrl === 'function'
+        ? getAssetUrl('/assets/img/default-poster.svg')
+        : `${BASE_URL}/assets/img/default-poster.svg`;
     'use strict';
 
     // ============================================
@@ -39,10 +41,10 @@
     // ============================================
     function initSmoothScroll() {
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
+            anchor.addEventListener('click', function (e) {
                 const href = this.getAttribute('href');
                 if (href === '#') return;
-                
+
                 e.preventDefault();
                 const target = document.querySelector(href);
                 if (target) {
@@ -83,12 +85,12 @@
                 <span>${message}</span>
             </div>
         `;
-        
+
         document.body.appendChild(toast);
-        
+
         // Animar entrada
         setTimeout(() => toast.classList.add('show'), 10);
-        
+
         // Remover después de la duración
         setTimeout(() => {
             toast.classList.remove('show');
@@ -138,10 +140,10 @@
     // ============================================
     function initParallax() {
         const parallaxElements = document.querySelectorAll('.parallax');
-        
+
         window.addEventListener('scroll', () => {
             const scrolled = window.pageYOffset;
-            
+
             parallaxElements.forEach(element => {
                 const speed = element.dataset.speed || 0.5;
                 const yPos = -(scrolled * speed);
@@ -155,13 +157,13 @@
     // ============================================
     function initCardHoverEffects() {
         const cards = document.querySelectorAll('.content-card');
-        
+
         cards.forEach(card => {
-            card.addEventListener('mouseenter', function() {
+            card.addEventListener('mouseenter', function () {
                 this.style.zIndex = '100';
             });
-            
-            card.addEventListener('mouseleave', function() {
+
+            card.addEventListener('mouseleave', function () {
                 this.style.zIndex = '';
             });
         });
@@ -179,7 +181,7 @@
         autocompleteContainer.className = 'autocomplete-results';
         searchInput.parentElement.appendChild(autocompleteContainer);
 
-        searchInput.addEventListener('input', function() {
+        searchInput.addEventListener('input', function () {
             clearTimeout(timeout);
             const query = this.value.trim();
 
@@ -190,8 +192,12 @@
 
             timeout = setTimeout(async () => {
                 try {
-                    const response = await fetch(`${BASE_URL}/api/content/popular.php?limit=5`);
-                    
+                    const apiUrl = typeof getApiUrl === 'function'
+                        ? getApiUrl('/api/content/popular?limit=5')
+                        : `${BASE_URL}/api/content/popular?limit=5`;
+
+                    const response = await fetch(apiUrl);
+
                     // Verificar que la respuesta sea JSON
                     const contentType = response.headers.get('content-type');
                     if (!contentType || !contentType.includes('application/json')) {
@@ -199,11 +205,11 @@
                         console.error('Respuesta no es JSON:', text.substring(0, 200));
                         throw new Error('El servidor devolvió HTML en lugar de JSON');
                     }
-                    
+
                     const data = await response.json();
-                    
+
                     if (data.success && data.data) {
-                        const results = data.data.filter(item => 
+                        const results = data.data.filter(item =>
                             item.title.toLowerCase().includes(query.toLowerCase())
                         ).slice(0, 5);
 
@@ -246,7 +252,7 @@
         initParallax();
         initCardHoverEffects();
         initSearchAutocomplete();
-        
+
         // Asegurar que el contenido principal sea visible inmediatamente si está en viewport
         setTimeout(() => {
             const contentRows = document.querySelector('.content-rows.fade-in');
@@ -262,13 +268,13 @@
 
     // Flag para prevenir múltiples inicializaciones
     let initialized = false;
-    
+
     function safeInit() {
         if (initialized) return;
         initialized = true;
         init();
     }
-    
+
     // Wait for DOM
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', safeInit);
@@ -417,4 +423,3 @@
     document.head.appendChild(style);
 
 })();
-

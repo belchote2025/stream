@@ -507,3 +507,42 @@ function renderGallery($content) {
     
     return $html;
 }
+
+/**
+ * Formatea la duración en un formato legible
+ * 
+ * @param int|string $duration Duración en minutos o segundos
+ * @return string Duración formateada (ej: "120 min", "2h 30min", "45 min")
+ */
+function formatDuration($duration) {
+    if (empty($duration) || $duration == 0) {
+        return '';
+    }
+    
+    // Convertir a entero
+    $duration = (int)$duration;
+    
+    // Si la duración es mayor a 120 minutos, probablemente está en segundos
+    // Si es menor, probablemente está en minutos
+    if ($duration > 120) {
+        // Está en segundos, convertir a minutos
+        $minutes = floor($duration / 60);
+        $hours = floor($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+    } else {
+        // Está en minutos
+        $hours = floor($duration / 60);
+        $remainingMinutes = $duration % 60;
+    }
+    
+    // Formatear según las horas
+    if ($hours > 0) {
+        if ($remainingMinutes > 0) {
+            return $hours . 'h ' . $remainingMinutes . 'min';
+        } else {
+            return $hours . 'h';
+        }
+    } else {
+        return $remainingMinutes . ' min';
+    }
+}

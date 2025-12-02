@@ -290,6 +290,9 @@
         }
     </style>
 
+    <!-- Utilidades -->
+    <script src="<?php echo $baseUrl; ?>/js/utils.js"></script>
+
     <!-- Script de inicialización del carrusel -->
     <script src="<?php echo $baseUrl; ?>/assets/js/init-carousel.js"></script>
     
@@ -300,8 +303,10 @@
     <!-- WebTorrent for P2P streaming (solo si se necesita) -->
     <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
     
-    <!-- Reproductor de video unificado -->
+    <!-- Reproductor de video unificado (solo si no se carga en la página) -->
+    <?php if (basename($_SERVER['PHP_SELF']) !== 'watch.php'): ?>
     <script src="<?php echo $baseUrl; ?>/js/video-player.js"></script>
+    <?php endif; ?>
     
     <!-- Scripts personalizados -->
     <script src="<?php echo $baseUrl; ?>/js/performance-optimizer.js"></script>
@@ -315,6 +320,11 @@
     <script src="<?php echo $baseUrl; ?>/js/animations.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/notifications.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/main.js"></script>
+    
+    <!-- Script de diagnóstico de botones del reproductor (solo en index.php) -->
+    <?php if (basename($_SERVER['PHP_SELF']) === 'index.php'): ?>
+    <script src="<?php echo $baseUrl; ?>/test-player-buttons.js"></script>
+    <?php endif; ?>
     
     <!-- Script de prueba de consola (comentado - puede activarse si se necesita) -->
     <!-- <script src="/js/console-test.js"></script> -->

@@ -215,7 +215,8 @@ function createCarouselSlide(item, index) {
     slide.querySelector('.play-btn').addEventListener('click', () => playContent(item.id, 'movie'));
     slide.querySelector('.btn-outline').addEventListener('click', () => {
         // Redirigir a la página de detalles del contenido
-        window.location.href = `/content.php?id=${item.id}`;
+        const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+        window.location.href = `${baseUrl}/content.php?id=${item.id}`;
     });
 
     return slide;
@@ -381,7 +382,8 @@ function createContentCard(item, type) {
     card.dataset.type = type;
     card.dataset.title = item.title || '';
     card.dataset.year = item.release_year || '';
-    card.dataset.detailUrl = `/content.php?id=${item.id}`;
+    const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+    card.dataset.detailUrl = `${baseUrl}/content.php?id=${item.id}`;
     card.dataset.trailerUrl = item.trailer_url || '';
     
     const isPremium = item.is_premium ? '<span class="premium-badge">PREMIUM</span>' : '';
@@ -418,13 +420,13 @@ function createContentCard(item, type) {
                 <span class="imdb-text">IMDb: —</span>
             </div>
             <div class="content-actions">
-                <button class="action-btn" data-action="play" data-id="${item.id}" title="Reproducir">
+                <button class="action-btn" data-action="play" data-id="${item.id}" data-type="${contentType}" title="Reproducir">
                     <i class="fas fa-play"></i>
                 </button>
-                <button class="action-btn" data-action="add" data-id="${item.id}" title="Añadir a Mi lista">
+                <button class="action-btn" data-action="add" data-id="${item.id}" data-type="${contentType}" title="Añadir a Mi lista">
                     <i class="fas fa-plus"></i>
                 </button>
-                <button class="action-btn" data-action="info" data-id="${item.id}" title="Más información">
+                <button class="action-btn" data-action="info" data-id="${item.id}" data-type="${contentType}" title="Más información">
                     <i class="fas fa-info-circle"></i>
                 </button>
                 <button class="action-btn torrent-btn" data-action="torrent" data-id="${item.id}" title="Buscar torrents" data-title="${encodeURIComponent(item.title || '')}" data-year="${item.release_year || ''}" data-type="${contentType}">
@@ -439,7 +441,8 @@ function createContentCard(item, type) {
         if (event.target.closest('.action-btn') || event.target.closest('.content-trailer-container')) {
             return;
         }
-        window.location.href = `/content.php?id=${item.id}`;
+        const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+        window.location.href = `${baseUrl}/content.php?id=${item.id}`;
     });
     
     // Añadir handler al poster para buscar torrents
@@ -450,7 +453,8 @@ function createContentCard(item, type) {
             if (typeof showTorrentModal === 'function') {
                 showTorrentModal(item.id, item.title || '', item.release_year || null, contentType);
             } else {
-                window.location.href = `/content.php?id=${item.id}`;
+                const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+        window.location.href = `${baseUrl}/content.php?id=${item.id}`;
             }
         });
     }
@@ -2244,7 +2248,10 @@ function enhanceExistingContentCards() {
         // Añadir atributos si no existen
         if (!card.dataset.title && title) card.dataset.title = title;
         if (!card.dataset.year && year) card.dataset.year = year;
-        if (!card.dataset.detailUrl) card.dataset.detailUrl = `/content.php?id=${id}`;
+        if (!card.dataset.detailUrl) {
+            const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+            card.dataset.detailUrl = `${baseUrl}/content.php?id=${id}`;
+        }
         
         // Añadir badge de IMDb si no existe
         let imdbBadge = card.querySelector('.imdb-badge');
@@ -2298,7 +2305,8 @@ function enhanceExistingContentCards() {
                 if (typeof showTorrentModal === 'function') {
                     showTorrentModal(id, title, year || null, type);
                 } else {
-                    window.location.href = card.dataset.detailUrl || `/content.php?id=${id}`;
+                    const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+                    window.location.href = card.dataset.detailUrl || `${baseUrl}/content.php?id=${id}`;
                 }
             });
             poster.dataset.torrentHandler = 'true';

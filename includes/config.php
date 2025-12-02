@@ -1,11 +1,6 @@
 <?php
 // Configuración de seguridad
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on');
-ini_set('session.cookie_samesite', 'Lax');
-
-// Configuración de reporte de errores
+// Configuración de reporte de errores inicial (se ajustará más abajo según entorno)
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
@@ -53,6 +48,20 @@ $isLocalHost = in_array($httpHost, ['localhost', '127.0.0.1'], true) || strpos($
 $appEnv = getenv('APP_ENV') ?: (($isCli || $isLocalHost) ? 'local' : 'production');
 $appEnv = strtolower($appEnv) === 'local' ? 'local' : 'production';
 define('APP_ENV', $appEnv);
+
+// Definir ENVIRONMENT basado en APP_ENV
+if (!defined('ENVIRONMENT')) {
+    define('ENVIRONMENT', APP_ENV === 'local' ? 'development' : 'production');
+}
+
+// Ajustar reporte de errores según entorno
+if (ENVIRONMENT === 'development') {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
+} else {
+    error_reporting(0);
+    ini_set('display_errors', 0);
+}
 
 // Configuración de base de datos - Las credenciales reales deben estar en .env
 $dbDefaults = [
@@ -124,28 +133,17 @@ define('SITE_NAME', 'UrresTv');
 define('HASH_ALGO', PASSWORD_BCRYPT);
 define('HASH_OPTIONS', ['cost' => 12]);
 
-// Configuración de sesión
+// Configuración de sesión unificada
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', APP_ENV === 'production' ? 1 : 0);
+// Usar HTTPS si estamos en producción o si el servidor lo reporta
+$isHttps = (APP_ENV === 'production') || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on');
+ini_set('session.cookie_secure', $isHttps ? 1 : 0);
 ini_set('session.cookie_samesite', 'Lax');
 
 // Iniciar sesión
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
-}
-
-// Manejo de errores
-if (!defined('ENVIRONMENT')) {
-    define('ENVIRONMENT', APP_ENV === 'local' ? 'development' : 'production');
-}
-
-if (ENVIRONMENT === 'development') {
-    error_reporting(E_ALL);
-    ini_set('display_errors', 1);
-} else {
-    error_reporting(0);
-    ini_set('display_errors', 0);
 }
 
 /**

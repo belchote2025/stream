@@ -1,5 +1,7 @@
 const baseUrl = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
-const DEFAULT_POSTER = `${baseUrl || ''}/assets/img/default-poster.svg`;
+const DEFAULT_POSTER = typeof getAssetUrl === 'function'
+    ? getAssetUrl('/assets/img/default-poster.svg')
+    : `${baseUrl || ''}/assets/img/default-poster.svg`;
 
 // Estado de la aplicación
 const appState = {
@@ -112,10 +114,10 @@ function init() {
     // Cargar datos del usuario actual
     loadUserData();
     loadNotificationsData();
-    
+
     // Configurar event listeners
     setupEventListeners();
-    
+
     // Cargar la sección actual
     loadSection();
 }
@@ -126,7 +128,7 @@ function setupEventListeners() {
     const menuToggle = document.getElementById('menuToggle');
     const sidebar = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
-    
+
     // Función para abrir/cerrar el menú
     function toggleSidebar() {
         if (sidebar) {
@@ -142,7 +144,7 @@ function setupEventListeners() {
             }
         }
     }
-    
+
     // Función para cerrar el menú
     function closeSidebar() {
         if (sidebar) {
@@ -153,10 +155,10 @@ function setupEventListeners() {
             document.body.style.overflow = '';
         }
     }
-    
+
     // Event listener para el botón hamburguesa
     if (menuToggle) {
-        menuToggle.addEventListener('click', function(e) {
+        menuToggle.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
             console.log('Menú hamburguesa clickeado'); // Debug
@@ -165,31 +167,31 @@ function setupEventListeners() {
     } else {
         console.warn('Botón menuToggle no encontrado'); // Debug
     }
-    
+
     if (!sidebar) {
         console.warn('Sidebar no encontrado'); // Debug
     }
-    
+
     if (!sidebarOverlay) {
         console.warn('SidebarOverlay no encontrado'); // Debug
     }
-    
+
     // Event listener para el overlay (cerrar al hacer clic fuera)
     if (sidebarOverlay) {
-        sidebarOverlay.addEventListener('click', function(e) {
+        sidebarOverlay.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
             closeSidebar();
         });
     }
-    
+
     // Cerrar menú con la tecla Escape
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && sidebar && sidebar.classList.contains('active')) {
             closeSidebar();
         }
     });
-    
+
     // Cerrar menú al hacer clic en un enlace (móviles)
     const navLinks = document.querySelectorAll('.admin-nav a');
     navLinks.forEach(link => {
@@ -199,13 +201,13 @@ function setupEventListeners() {
                 if (sidebar) sidebar.classList.remove('active');
                 if (sidebarOverlay) sidebarOverlay.classList.remove('active');
             }
-            
+
             e.preventDefault();
             const section = link.getAttribute('href').substring(1);
             navigateTo(section);
         });
     });
-    
+
     // Submenús
     const hasSubmenu = document.querySelectorAll('.admin-nav > ul > li > a + ul');
     hasSubmenu.forEach(menu => {
@@ -218,15 +220,15 @@ function setupEventListeners() {
             }
         });
     });
-    
+
     // Búsqueda
     const searchButton = document.querySelector('#search-btn') || elements.searchButton;
     const searchInput = document.querySelector('#admin-search') || elements.searchInput;
-    
+
     if (searchButton) {
         searchButton.addEventListener('click', handleSearch);
     }
-    
+
     if (searchInput) {
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -234,26 +236,26 @@ function setupEventListeners() {
             }
         });
     }
-    
+
     // Menú de usuario
     const userMenu = document.querySelector('.user-menu') || elements.userMenu;
     if (userMenu) {
         userMenu.addEventListener('click', toggleUserMenu);
     }
-    
+
     // Notificaciones
     const notifications = document.querySelector('#notifications') || elements.notifications;
     if (notifications) {
         notifications.addEventListener('click', toggleNotifications);
     }
-    
+
     // Modal de contenido
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('close-modal') || e.target.classList.contains('close-modal-btn')) {
             closeModal();
         }
     });
-    
+
     // Modal de usuarios
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('close-modal-user') || e.target.classList.contains('close-modal-user-btn')) {
@@ -263,12 +265,12 @@ function setupEventListeners() {
 
     document.addEventListener('click', handleGlobalMenusClose);
     document.addEventListener('keydown', handleEscapeKeyClose);
-    
+
     // Formulario de contenido
     const contentForm = document.getElementById('contentForm');
     if (contentForm) {
         contentForm.addEventListener('submit', handleContentSubmit);
-        
+
         // Manejo de opciones mutuamente excluyentes para video
         setupMutuallyExclusiveOptions('video_source', {
             'url': {
@@ -286,7 +288,7 @@ function setupEventListeners() {
                 previewBtn: 'previewVideoBtn'
             }
         });
-        
+
         // Manejo de opciones mutuamente excluyentes para tráiler
         setupMutuallyExclusiveOptions('trailer_source', {
             'url': {
@@ -308,55 +310,55 @@ function setupEventListeners() {
                 otherInput2: 'trailer_file'
             }
         });
-        
+
         // Validación de archivos de video
         const videoFileInput = document.getElementById('video_file');
         if (videoFileInput) {
-            videoFileInput.addEventListener('change', function(e) {
+            videoFileInput.addEventListener('change', function (e) {
                 if (e.target.files && e.target.files[0]) {
                     validateFileInput(e.target, 'video_file_info', 2147483648); // 2GB
                 }
             });
         }
-        
+
         // Validación de archivos de tráiler
         const trailerFileInput = document.getElementById('trailer_file');
         if (trailerFileInput) {
-            trailerFileInput.addEventListener('change', function(e) {
+            trailerFileInput.addEventListener('change', function (e) {
                 if (e.target.files && e.target.files[0]) {
                     validateFileInput(e.target, 'trailer_file_info', 524288000); // 500MB
                 }
             });
         }
-        
+
         // Búsqueda de torrents
-    const searchTorrentBtn = document.getElementById('searchTorrentBtn');
-    if (searchTorrentBtn) {
-        searchTorrentBtn.addEventListener('click', handleSearchTorrent);
-    }
-    const retryTorrentBtn = document.getElementById('retryTorrentBtn');
-    if (retryTorrentBtn) {
-        retryTorrentBtn.addEventListener('click', handleInvalidTorrent);
-    }
-        
+        const searchTorrentBtn = document.getElementById('searchTorrentBtn');
+        if (searchTorrentBtn) {
+            searchTorrentBtn.addEventListener('click', handleSearchTorrent);
+        }
+        const retryTorrentBtn = document.getElementById('retryTorrentBtn');
+        if (retryTorrentBtn) {
+            retryTorrentBtn.addEventListener('click', handleInvalidTorrent);
+        }
+
         // Previsualización de video
         const previewVideoBtn = document.getElementById('previewVideoBtn');
         if (previewVideoBtn) {
             previewVideoBtn.addEventListener('click', handlePreviewVideo);
         }
-        
+
         const closePreviewBtn = document.getElementById('closePreviewBtn');
         if (closePreviewBtn) {
             closePreviewBtn.addEventListener('click', closeVideoPreview);
         }
     }
-    
+
     // Formulario de usuarios
     const userForm = document.getElementById('userForm');
     if (userForm) {
         userForm.addEventListener('submit', handleUserSubmit);
     }
-    
+
     // Botón para agregar usuario
     document.addEventListener('click', (e) => {
         if (e.target.closest('#add-user-btn')) {
@@ -364,7 +366,7 @@ function setupEventListeners() {
             showUserModal();
         }
     });
-    
+
     // Cerrar modal de contenido al hacer clic fuera
     window.addEventListener('click', (e) => {
         const modal = document.getElementById('contentModal');
@@ -372,7 +374,7 @@ function setupEventListeners() {
             closeModal();
         }
     });
-    
+
     // Cerrar modal de usuarios al hacer clic fuera
     window.addEventListener('click', (e) => {
         const userModal = document.getElementById('userModal');
@@ -380,7 +382,7 @@ function setupEventListeners() {
             closeUserModal();
         }
     });
-    
+
     // Botones de acción en tablas
     document.addEventListener('click', (e) => {
         // Botón de ver
@@ -408,7 +410,7 @@ function setupEventListeners() {
                 editItem(id, type);
             }
         }
-        
+
         // Botón de eliminar
         if (e.target.closest('.btn-delete')) {
             const btn = e.target.closest('.btn-delete');
@@ -423,7 +425,7 @@ function setupEventListeners() {
                 deleteItem(id, title, type);
             }
         }
-        
+
         // Botón de agregar nuevo
         if (e.target.closest('.btn-add-new')) {
             showContentModal();
@@ -434,7 +436,7 @@ function setupEventListeners() {
             showUserModal();
         }
     });
-    
+
     // Responsive: colapsar/expandir menú lateral
     window.addEventListener('resize', handleResize);
     handleResize(); // Ejecutar al cargar
@@ -446,10 +448,10 @@ function loadUserData() {
     if (userInfo) {
         const avatar = userInfo.querySelector('.avatar');
         const name = userInfo.querySelector('span');
-        
+
         if (avatar) {
             avatar.src = appState.currentUser.avatar || DEFAULT_POSTER;
-            avatar.onerror = function() {
+            avatar.onerror = function () {
                 this.src = DEFAULT_POSTER;
             };
         }
@@ -463,13 +465,13 @@ function navigateTo(section) {
     const parts = section.split('/');
     appState.currentSection = parts[0];
     appState.currentSubsection = parts[1] || '';
-    
+
     // Actualizar URL sin recargar la página
     history.pushState({}, '', `#${section}`);
-    
+
     // Cargar la sección
     loadSection();
-    
+
     // Actualizar menú activo
     updateActiveMenu();
 }
@@ -479,34 +481,41 @@ async function loadSection() {
     const { currentSection, currentSubsection } = appState;
     let content = '';
     const mainContent = document.querySelector('.dashboard') || document.querySelector('.main-content > div');
-    
+
     // Mostrar un indicador de carga
     if (mainContent) {
         mainContent.innerHTML = '<h1><i class="fas fa-spinner fa-spin"></i> Cargando...</h1>';
     }
-    
+
     switch (currentSection) {
         case 'dashboard':
             try {
                 const statsResponse = await apiRequest('/api/admin/stats.php');
                 const stats = statsResponse.success && statsResponse.data ? statsResponse.data : null;
-                
+
                 // Obtener usuarios recientes
                 const usersResponse = await apiRequest('/api/users/index.php');
                 const allUsers = usersResponse.success && usersResponse.data ? usersResponse.data : [];
                 const recentUsers = allUsers.slice(0, 5);
-                
+
                 // Obtener contenido reciente
                 const contentResponse = await apiRequest('/api/content/popular.php?limit=4');
                 const recentContent = contentResponse.success && contentResponse.data ? contentResponse.data : [];
-                
+
                 content = renderDashboard(stats, recentUsers, recentContent);
+
+                // Actualizar gráficos después de renderizar
+                setTimeout(() => {
+                    if (typeof updateDashboardCharts === 'function' && stats) {
+                        updateDashboardCharts(stats);
+                    }
+                }, 100);
             } catch (error) {
                 console.error('Error cargando dashboard:', error);
                 content = renderDashboard(null, [], []);
             }
             break;
-            
+
         case 'contenido':
             if (currentSubsection === 'peliculas') {
                 try {
@@ -551,7 +560,7 @@ async function loadSection() {
                 `;
             }
             break;
-            
+
         case 'usuarios':
             try {
                 const response = await apiRequest('/api/users/index.php');
@@ -562,7 +571,7 @@ async function loadSection() {
                 console.error(error);
             }
             break;
-            
+
         case 'suscripciones':
             try {
                 const response = await apiRequest('/api/subscriptions/index.php');
@@ -574,11 +583,11 @@ async function loadSection() {
                 content = renderError('No se pudieron cargar las suscripciones: ' + error.message);
             }
             break;
-            
+
         case 'reportes':
             content = renderReports();
             break;
-            
+
         case 'configuracion':
             content = renderSettings();
             // Configurar pestañas después de renderizar
@@ -586,20 +595,25 @@ async function loadSection() {
                 setupSettingsTabs();
             }, 100);
             break;
-            
+
         default:
             content = '<h1>Sección no encontrada</h1><p>La página solicitada no existe.</p>';
     }
-    
+
     // Actualizar el contenido principal
     if (mainContent) {
         mainContent.innerHTML = content;
     } else {
         document.querySelector('.main-content').innerHTML = `<div class="dashboard">${content}</div>`;
     }
-    
+
     // Inicializar componentes dinámicos
     initDynamicComponents();
+
+    // Inicializar funcionalidades mejoradas
+    if (typeof initEnhancedFeatures === 'function') {
+        initEnhancedFeatures();
+    }
 }
 
 // Actualizar menú activo
@@ -608,13 +622,13 @@ function updateActiveMenu() {
     document.querySelectorAll('.admin-nav a').forEach(link => {
         link.classList.remove('active');
     });
-    
+
     // Marcar como activo el enlace correspondiente a la sección actual
     const { currentSection, currentSubsection } = appState;
-    const selector = currentSubsection 
-        ? `.admin-nav a[href="#${currentSection}/${currentSubsection}"]` 
+    const selector = currentSubsection
+        ? `.admin-nav a[href="#${currentSection}/${currentSubsection}"]`
         : `.admin-nav a[href="#${currentSection}"]`;
-    
+
     const activeLink = document.querySelector(selector);
     if (activeLink) {
         activeLink.classList.add('active');
@@ -646,9 +660,9 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
         totalViews: 0,
         totalViewsThisMonth: 0
     };
-    
+
     const finalStats = stats || defaultStats;
-    
+
     // Generar actividades recientes desde el contenido reciente
     const recentActivities = recentContent.slice(0, 4).map((item, index) => {
         const createdDate = item.created_at ? new Date(item.created_at) : new Date();
@@ -656,13 +670,13 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
         const diff = now - createdDate;
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const days = Math.floor(hours / 24);
-        
+
         let timeText = 'Hace ' + hours + ' horas';
         if (days === 0 && hours === 0) timeText = 'Hace menos de una hora';
         if (days === 1) timeText = 'Ayer';
         if (days > 1 && days < 7) timeText = `Hace ${days} días`;
         if (days >= 7) timeText = createdDate.toLocaleDateString('es-ES');
-        
+
         return {
             type: item.type === 'movie' ? 'success' : 'info',
             icon: item.type === 'movie' ? 'film' : 'tv',
@@ -671,19 +685,19 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
             time: timeText
         };
     });
-    
+
     // Formatear usuarios recientes
     const formattedRecentUsers = recentUsers.map(user => {
         const createdDate = user.created_at || user.registrationDate ? new Date(user.created_at || user.registrationDate) : new Date();
         const now = new Date();
         const diff = now - createdDate;
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        
+
         let registrationDate = 'Hoy';
         if (days === 1) registrationDate = 'Ayer';
         if (days > 1 && days < 7) registrationDate = `Hace ${days} días`;
         if (days >= 7) registrationDate = createdDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
-        
+
         return {
             id: user.id,
             name: user.full_name || user.username,
@@ -694,19 +708,19 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
             avatar: user.avatar_url || DEFAULT_POSTER
         };
     });
-    
+
     // Calcular cambio porcentual para usuarios
     const usersChangeClass = finalStats.usersChangePercent >= 0 ? 'positive' : 'negative';
-    const usersChangeText = finalStats.usersChangePercent >= 0 
-        ? `+${finalStats.usersChangePercent}% este mes` 
+    const usersChangeText = finalStats.usersChangePercent >= 0
+        ? `+${finalStats.usersChangePercent}% este mes`
         : `${finalStats.usersChangePercent}% este mes`;
-    
+
     // Calcular cambio porcentual para ingresos
     const revenueChangeClass = finalStats.revenueChangePercent >= 0 ? 'positive' : 'negative';
-    const revenueChangeText = finalStats.revenueChangePercent >= 0 
-        ? `+${finalStats.revenueChangePercent}% este mes` 
+    const revenueChangeText = finalStats.revenueChangePercent >= 0
+        ? `+${finalStats.revenueChangePercent}% este mes`
         : `${finalStats.revenueChangePercent}% este mes`;
-    
+
     // Generar HTML del dashboard
     return `
         <h1>Panel de Control</h1>
@@ -766,6 +780,65 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
                         <i class="fas fa-arrow-${finalStats.revenueChangePercent >= 0 ? 'up' : 'down'}"></i>
                         ${revenueChangeText}
                     </p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <i class="fas fa-eye"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>Vistas Hoy</h3>
+                    <p class="stat-number">${(finalStats.viewsToday || 0).toLocaleString()}</p>
+                    <p class="stat-change neutral">
+                        <i class="fas fa-chart-line"></i>
+                        ${(finalStats.viewsThisMonth || 0).toLocaleString()} este mes
+                    </p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>Usuarios Activos</h3>
+                    <p class="stat-number">${(finalStats.activeUsersWeek || 0).toLocaleString()}</p>
+                    <p class="stat-change positive">
+                        <i class="fas fa-clock"></i>
+                        Últimos 7 días
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Gráficos -->
+        <div class="charts-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin: 2rem 0;">
+            <div class="chart-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px;">
+                <h3 style="margin-bottom: 1rem; color: #fff;">Tendencia de Vistas (7 días)</h3>
+                <div style="height: 250px;">
+                    <canvas id="viewsTrendChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px;">
+                <h3 style="margin-bottom: 1rem; color: #fff;">Nuevos Usuarios (7 días)</h3>
+                <div style="height: 250px;">
+                    <canvas id="usersTrendChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px;">
+                <h3 style="margin-bottom: 1rem; color: #fff;">Distribución de Usuarios</h3>
+                <div style="height: 250px;">
+                    <canvas id="usersDistributionChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px;">
+                <h3 style="margin-bottom: 1rem; color: #fff;">Contenido Más Visto (30 días)</h3>
+                <div style="height: 250px;">
+                    <canvas id="topContentChart"></canvas>
                 </div>
             </div>
         </div>
@@ -841,13 +914,63 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
 // Renderizar lista de contenido (películas o series)
 function renderContentList(type, title, items = []) {
     const isMovie = type === 'peliculas';
-    
+    const totalItems = items.length;
+    const premiumItems = items.filter(i => i.is_premium).length;
+    const featuredItems = items.filter(i => i.is_featured).length;
+
     return `
         <div class="content-header">
             <h1>${title}</h1>
-            <button class="btn btn-primary btn-add-new">
-                <i class="fas fa-plus"></i> Agregar Nuevo
-            </button>
+            <div class="header-actions">
+                <button class="btn btn-outline" id="export-${type}-btn">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
+                <button class="btn btn-primary btn-add-new">
+                    <i class="fas fa-plus"></i> Agregar Nuevo
+                </button>
+            </div>
+        </div>
+        
+        <!-- Estadísticas rápidas -->
+        <div class="content-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+            <div class="stat-card-mini" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fas fa-${isMovie ? 'film' : 'tv'}" style="font-size: 1.5rem; color: #667eea;"></i>
+                    <div>
+                        <div style="font-size: 1.5rem; font-weight: 600;">${totalItems}</div>
+                        <div style="font-size: 0.85rem; color: #999;">Total ${title}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-mini" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fas fa-crown" style="font-size: 1.5rem; color: #f093fb;"></i>
+                    <div>
+                        <div style="font-size: 1.5rem; font-weight: 600;">${premiumItems}</div>
+                        <div style="font-size: 0.85rem; color: #999;">Premium</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-mini" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fas fa-star" style="font-size: 1.5rem; color: #ffc107;"></i>
+                    <div>
+                        <div style="font-size: 1.5rem; font-weight: 600;">${featuredItems}</div>
+                        <div style="font-size: 0.85rem; color: #999;">Destacados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Barra de búsqueda -->
+        <div class="content-search" style="margin-bottom: 1.5rem;">
+            <div class="search-input-wrapper" style="position: relative; max-width: 500px;">
+                <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #999;"></i>
+                <input type="text" id="${type}-search" placeholder="Buscar por título, año, género..." class="form-control" style="padding-left: 2.5rem; padding-right: 2.5rem;">
+                <button class="search-clear" id="${type}-search-clear" style="display: none; position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #999; cursor: pointer;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
         </div>
         
         <div class="table-responsive">
@@ -867,12 +990,12 @@ function renderContentList(type, title, items = []) {
                 </thead>
                 <tbody>
                     ${items.length > 0 ? items.map(item => {
-                        const itemId = item.id;
-                        const itemTitle = item.title || 'Sin título';
-                        const itemYear = item.release_year || '';
-                        const contentType = isMovie ? 'movie' : 'series';
-                        
-                        return `
+        const itemId = item.id;
+        const itemTitle = item.title || 'Sin título';
+        const itemYear = item.release_year || '';
+        const contentType = isMovie ? 'movie' : 'series';
+
+        return `
                         <tr data-id="${itemId}" data-title="${escapeHtml(itemTitle)}" data-year="${itemYear}" data-type="${contentType}">
                             <td>
                                 <img src="${item.poster_url || DEFAULT_POSTER}" 
@@ -903,7 +1026,7 @@ function renderContentList(type, title, items = []) {
                             </td>
                         </tr>
                     `;
-                    }).join('') : '<tr><td colspan="9" class="text-center">No hay contenido para mostrar.</td></tr>'}
+    }).join('') : '<tr><td colspan="9" class="text-center">No hay contenido para mostrar.</td></tr>'}
                 </tbody>
             </table>
         </div>
@@ -919,7 +1042,7 @@ function renderEpisodesList() {
         { id: 3, series: 'Stranger Things', season: 1, episode: 1, title: 'Capítulo uno: La desaparición de Will Byers', duration: '52 min', views: 24500 },
         { id: 4, series: 'Stranger Things', season: 1, episode: 2, title: 'Capítulo dos: La loca de la calle Maple', duration: '55 min', views: 23100 }
     ];
-    
+
     return `
         <div class="content-header">
             <h1>Episodios</h1>
@@ -1006,7 +1129,7 @@ function renderUsersList(users = []) {
         const today = new Date();
         return created.toDateString() === today.toDateString();
     }).length;
-    
+
     return `
         <div class="content-header">
             <h1>Gestión de Usuarios</h1>
@@ -1158,12 +1281,12 @@ function renderUsersList(users = []) {
                 </thead>
                 <tbody>
                         ${users.length > 0 ? users.map((user, index) => {
-                            const createdDate = user.created_at ? new Date(user.created_at) : null;
-                            const lastLoginDate = user.last_login ? new Date(user.last_login) : null;
-                            const isActive = user.status === 'active';
-                            const isPremium = user.role === 'premium' || user.role === 'admin';
-                            
-                            return `
+        const createdDate = user.created_at ? new Date(user.created_at) : null;
+        const lastLoginDate = user.last_login ? new Date(user.last_login) : null;
+        const isActive = user.status === 'active';
+        const isPremium = user.role === 'premium' || user.role === 'admin';
+
+        return `
                                 <tr data-id="${user.id}" class="${!isActive ? 'inactive-row' : ''}">
                                     <td>
                                         <input type="checkbox" class="user-checkbox" data-id="${user.id}">
@@ -1189,12 +1312,12 @@ function renderUsersList(users = []) {
                                         </div>
                                     </td>
                                     <td>
-                                        ${user.role === 'admin' ? 
-                                            '<span class="badge admin"><i class="fas fa-shield-alt"></i> Admin</span>' :
-                                            isPremium ? 
-                                            '<span class="badge premium"><i class="fas fa-crown"></i> Premium</span>' :
-                                            '<span class="badge free"><i class="fas fa-user"></i> Usuario</span>'
-                                        }
+                                        ${user.role === 'admin' ?
+                '<span class="badge admin"><i class="fas fa-shield-alt"></i> Admin</span>' :
+                isPremium ?
+                    '<span class="badge premium"><i class="fas fa-crown"></i> Premium</span>' :
+                    '<span class="badge free"><i class="fas fa-user"></i> Usuario</span>'
+            }
                                     </td>
                                     <td>
                                         <div class="password-cell">
@@ -1240,7 +1363,7 @@ function renderUsersList(users = []) {
                             </td>
                         </tr>
                             `;
-                        }).join('') : `
+    }).join('') : `
                             <tr>
                                 <td colspan="9" class="empty-state">
                                     <div class="empty-content">
@@ -1303,11 +1426,11 @@ function formatDateTime(dateString) {
     const now = new Date();
     const diff = now - date;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) return 'Hoy';
     if (days === 1) return 'Ayer';
     if (days < 7) return `Hace ${days} días`;
-    
+
     return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
@@ -1478,14 +1601,14 @@ function renderPlanBadge(planName = '') {
     } else if (normalized.includes('bas')) {
         badgeClass = 'basic';
     }
-    
+
     return `<span class="badge ${badgeClass}">${escapeHtml(planName || 'Plan')}</span>`;
 }
 
 function prepareSubscriptionData(payload = {}) {
     const subscriptions = payload.subscriptions || [];
     const payments = payload.payments || [];
-    
+
     return {
         stats: payload.stats || {},
         plans: payload.plans || [],
@@ -1899,11 +2022,10 @@ function renderSubscriptions(data = {}) {
                         <h3>${formatNumber(stats.activeSubscriptions)}</h3>
                         <p>Activas</p>
                         <span class="trend positive">
-                            <i class="fas fa-check-circle"></i> ${
-                                stats.totalSubscribers
-                                    ? Math.round((stats.activeSubscriptions / stats.totalSubscribers) * 100)
-                                    : 0
-                            }% activas
+                            <i class="fas fa-check-circle"></i> ${stats.totalSubscribers
+            ? Math.round((stats.activeSubscriptions / stats.totalSubscribers) * 100)
+            : 0
+        }% activas
                         </span>
                     </div>
                 </div>
@@ -2680,33 +2802,33 @@ function renderSettings() {
 function setupSettingsTabs() {
     const tabItems = document.querySelectorAll('.settings-menu li');
     if (tabItems.length === 0) return;
-    
+
     // Remover listeners anteriores si existen
     tabItems.forEach(item => {
         const newItem = item.cloneNode(true);
         item.parentNode.replaceChild(newItem, item);
     });
-    
+
     // Añadir nuevos listeners
     const newTabItems = document.querySelectorAll('.settings-menu li');
     newTabItems.forEach(item => {
         item.addEventListener('click', () => {
             const tabId = item.getAttribute('data-tab');
-            
+
             // Actualizar menú activo
             const activeMenuItem = document.querySelector('.settings-menu li.active');
             if (activeMenuItem) {
                 activeMenuItem.classList.remove('active');
             }
             item.classList.add('active');
-            
+
             // Ocultar todas las pestañas
             const allTabs = document.querySelectorAll('.settings-tab');
             allTabs.forEach(tab => {
                 tab.classList.remove('active');
                 tab.style.display = 'none';
             });
-            
+
             // Mostrar la pestaña seleccionada
             const selectedTab = document.getElementById(`${tabId}-tab`);
             if (selectedTab) {
@@ -2715,7 +2837,7 @@ function setupSettingsTabs() {
             }
         });
     });
-    
+
     // Asegurar que la primera pestaña esté visible
     const firstTab = document.querySelector('.settings-tab.active') || document.querySelector('.settings-tab');
     if (firstTab) {
@@ -2724,7 +2846,7 @@ function setupSettingsTabs() {
 }
 
 // Función para copiar API key
-window.copyApiKey = function() {
+window.copyApiKey = function () {
     const apiKeyInput = document.getElementById('api-key');
     if (apiKeyInput) {
         apiKeyInput.select();
@@ -2734,7 +2856,7 @@ window.copyApiKey = function() {
 };
 
 // Función para regenerar API secret
-window.regenerateApiSecret = function() {
+window.regenerateApiSecret = function () {
     if (confirm('¿Estás seguro de que quieres regenerar el secreto API? Esto invalidará el secreto actual.')) {
         showNotification('Secreto API regenerado correctamente', 'success');
         // Aquí iría la lógica real para regenerar el secreto
@@ -2752,10 +2874,10 @@ function showContentModal(itemData = null) {
     if (modalTitle) {
         modalTitle.textContent = itemData ? `Editar ${itemData.title || 'Contenido'}` : 'Agregar Nuevo Contenido';
     }
-    
+
     const form = document.getElementById('contentForm');
     if (!form) return;
-    
+
     form.reset();
 
     if (itemData) {
@@ -2771,12 +2893,12 @@ function showContentModal(itemData = null) {
                 }
             }
         });
-        
+
         // Configurar fuente de video (URL por defecto si existe video_url)
         const videoUrlRadio = document.getElementById('video_source_url');
         const videoFileRadio = document.getElementById('video_source_file');
         const videoUrlInput = document.getElementById('video_url');
-        
+
         if (itemData.video_url && itemData.video_url.trim() !== '') {
             // Si hay URL de video, usar opción URL
             if (videoUrlRadio) {
@@ -2793,13 +2915,13 @@ function showContentModal(itemData = null) {
                 videoUrlRadio.dispatchEvent(new Event('change'));
             }
         }
-        
+
         // Configurar fuente de tráiler
         const trailerUrlRadio = document.getElementById('trailer_source_url');
         const trailerFileRadio = document.getElementById('trailer_source_file');
         const trailerNoneRadio = document.getElementById('trailer_source_none');
         const trailerUrlInput = document.getElementById('trailer_url');
-        
+
         if (itemData.trailer_url && itemData.trailer_url.trim() !== '') {
             // Si hay URL de tráiler, usar opción URL
             if (trailerUrlRadio) {
@@ -2816,12 +2938,12 @@ function showContentModal(itemData = null) {
                 trailerNoneRadio.dispatchEvent(new Event('change'));
             }
         }
-        
+
         // Checkboxes especiales
         if (form.elements.is_featured) form.elements.is_featured.checked = !!itemData.is_featured;
         if (form.elements.is_trending) form.elements.is_trending.checked = !!itemData.is_trending;
         if (form.elements.is_premium) form.elements.is_premium.checked = !!itemData.is_premium;
-        
+
         // Tipo de contenido
         if (form.elements.type) {
             form.elements.type.value = itemData.type || 'movie';
@@ -2830,7 +2952,7 @@ function showContentModal(itemData = null) {
         // Modo creación: establecer valores por defecto
         const videoUrlRadio = document.getElementById('video_source_url');
         const trailerNoneRadio = document.getElementById('trailer_source_none');
-        
+
         if (videoUrlRadio) {
             videoUrlRadio.checked = true;
             videoUrlRadio.dispatchEvent(new Event('change'));
@@ -2844,7 +2966,7 @@ function showContentModal(itemData = null) {
     const modal = document.getElementById('contentModal');
     if (modal) {
         modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
     }
 }
 
@@ -2854,7 +2976,7 @@ function showContentModal(itemData = null) {
  */
 function showUserModal(userData = null) {
     appState.editingItemId = userData ? userData.id : null;
-    
+
     const modal = document.getElementById('userModal');
     const modalTitle = document.getElementById('user-modal-title');
     const form = document.getElementById('userForm');
@@ -2862,20 +2984,20 @@ function showUserModal(userData = null) {
     const passwordConfirmInput = document.getElementById('password_confirm');
     const passwordRequired = document.getElementById('password-required');
     const passwordHelp = document.getElementById('password-help');
-    
+
     if (!modal || !form) {
         console.error('Modal de usuario o formulario no encontrado');
         return;
     }
-    
+
     // Establecer título
     if (modalTitle) {
         modalTitle.textContent = userData ? `Editar Usuario: ${userData.username || userData.email}` : 'Agregar Nuevo Usuario';
     }
-    
+
     // Resetear formulario
     form.reset();
-    
+
     if (userData) {
         // Modo edición: rellenar con datos existentes
         const fields = ['id', 'username', 'email', 'full_name', 'role', 'status'];
@@ -2885,7 +3007,7 @@ function showUserModal(userData = null) {
                 input.value = userData[key];
             }
         });
-        
+
         // Contraseña no requerida en edición (solo si se quiere cambiar)
         if (passwordInput) {
             passwordInput.removeAttribute('required');
@@ -2916,7 +3038,7 @@ function showUserModal(userData = null) {
             passwordHelp.textContent = 'Mínimo 8 caracteres (requerida para nuevos usuarios)';
         }
     }
-    
+
     // Mostrar modal
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -2936,23 +3058,23 @@ async function editItem(id, type) {
             'users': '/api/users/index.php',
             'user': '/api/users/index.php'
         };
-        
+
         // Determinar el endpoint correcto
         let endpoint = endpointMap[type] || '/api/content/index.php';
-        
+
         // Si el endpoint requiere ID en la URL, agregarlo
         if (endpoint.includes('index.php')) {
             endpoint = `${endpoint}?id=${id}`;
         } else {
             endpoint = `${endpoint}/${id}`;
         }
-        
+
         const response = await apiRequest(endpoint);
-        
+
         // Verificar si la respuesta tiene el formato esperado
         if (response && (response.data || response.success)) {
             const itemData = response.data || response;
-            
+
             // Si es un usuario, mostrar modal de usuario
             if (type === 'users' || type === 'usuarios' || type === 'user') {
                 showUserModal(itemData);
@@ -2989,17 +3111,17 @@ async function viewItem(id, type) {
             'users': '/api/users/index.php',
             'user': '/api/users/index.php'
         };
-        
+
         // Determinar el endpoint correcto
         let endpoint = endpointMap[type] || '/api/content/index.php';
-        
+
         // Si el endpoint requiere ID en la URL, agregarlo
         if (endpoint.includes('index.php')) {
             endpoint = `${endpoint}?id=${id}`;
         } else {
             endpoint = `${endpoint}/${id}`;
         }
-        
+
         const item = await apiRequest(endpoint);
         if (item && item.data) {
             // Por ahora, mostramos una alerta. Idealmente, esto abriría un modal de vista detallada.
@@ -3012,7 +3134,7 @@ async function viewItem(id, type) {
                     return `${key}: ${value}`;
                 })
                 .join('\n');
-            
+
             const title = item.data.title || item.data.username || item.data.email || `Elemento #${id}`;
             alert(`Detalles de ${title}:\n\n${details}`);
         } else {
@@ -3043,7 +3165,7 @@ async function deleteItem(id, title, type) {
                     endpoint = `/api/${type}/index.php?id=${id}`;
                     break;
             }
-            
+
             const response = await apiRequest(endpoint, { method: 'DELETE' });
             if (response.success || response.status === 'success') {
                 showNotification(response.message || 'Elemento eliminado correctamente.', 'success');
@@ -3080,10 +3202,10 @@ function closeUserModal() {
 // Manejar envío del formulario de contenido
 async function handleContentSubmit(e) {
     e.preventDefault();
-    
+
     const form = e.target;
     const formData = new FormData(form);
-    
+
     // Mostrar indicador de carga
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn ? submitBtn.textContent : '';
@@ -3091,7 +3213,7 @@ async function handleContentSubmit(e) {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Guardando...';
     }
-    
+
     try {
         // Validar que se haya seleccionado una fuente de video
         const videoSource = formData.get('video_source');
@@ -3103,7 +3225,7 @@ async function handleContentSubmit(e) {
             }
             return;
         }
-        
+
         // Validar archivos antes de subir (solo si se seleccionó archivo)
         if (videoSource === 'file') {
             const videoFileInput = document.getElementById('video_file');
@@ -3133,7 +3255,7 @@ async function handleContentSubmit(e) {
                 return;
             }
         }
-        
+
         // Validar tráiler si se seleccionó archivo
         const trailerSource = formData.get('trailer_source') || 'none';
         if (trailerSource === 'file') {
@@ -3154,30 +3276,30 @@ async function handleContentSubmit(e) {
                 return;
             }
         }
-        
+
         // Determinar qué fuente de video usar (URL o archivo)
         let videoUrl = '';
-        
+
         if (videoSource === 'file') {
             // Subir archivo de video
             const videoFile = formData.get('video_file');
             if (!videoFile || videoFile.size === 0) {
                 throw new Error('Por favor, selecciona un archivo de video');
             }
-            
+
             showNotification('Subiendo video...', 'info');
             const videoUploadData = new FormData();
             videoUploadData.append('file', videoFile);
-            
+
             const uploadEndpoint = `${baseUrl}/api/upload/video.php`;
             const videoUploadResponse = await fetch(uploadEndpoint, {
                 method: 'POST',
                 body: videoUploadData,
                 credentials: 'same-origin'
             });
-            
+
             const videoUploadResult = await videoUploadResponse.json();
-            
+
             if (videoUploadResult.success && videoUploadResult.data) {
                 videoUrl = videoUploadResult.data.url;
                 showNotification('Video subido correctamente', 'success');
@@ -3194,31 +3316,31 @@ async function handleContentSubmit(e) {
         } else {
             throw new Error('Por favor, selecciona una fuente de video (URL o archivo)');
         }
-        
+
         // Determinar qué fuente de tráiler usar (URL, archivo o ninguno)
         let trailerUrl = '';
-        
+
         if (trailerSource === 'file') {
             // Subir archivo de tráiler
             const trailerFile = formData.get('trailer_file');
             if (!trailerFile || trailerFile.size === 0) {
                 throw new Error('Por favor, selecciona un archivo de tráiler');
             }
-            
+
             showNotification('Subiendo tráiler...', 'info');
             const trailerUploadData = new FormData();
             trailerUploadData.append('file', trailerFile);
             trailerUploadData.append('is_trailer', '1');
-            
+
             const uploadEndpoint = `${baseUrl}/api/upload/video.php`;
             const trailerUploadResponse = await fetch(uploadEndpoint, {
                 method: 'POST',
                 body: trailerUploadData,
                 credentials: 'same-origin'
             });
-            
+
             const trailerUploadResult = await trailerUploadResponse.json();
-            
+
             if (trailerUploadResult.success && trailerUploadResult.data) {
                 trailerUrl = trailerUploadResult.data.url;
                 showNotification('Tráiler subido correctamente', 'success');
@@ -3233,10 +3355,10 @@ async function handleContentSubmit(e) {
             }
         }
         // Si trailerSource === 'none', trailerUrl permanece vacío
-        
+
         // Preparar datos del formulario
         const data = Object.fromEntries(formData.entries());
-        
+
         // Convertir checkboxes a booleanos (0 o 1)
         data.is_featured = data.is_featured ? 1 : 0;
         data.is_trending = data.is_trending ? 1 : 0;
@@ -3245,25 +3367,25 @@ async function handleContentSubmit(e) {
         // Determinar la URL y el método de la API
         const type = appState.currentSubsection || 'peliculas'; // 'peliculas', 'series', etc.
         const contentType = type === 'peliculas' ? 'movie' : 'series';
-        
-            // Preparar datos para la API
-            const apiData = {
-                title: data.title,
-                description: data.description,
-                release_year: parseInt(data.release_year),
-                duration: parseInt(data.duration),
-                type: contentType,
-                poster_url: data.poster_url || '',
-                backdrop_url: data.backdrop_url || '',
-                video_url: videoUrl,
-                trailer_url: trailerUrl,
-                torrent_magnet: data.torrent_magnet || null,
-                age_rating: data.age_rating || null,
-                is_featured: data.is_featured === '1' || data.is_featured === true ? 1 : 0,
-                is_trending: data.is_trending === '1' || data.is_trending === true ? 1 : 0,
-                is_premium: data.is_premium === '1' || data.is_premium === true ? 1 : 0
-            };
-        
+
+        // Preparar datos para la API
+        const apiData = {
+            title: data.title,
+            description: data.description,
+            release_year: parseInt(data.release_year),
+            duration: parseInt(data.duration),
+            type: contentType,
+            poster_url: data.poster_url || '',
+            backdrop_url: data.backdrop_url || '',
+            video_url: videoUrl,
+            trailer_url: trailerUrl,
+            torrent_magnet: data.torrent_magnet || null,
+            age_rating: data.age_rating || null,
+            is_featured: data.is_featured === '1' || data.is_featured === true ? 1 : 0,
+            is_trending: data.is_trending === '1' || data.is_trending === true ? 1 : 0,
+            is_premium: data.is_premium === '1' || data.is_premium === true ? 1 : 0
+        };
+
         let url = '/api/movies/index.php';
         let method = 'POST';
 
@@ -3274,7 +3396,7 @@ async function handleContentSubmit(e) {
         }
 
         showNotification('Guardando contenido...', 'info');
-        
+
         const response = await apiRequest(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
@@ -3303,39 +3425,39 @@ async function handleContentSubmit(e) {
 // Manejar envío del formulario de usuarios
 async function handleUserSubmit(e) {
     e.preventDefault();
-    
+
     const form = e.target;
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
-    
+
     // Validaciones
     if (!data.username || data.username.trim().length < 3) {
         showNotification('El nombre de usuario debe tener al menos 3 caracteres.', 'error');
         return;
     }
-    
+
     if (!data.email || !data.email.includes('@')) {
         showNotification('Por favor, ingresa un email válido.', 'error');
         return;
     }
-    
+
     // Validar contraseña
     const isEditing = !!appState.editingItemId;
     if (!isEditing && (!data.password || data.password.length < 8)) {
         showNotification('La contraseña debe tener al menos 8 caracteres.', 'error');
         return;
     }
-    
+
     if (data.password && data.password.length < 8) {
         showNotification('La contraseña debe tener al menos 8 caracteres.', 'error');
         return;
     }
-    
+
     if (data.password && data.password !== data.password_confirm) {
         showNotification('Las contraseñas no coinciden.', 'error');
         return;
     }
-    
+
     // Preparar datos para la API
     const apiData = {
         username: data.username.trim(),
@@ -3344,28 +3466,28 @@ async function handleUserSubmit(e) {
         role: data.role || 'user',
         status: data.status || 'active'
     };
-    
+
     // Solo incluir contraseña si se proporcionó
     if (data.password && data.password.trim()) {
         apiData.password = data.password;
     }
-    
+
     let url = '/api/users/index.php';
     let method = 'POST';
-    
+
     if (appState.editingItemId) {
         url = `/api/users/index.php?id=${appState.editingItemId}`;
         method = 'PUT';
         apiData.id = parseInt(appState.editingItemId);
     }
-    
+
     try {
         const response = await apiRequest(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(apiData)
         });
-        
+
         if (response.success || response.status === 'success') {
             showNotification(response.message || (isEditing ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.'), 'success');
             closeUserModal();
@@ -3388,43 +3510,46 @@ async function handleUserSubmit(e) {
 async function apiRequest(endpoint, options = {}) {
     try {
         // Asegurar que el endpoint tenga la ruta base correcta
-        const baseUrl = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
-        
-        // Si el endpoint ya incluye la ruta base, no duplicarla
         let fullEndpoint;
-        if (endpoint.startsWith('http')) {
-            fullEndpoint = endpoint;
-        } else if (endpoint.startsWith('/streaming-platform')) {
-            fullEndpoint = baseUrl + endpoint.replace('/streaming-platform', '');
-        } else if (endpoint.startsWith('/')) {
-            // Ruta absoluta, añadir base
-            fullEndpoint = baseUrl + endpoint;
+
+        if (typeof getApiUrl === 'function') {
+            fullEndpoint = getApiUrl(endpoint);
         } else {
-            // Ruta relativa, añadir base y slash
-            fullEndpoint = baseUrl + '/' + endpoint;
+            // Fallback: lógica manual si getApiUrl no está disponible
+            const baseUrl = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+
+            if (endpoint.startsWith('http')) {
+                fullEndpoint = endpoint;
+            } else if (endpoint.startsWith('/streaming-platform')) {
+                fullEndpoint = baseUrl + endpoint.replace('/streaming-platform', '');
+            } else if (endpoint.startsWith('/')) {
+                fullEndpoint = baseUrl + endpoint;
+            } else {
+                fullEndpoint = baseUrl + '/' + endpoint;
+            }
         }
-        
+
         // Añadir headers por defecto
         const defaultHeaders = {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         };
-        
+
         options.headers = { ...defaultHeaders, ...(options.headers || {}) };
-        
+
         // Incluir credenciales (cookies de sesión) en las peticiones
         options.credentials = 'same-origin';
-        
+
         const response = await fetch(fullEndpoint, options);
-        
+
         if (!response.ok) {
             // Intentar obtener el mensaje de error del servidor
             let errorMessage = `Error HTTP ${response.status}`;
             const contentType = response.headers.get('content-type');
-            
+
             // Clonar la respuesta para poder leerla múltiples veces si es necesario
             const clonedResponse = response.clone();
-            
+
             try {
                 if (contentType && contentType.includes('application/json')) {
                     const errorData = await response.json();
@@ -3481,18 +3606,18 @@ function showNotification(message, type = 'success') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
-    
+
     document.body.appendChild(notification);
-    
+
     // Mostrar con animación
     setTimeout(() => {
         notification.classList.add('show');
     }, 100);
-    
+
     // Ocultar después de 3 segundos
     setTimeout(() => {
         notification.classList.remove('show');
-        
+
         // Eliminar después de la animación
         setTimeout(() => {
             notification.remove();
@@ -3504,12 +3629,12 @@ function showNotification(message, type = 'success') {
 function validateFileInput(input, infoId, maxSize) {
     const file = input.files[0];
     const infoDiv = document.getElementById(infoId);
-    
+
     if (!file) {
         if (infoDiv) infoDiv.style.display = 'none';
         return true;
     }
-    
+
     // Validar tamaño
     if (file.size > maxSize) {
         const maxSizeMB = Math.round(maxSize / (1024 * 1024));
@@ -3518,50 +3643,50 @@ function validateFileInput(input, infoId, maxSize) {
         if (infoDiv) infoDiv.style.display = 'none';
         return false;
     }
-    
+
     // Validar tipo
     const allowedTypes = ['video/mp4', 'video/webm', 'video/avi', 'video/x-msvideo', 'video/x-matroska', 'video/quicktime'];
     const allowedExtensions = ['mp4', 'webm', 'avi', 'mkv', 'mov'];
     const fileExtension = file.name.split('.').pop().toLowerCase();
-    
+
     if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
         showNotification('Tipo de archivo no permitido. Formatos permitidos: MP4, WebM, AVI, MKV, MOV', 'error');
         input.value = '';
         if (infoDiv) infoDiv.style.display = 'none';
         return false;
     }
-    
+
     // Mostrar información del archivo
     if (infoDiv) {
         const fileName = infoDiv.querySelector('.file-name');
         const fileSize = infoDiv.querySelector('.file-size');
-        
+
         if (fileName) {
             fileName.textContent = `Archivo: ${file.name}`;
         }
-        
+
         if (fileSize) {
             const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
             fileSize.textContent = `Tamaño: ${sizeMB} MB`;
         }
-        
+
         infoDiv.style.display = 'block';
     }
-    
+
     return true;
 }
 
 // Configurar opciones mutuamente excluyentes
 function setupMutuallyExclusiveOptions(radioGroupName, options) {
     const radioButtons = document.querySelectorAll(`input[name="${radioGroupName}"]`);
-    
+
     radioButtons.forEach(radio => {
-        radio.addEventListener('change', function() {
+        radio.addEventListener('change', function () {
             const selectedValue = this.value;
             const config = options[selectedValue];
-            
+
             if (!config) return;
-            
+
             // Ocultar y deshabilitar todas las opciones primero
             Object.keys(options).forEach(key => {
                 const opt = options[key];
@@ -3585,7 +3710,7 @@ function setupMutuallyExclusiveOptions(radioGroupName, options) {
                     if (btn) btn.disabled = true;
                 }
             });
-            
+
             // Mostrar y habilitar la opción seleccionada
             if (config.container) {
                 const container = document.getElementById(config.container);
@@ -3602,7 +3727,7 @@ function setupMutuallyExclusiveOptions(radioGroupName, options) {
                 const btn = document.getElementById(config.previewBtn);
                 if (btn) btn.disabled = false;
             }
-            
+
             // Deshabilitar y limpiar la otra opción
             if (config.otherOption) {
                 const otherOption = document.getElementById(config.otherOption);
@@ -3628,7 +3753,7 @@ function setupMutuallyExclusiveOptions(radioGroupName, options) {
                     }
                 }
             }
-            
+
             // Si es "none", también limpiar la segunda opción si existe
             if (selectedValue === 'none' && config.otherOption2) {
                 const otherOption2 = document.getElementById(config.otherOption2);
@@ -3653,7 +3778,7 @@ function setupMutuallyExclusiveOptions(radioGroupName, options) {
                     }
                 }
             }
-            
+
             // Restaurar opacidad de la opción seleccionada
             const selectedOption = document.querySelector(`input[name="${radioGroupName}"]:checked`);
             if (selectedOption) {
@@ -3665,7 +3790,7 @@ function setupMutuallyExclusiveOptions(radioGroupName, options) {
                     selectedCard.style.background = '#fff5f5';
                 }
             }
-            
+
             // Restaurar opacidad de otras opciones no seleccionadas
             radioButtons.forEach(rb => {
                 if (rb !== this && rb.value !== 'none') {
@@ -3679,7 +3804,7 @@ function setupMutuallyExclusiveOptions(radioGroupName, options) {
                 }
             });
         });
-        
+
         // Disparar el evento change si ya está seleccionado
         if (radio.checked) {
             radio.dispatchEvent(new Event('change'));
@@ -3691,14 +3816,14 @@ function setupMutuallyExclusiveOptions(radioGroupName, options) {
 function clearVideoFile() {
     const videoFileInput = document.getElementById('video_file');
     const videoFileInfo = document.getElementById('video_file_info');
-    
+
     if (videoFileInput) {
         videoFileInput.value = '';
     }
     if (videoFileInfo) {
         videoFileInfo.style.display = 'none';
     }
-    
+
     // Cambiar a opción de URL
     const urlRadio = document.getElementById('video_source_url');
     if (urlRadio) {
@@ -3711,14 +3836,14 @@ function clearVideoFile() {
 function clearTrailerFile() {
     const trailerFileInput = document.getElementById('trailer_file');
     const trailerFileInfo = document.getElementById('trailer_file_info');
-    
+
     if (trailerFileInput) {
         trailerFileInput.value = '';
     }
     if (trailerFileInfo) {
         trailerFileInfo.style.display = 'none';
     }
-    
+
     // Cambiar a opción "none"
     const noneRadio = document.getElementById('trailer_source_none');
     if (noneRadio) {
@@ -3745,14 +3870,14 @@ function formatCategory(category) {
         'animation': 'Animación',
         'romance': 'Romance'
     };
-    
+
     return categories[category] || category;
 }
 
 // Formatear fecha
 function formatDate(dateString) {
     if (!dateString) return 'N/A';
-    
+
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString('es-ES', options);
 }
@@ -3760,15 +3885,15 @@ function formatDate(dateString) {
 // Formatear fecha y hora
 function formatDateTime(dateTimeString) {
     if (!dateTimeString) return 'Nunca';
-    
-    const options = { 
-        year: 'numeric', 
-        month: 'short', 
+
+    const options = {
+        year: 'numeric',
+        month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
     };
-    
+
     return new Date(dateTimeString).toLocaleDateString('es-ES', options);
 }
 
@@ -3781,7 +3906,7 @@ function formatStatus(status) {
         'pending': 'Pendiente',
         'banned': 'Bloqueado'
     };
-    
+
     return statusMap[status] || status;
 }
 
@@ -3789,7 +3914,7 @@ function formatStatus(status) {
 function initDynamicComponents() {
     // Tabs de configuración
     setupSettingsTabs();
-    
+
     // Selector de rango de fechas personalizado
     const dateRangeSelect = document.getElementById('date-range');
     if (dateRangeSelect) {
@@ -3802,7 +3927,7 @@ function initDynamicComponents() {
             }
         });
     }
-    
+
     // Botón para agregar nuevo contenido
     const addNewButtons = document.querySelectorAll('.btn-add-new');
     addNewButtons.forEach(button => { // Solo debería haber uno por vista
@@ -3811,13 +3936,13 @@ function initDynamicComponents() {
             showContentModal();
         });
     });
-    
+
     // Cerrar modal al hacer clic en el botón de cerrar
     const closeButtons = document.querySelectorAll('.close-modal, .close-modal-btn');
     closeButtons.forEach(button => {
         button.addEventListener('click', closeModal);
     });
-    
+
     // Evitar que el clic en el modal lo cierre
     const modalContent = document.querySelector('.modal-content');
     if (modalContent) {
@@ -3825,7 +3950,7 @@ function initDynamicComponents() {
             e.stopPropagation();
         });
     }
-    
+
     // Inicializar tooltips
     const tooltipTriggers = document.querySelectorAll('[data-toggle="tooltip"]');
     tooltipTriggers.forEach(trigger => {
@@ -4468,32 +4593,32 @@ async function handleCreatePlan() {
 function showTooltip(e) {
     const tooltipText = this.getAttribute('title');
     if (!tooltipText) return;
-    
+
     const tooltip = document.createElement('div');
     tooltip.className = 'tooltip';
     tooltip.textContent = tooltipText;
-    
+
     document.body.appendChild(tooltip);
-    
+
     const rect = this.getBoundingClientRect();
     const tooltipHeight = tooltip.offsetHeight;
     const tooltipWidth = tooltip.offsetWidth;
-    
+
     let top = rect.top - tooltipHeight - 10;
     let left = rect.left + (this.offsetWidth / 2) - (tooltipWidth / 2);
-    
+
     // Ajustar si el tooltip se sale por la izquierda
     if (left < 10) left = 10;
-    
+
     // Ajustar si el tooltip se sale por arriba
     if (top < 10) {
         top = rect.bottom + 10;
     }
-    
+
     tooltip.style.top = `${top}px`;
     tooltip.style.left = `${left}px`;
     tooltip.classList.add('show');
-    
+
     // Eliminar el título para evitar el tooltip nativo
     this.removeAttribute('title');
     this.setAttribute('data-original-title', tooltipText);
@@ -4509,7 +4634,7 @@ function hideTooltip() {
             this.setAttribute('title', originalTitle);
             this.removeAttribute('data-original-title');
         }
-        
+
         tooltip.remove();
     }
 }
@@ -4545,7 +4670,7 @@ if (document.readyState === 'loading') {
 function togglePasswordView(button) {
     const passwordText = button.querySelector('.password-text');
     const icon = button.querySelector('i');
-    
+
     if (passwordText && (passwordText.style.display === 'none' || !passwordText.style.display)) {
         passwordText.style.display = 'inline';
         if (icon) {
@@ -4566,21 +4691,21 @@ function togglePasswordView(button) {
 // Resetear contraseña de usuario
 async function resetUserPassword(userId) {
     if (!userId) return;
-    
+
     const newPassword = prompt('Ingresa la nueva contraseña (mínimo 8 caracteres):');
     if (!newPassword) return;
-    
+
     if (newPassword.length < 8) {
         alert('La contraseña debe tener al menos 8 caracteres.');
         return;
     }
-    
+
     const confirmPassword = prompt('Confirma la nueva contraseña:');
     if (newPassword !== confirmPassword) {
         alert('Las contraseñas no coinciden.');
         return;
     }
-    
+
     try {
         const response = await apiRequest(`/api/users/index.php?id=${userId}`, {
             method: 'PUT',
@@ -4588,7 +4713,7 @@ async function resetUserPassword(userId) {
                 password: newPassword
             })
         });
-        
+
         if (response.success) {
             alert('Contraseña actualizada correctamente.');
             // Recargar la lista de usuarios
@@ -4620,14 +4745,14 @@ async function handlePreviewVideo() {
     const videoFileInput = document.getElementById('video_file');
     const previewContainer = document.getElementById('videoPreviewContainer');
     const previewPlayerDiv = document.getElementById('videoPreviewPlayer');
-    
+
     if (!previewContainer || !previewPlayerDiv) {
         showNotification('Error: Contenedor de previsualización no encontrado', 'error');
         return;
     }
-    
+
     let videoUrl = null;
-    
+
     // Obtener URL del video desde el input o archivo subido
     if (videoUrlInput && videoUrlInput.value.trim()) {
         videoUrl = videoUrlInput.value.trim();
@@ -4639,14 +4764,14 @@ async function handlePreviewVideo() {
         showNotification('Por favor, ingresa una URL de video o selecciona un archivo', 'warning');
         return;
     }
-    
+
     if (!videoUrl) {
         return;
     }
-    
+
     // Mostrar el contenedor de previsualización
     previewContainer.style.display = 'block';
-    
+
     // Limpiar el reproductor anterior si existe
     if (previewPlayer) {
         try {
@@ -4656,9 +4781,9 @@ async function handlePreviewVideo() {
         }
         previewPlayer = null;
     }
-    
+
     previewPlayerDiv.innerHTML = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff;"><i class="fas fa-spinner fa-spin"></i> Cargando video...</div>';
-    
+
     // Esperar a que UnifiedVideoPlayer esté disponible
     if (typeof UnifiedVideoPlayer === 'undefined') {
         // Cargar el script si no está disponible
@@ -4687,7 +4812,7 @@ function initPreviewPlayer(videoUrl, container) {
     tempContainer.style.height = '100%';
     container.innerHTML = '';
     container.appendChild(tempContainer);
-    
+
     try {
         previewPlayer = new UnifiedVideoPlayer('tempPreviewPlayer', {
             autoplay: false,
@@ -4701,7 +4826,7 @@ function initPreviewPlayer(videoUrl, container) {
                 </div>`;
             }
         });
-        
+
         previewPlayer.loadVideo(videoUrl).then(() => {
             console.log('Video de previsualización cargado');
         }).catch(error => {
@@ -4727,7 +4852,7 @@ function closeVideoPreview() {
     if (previewContainer) {
         previewContainer.style.display = 'none';
     }
-    
+
     // Limpiar el reproductor
     if (previewPlayer) {
         try {
@@ -4737,7 +4862,7 @@ function closeVideoPreview() {
         }
         previewPlayer = null;
     }
-    
+
     const previewPlayerDiv = document.getElementById('videoPreviewPlayer');
     if (previewPlayerDiv) {
         previewPlayerDiv.innerHTML = '';
@@ -4758,26 +4883,26 @@ function handlePosterClick(id, title, year, type) {
 async function loadIMDbInfo(id, title, year, type) {
     const imdbElement = document.querySelector(`.imdb-info[data-id="${id}"]`);
     if (!imdbElement) return;
-    
+
     const originalHTML = imdbElement.innerHTML;
     imdbElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
     imdbElement.style.pointerEvents = 'none';
-    
+
     try {
         const baseUrl = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
         const url = `${baseUrl}/api/imdb/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year || '')}&type=${encodeURIComponent(type)}`;
-        
+
         const response = await fetch(url, { credentials: 'same-origin' });
         const data = await response.json();
-        
+
         if (data.success && data.data) {
             const info = data.data;
             const rating = info.imdb_rating || 'N/A';
             const source = info.source || 'imdb';
-            
+
             imdbElement.innerHTML = `<i class="fab fa-imdb"></i> ${rating} (${source})`;
             imdbElement.title = `Rating: ${rating} | Fuente: ${source}`;
-            
+
             // Actualizar rating en la base de datos si es diferente
             if (rating !== 'N/A' && parseFloat(rating) > 0) {
                 updateContentRating(id, parseFloat(rating));
@@ -4805,7 +4930,7 @@ async function updateContentRating(id, rating) {
             credentials: 'same-origin',
             body: JSON.stringify({ id: parseInt(id), rating: rating })
         });
-        
+
         if (response.ok) {
             console.log(`Rating actualizado para contenido ${id}: ${rating}`);
         }
@@ -4826,22 +4951,22 @@ async function handleSearchTorrent(event, presetQuery = null) {
     const resultsContent = document.getElementById('torrent-results-content');
     const searchBtn = document.getElementById('searchTorrentBtn');
     const retryBtn = document.getElementById('retryTorrentBtn');
-    
+
     if (!resultsDiv || !resultsContent) {
         return;
     }
-    
+
     const title = presetQuery?.title ?? titleInput?.value.trim();
     if (!title) {
         showNotification('Por favor, ingresa un título primero', 'warning');
         return;
     }
-    
+
     const year = presetQuery?.year ?? yearInput?.value ?? '';
     const type = presetQuery?.type ?? typeInput?.value ?? 'movie';
-    
+
     window.__lastTorrentQuery = { title, year, type };
-    
+
     const loadingBtn = presetQuery?.trigger === 'retry' ? retryBtn : searchBtn;
     if (loadingBtn) {
         loadingBtn.disabled = true;
@@ -4849,25 +4974,25 @@ async function handleSearchTorrent(event, presetQuery = null) {
     }
     resultsDiv.style.display = 'block';
     resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem;"><i class="fas fa-spinner fa-spin"></i> Buscando torrents...</p>';
-    
+
     try {
         const url = `/api/torrent/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`;
-        
+
         const response = await fetch(url, {
             credentials: 'same-origin'
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success && data.results && data.results.length > 0) {
             let html = '<div style="margin-bottom: 0.5rem; font-weight: 600;">Encontrados ' + data.count + ' resultados:</div>';
-            
+
             data.results.forEach((torrent) => {
                 const safeMagnet = (torrent.magnet || '').replace(/'/g, "\\'");
                 const qualityBadge = torrent.quality && torrent.quality !== 'Unknown' ? `<span style="background: #e50914; color: white; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.75rem; margin-right: 0.5rem;">${torrent.quality}</span>` : '';
                 const seedsInfo = torrent.seeds > 0 ? `<span style="color: #28a745;"><i class="fas fa-arrow-up"></i> ${torrent.seeds}</span>` : '';
                 const sizeInfo = torrent.size ? `<span style="color: #666; margin-left: 0.5rem;"><i class="fas fa-hdd"></i> ${torrent.size}</span>` : '';
-                
+
                 html += `
                     <div style="padding: 0.75rem; margin-bottom: 0.5rem; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s;" 
                          onmouseover="this.style.borderColor='#e50914'; this.style.boxShadow='0 2px 4px rgba(229,9,20,0.2)'"
@@ -4890,7 +5015,7 @@ async function handleSearchTorrent(event, presetQuery = null) {
                     </div>
                 `;
             });
-            
+
             resultsContent.innerHTML = html;
         } else {
             resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem; color: #666;">No se encontraron resultados. Puedes ingresar el enlace magnet manualmente.</p>';
@@ -4924,13 +5049,13 @@ function handleInvalidTorrent(e) {
 function selectTorrent(magnetLink) {
     const torrentInput = document.getElementById('torrent_magnet');
     const resultsDiv = document.getElementById('torrent-results');
-    
+
     if (torrentInput) {
         torrentInput.value = magnetLink;
         showNotification('Enlace magnet seleccionado', 'success');
         window.__selectedTorrent = magnetLink;
     }
-    
+
     if (resultsDiv) {
         resultsDiv.style.display = 'none';
     }

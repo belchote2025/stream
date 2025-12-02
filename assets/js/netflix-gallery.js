@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                     // Redirigir después de un pequeño delay para que el modal se cierre suavemente
                     setTimeout(() => {
-                        window.location.href = `${BASE_URL}/content.php?id=${contentId}`;
+                        window.location.href = `${BASE_URL}/content-detail.php?id=${contentId}`;
                     }, 300);
                 }
             });
@@ -717,16 +717,30 @@ document.addEventListener('DOMContentLoaded', function () {
     async function playContent(contentId, contentType = 'movie') {
         console.log('[playContent] Iniciando reproducción:', { contentId, contentType });
         
-        const hasVideoModal = elements.videoModal && elements.modalPlayer;
+        // Buscar elementos dinámicamente si no están en cache (útil cuando se llama desde otras páginas)
+        let videoModal = elements.videoModal;
+        let modalPlayer = elements.modalPlayer;
+        
+        if (!videoModal) {
+            videoModal = document.querySelector(config.selectors.videoModal);
+        }
+        if (!modalPlayer) {
+            modalPlayer = document.querySelector('#contentPlayer');
+        }
+        
+        const hasVideoModal = videoModal && modalPlayer;
         console.log('[playContent] Verificando modal:', {
             hasVideoModal,
-            videoModal: !!elements.videoModal,
-            modalPlayer: !!elements.modalPlayer
+            videoModal: !!videoModal,
+            modalPlayer: !!modalPlayer
         });
         
         // Si tenemos el modal disponible, usarlo directamente (no redirigir a window.playContent)
         if (hasVideoModal) {
             console.log('[playContent] Usando modal de netflix-gallery.js');
+            // Actualizar elementos en cache si no estaban
+            if (!elements.videoModal) elements.videoModal = videoModal;
+            if (!elements.modalPlayer) elements.modalPlayer = modalPlayer;
             // Continuar con la lógica del modal
         } else if (typeof window.playContent === 'function' && window.playContent !== playContent) {
             // Solo redirigir a window.playContent si NO tenemos modal disponible
@@ -780,11 +794,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             console.log('[playContent] Abriendo modal...');
-            const modalInstance = bootstrap.Modal.getOrCreateInstance(elements.videoModal);
+            // Usar videoModal y modalPlayer locales (ya actualizados en cache si era necesario)
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(videoModal);
             modalInstance.show();
             console.log('[playContent] Modal abierto correctamente');
 
-            const videoEl = elements.modalPlayer;
+            const videoEl = modalPlayer;
             videoEl.pause();
             videoEl.removeAttribute('src');
             videoEl.load();
@@ -1127,6 +1142,9 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('Error marcando como completado:', error);
         }
     }
+
+    // Exponer playContent globalmente para que otras páginas puedan usarla
+    window.playContentFromGallery = playContent;
 
     // Initialize the gallery when the DOM is fully loaded
     if (document.readyState === 'loading') {

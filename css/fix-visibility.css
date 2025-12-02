@@ -24,15 +24,17 @@ body {
     visibility: visible !important;
 }
 
-/* Hero slides visibles */
+/* Hero slides - solo el activo debe ser visible */
 .hero-slide {
-    opacity: 1 !important;
-    visibility: visible !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
 
 .hero-slide.active {
     opacity: 1 !important;
     visibility: visible !important;
+    pointer-events: auto !important;
     display: block !important;
 }
 

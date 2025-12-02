@@ -95,8 +95,9 @@ include __DIR__ . '/includes/header.php';
 <section class="hero">
     <?php if (!empty($featuredContent)): ?>
         <?php foreach ($featuredContent as $index => $content): 
-            $backdropUrl = htmlspecialchars($content['backdrop_url'] ?? $content['poster_url'] ?? '');
-            $posterUrl = htmlspecialchars($content['poster_url'] ?? $backdropUrl);
+            // Usar getImageUrl para procesar las URLs correctamente (con proxy si es necesario)
+            $backdropUrl = getImageUrl($content['backdrop_url'] ?? $content['poster_url'] ?? '', '/assets/img/default-backdrop.svg');
+            $posterUrl = getImageUrl($content['poster_url'] ?? '', '/assets/img/default-poster.svg');
             $title = htmlspecialchars($content['title'] ?? '');
             $description = $content['description'] ?? $content['overview'] ?? '';
             $overview = htmlspecialchars(substr($description, 0, 200) . (strlen($description) > 200 ? '...' : ''));
@@ -134,7 +135,7 @@ include __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
     <?php else: ?>
         <div class="hero-slide active">
-            <div class="hero-backdrop" style="background-image: url('<?php echo $baseUrl; ?>/assets/img/default-backdrop.jpg.php'); background-size: cover;"></div>
+            <div class="hero-backdrop" style="background-image: url('<?php echo $baseUrl; ?>/assets/img/default-backdrop.svg'); background-size: cover;"></div>
         </div>
     <?php endif; ?>
     <div class="hero-overlay"></div>

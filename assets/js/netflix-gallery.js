@@ -84,7 +84,17 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
 
         // Cache DOM elements
+        // IMPORTANTE: Si hay slides del PHP, NO cachear heroTitle/heroDescription/heroActions globalmente
+        // porque hay múltiples instancias (una por slide) y no queremos sobrescribir el contenido
+        const hasExistingSlides = document.querySelectorAll('.hero-slide').length > 0;
+        
         for (const [key, selector] of Object.entries(config.selectors)) {
+            // Si hay slides existentes del PHP, no cachear elementos del hero que son específicos por slide
+            if (hasExistingSlides && (key === 'heroTitle' || key === 'heroDescription' || key === 'heroActions')) {
+                // No cachear estos elementos - cada slide tiene los suyos
+                continue;
+            }
+            
             const element = document.querySelector(selector);
             if (element) {
                 elements[key] = element;
@@ -152,15 +162,19 @@ document.addEventListener('DOMContentLoaded', function () {
             // Usar los slides existentes del HTML
             state.heroItems = Array.from(existingSlides).map((slide, index) => {
                 const backdrop = slide.querySelector('.hero-backdrop');
-                const title = document.querySelector('.hero-title');
-                const description = document.querySelector('.hero-description');
+                // Obtener título y descripción del slide específico, no del primero
+                const titleEl = slide.querySelector('.hero-title');
+                const descEl = slide.querySelector('.hero-description');
+                const actionsEl = slide.querySelector('.hero-actions');
+                const playLink = actionsEl ? actionsEl.querySelector('a[href*="watch.php"]') : null;
+                const contentId = playLink ? (playLink.href.match(/id=(\d+)/)?.[1] || slide.dataset.index || index) : (slide.dataset.index || index);
                 const trailer = slide.dataset.trailer || '';
 
                 return {
-                    id: slide.dataset.index || index,
-                    title: title ? title.textContent : '',
-                    description: description ? description.textContent : '',
-                    backdrop_url: backdrop ? backdrop.style.backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/)?.[1] : '',
+                    id: contentId,
+                    title: titleEl ? titleEl.textContent : '',
+                    description: descEl ? descEl.textContent : '',
+                    backdrop_url: backdrop ? (backdrop.style.backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/)?.[1] || '') : '',
                     trailer_url: trailer
                 };
             });
@@ -224,33 +238,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 slide.classList.toggle('active', index === state.currentHeroIndex);
             });
 
-            // NO sobrescribir título y descripción si ya tienen contenido del PHP
-            // Solo actualizar si están vacíos
-            const titleEl = document.querySelector('.hero-slide.active .hero-title');
-            const descEl = document.querySelector('.hero-slide.active .hero-description');
-
-            if (titleEl && (!titleEl.textContent || titleEl.textContent.trim() === '') && item.title) {
-                titleEl.textContent = item.title;
-            }
-            if (descEl && (!descEl.textContent || descEl.textContent.trim() === '') && item.description) {
-                descEl.textContent = item.description;
+            // Obtener el slide activo actual
+            const activeSlide = existingSlides[state.currentHeroIndex];
+            if (!activeSlide) {
+                return; // Si no hay slide activo, salir
             }
 
-            // NO sobrescribir los botones de acción - mantener los que vienen del PHP
-            // Solo actualizar data-id si no existe
-            const actionsEl = document.querySelector('.hero-slide.active .hero-actions');
-            if (actionsEl && item.id) {
-                const playBtn = actionsEl.querySelector('[data-action="play"], .btn-primary');
+            // NO sobrescribir título y descripción - mantener el contenido del PHP
+            // El contenido ya viene correcto del PHP, no necesitamos actualizarlo
+            // Solo actualizar data-id de los botones si es necesario
+            const actionsEl = activeSlide.querySelector('.hero-actions');
+            if (actionsEl) {
+                const playBtn = actionsEl.querySelector('[data-action="play"], .btn-primary, a[href*="watch.php"]');
                 const infoBtn = actionsEl.querySelector('[data-action="info"], .btn-outline');
-                if (playBtn && !playBtn.dataset.id) {
+                
+                // Actualizar data-id solo si no existe y tenemos el ID del item
+                if (playBtn && !playBtn.dataset.id && item.id) {
                     playBtn.dataset.id = item.id;
                 }
-                if (infoBtn && !infoBtn.dataset.id) {
+                if (infoBtn && !infoBtn.dataset.id && item.id) {
                     infoBtn.dataset.id = item.id;
                 }
             }
 
-            return; // Salir temprano si hay slides existentes
+            return; // Salir temprano si hay slides existentes - NO modificar el contenido
         }
 
         let backdropUrl = item.backdrop_url || config.defaultBackdrop;
@@ -260,6 +271,22 @@ document.addEventListener('DOMContentLoaded', function () {
             backdropUrl = `${BASE_URL}/api/image-proxy.php?url=` + encodeURIComponent(backdropUrl);
         }
 
+        // Si llegamos aquí, significa que NO hay slides existentes del PHP
+        // Solo crear contenido si realmente no existe ningún slide
+        // Esto no debería pasar si el PHP está generando los slides correctamente
+        console.warn('[netflix-gallery] No se encontraron slides existentes, creando desde JavaScript');
+        
+        // Si llegamos aquí, significa que NO hay slides existentes del PHP
+        // Solo crear contenido si realmente no existe ningún slide
+        // Esto no debería pasar si el PHP está generando los slides correctamente
+        const existingSlidesCheck = document.querySelectorAll('.hero-slide');
+        if (existingSlidesCheck.length > 0) {
+            console.warn('[netflix-gallery] Se detectaron slides pero renderHero() fue llamado. Esto no debería pasar.');
+            return; // Salir - no modificar nada si hay slides
+        }
+        
+        console.warn('[netflix-gallery] No se encontraron slides existentes, creando desde JavaScript');
+        
         const safeBackdropUrl = backdropUrl.replace(/'/g, "\\'");
 
         // Update hero content - verificar que los elementos existan
@@ -274,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        // NO sobrescribir si ya hay contenido del PHP
+        // Solo actualizar si los elementos están vacíos (no debería pasar si hay slides del PHP)
         if (elements.heroTitle && (!elements.heroTitle.textContent || elements.heroTitle.textContent.trim() === '')) {
             elements.heroTitle.textContent = item.title || '';
         }
@@ -283,8 +310,7 @@ document.addEventListener('DOMContentLoaded', function () {
             elements.heroDescription.textContent = item.description || '';
         }
 
-        // NO reemplazar los botones de acción si ya existen - mantener los del PHP
-        // Solo actualizar si no hay botones
+        // Solo crear botones si no existen
         if (elements.heroActions && elements.heroActions.children.length === 0) {
             const safeId = item.id || 0;
             const baseUrl = BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
@@ -296,16 +322,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     <i class="fas fa-info-circle"></i> Más información
                 </button>
             `;
-        } else if (elements.heroActions) {
-            // Solo actualizar data-id si no existe
-            const playBtn = elements.heroActions.querySelector('[data-action="play"], .btn-primary');
-            const infoBtn = elements.heroActions.querySelector('[data-action="info"], .btn-outline');
-            if (playBtn && !playBtn.dataset.id && item.id) {
-                playBtn.dataset.id = item.id;
-            }
-            if (infoBtn && !infoBtn.dataset.id && item.id) {
-                infoBtn.dataset.id = item.id;
-            }
         }
     }
 
@@ -348,6 +364,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     // Actualizar índice
                     state.currentHeroIndex = nextIndex;
+                    
+                    // NO llamar a renderHero() - el contenido ya está en el HTML del PHP
+                    // Solo cambiar la clase active para mostrar/ocultar slides
                 } else {
                     // Si no hay activo, activar el primero
                     slides[0].classList.add('active');

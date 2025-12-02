@@ -95,7 +95,7 @@ function getBackdropImage($title, $type = 'movie', $year = null) {
     }
     
     // Si no se encuentra en IMDB, usar una imagen de fondo por defecto
-    return '/assets/img/default-backdrop.jpg';
+    return '/assets/img/default-backdrop.svg';
 }
 
 /**
@@ -109,21 +109,34 @@ function addImdbImagesToContent($content) {
         return [];
     }
     
+    // Asegurar que getImageUrl esté disponible
+    if (!function_exists('getImageUrl')) {
+        require_once __DIR__ . '/image-helper.php';
+    }
+    
     foreach ($content as &$item) {
+        // Procesar poster_url
         if (empty($item['poster_url']) || strpos($item['poster_url'], 'default-') !== false) {
             $item['poster_url'] = getPosterImage(
                 $item['title'],
                 $item['type'] ?? 'movie',
                 $item['release_year'] ?? null
             );
+        } else {
+            // Si ya tiene URL, procesarla para usar proxy si es necesario
+            $item['poster_url'] = getImageUrl($item['poster_url'], '/assets/img/default-poster.svg');
         }
         
+        // Procesar backdrop_url
         if (empty($item['backdrop_url']) || strpos($item['backdrop_url'], 'default-') !== false) {
             $item['backdrop_url'] = getBackdropImage(
                 $item['title'],
                 $item['type'] ?? 'movie',
                 $item['release_year'] ?? null
             );
+        } else {
+            // Si ya tiene URL, procesarla para usar proxy si es necesario
+            $item['backdrop_url'] = getImageUrl($item['backdrop_url'], '/assets/img/default-backdrop.svg');
         }
     }
     

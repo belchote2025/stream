@@ -108,15 +108,15 @@ try {
     // ============================================
     
     // Vistas totales
-    $stmt = $db->query("SELECT SUM(view_count) as total FROM content");
+    $stmt = $db->query("SELECT SUM(views) as total FROM content");
     $totalViews = (int)($stmt->fetch()['total'] ?? 0);
     
     // Vistas este mes
     $stmt = $db->query("
         SELECT COUNT(*) as total 
         FROM playback_history 
-        WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) 
-        AND YEAR(created_at) = YEAR(CURRENT_DATE())
+        WHERE MONTH(updated_at) = MONTH(CURRENT_DATE()) 
+        AND YEAR(updated_at) = YEAR(CURRENT_DATE())
     ");
     $viewsThisMonth = (int)($stmt->fetch()['total'] ?? 0);
     
@@ -124,7 +124,7 @@ try {
     $stmt = $db->query("
         SELECT COUNT(*) as total 
         FROM playback_history 
-        WHERE DATE(created_at) = CURDATE()
+        WHERE DATE(updated_at) = CURDATE()
     ");
     $viewsToday = (int)($stmt->fetch()['total'] ?? 0);
     
@@ -133,7 +133,7 @@ try {
         SELECT c.id, c.title, c.type, COUNT(ph.id) as views
         FROM content c
         LEFT JOIN playback_history ph ON c.id = ph.content_id
-        WHERE ph.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        WHERE ph.updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
         GROUP BY c.id
         ORDER BY views DESC
         LIMIT 5
@@ -198,11 +198,11 @@ try {
     
     $stmt = $db->query("
         SELECT 
-            DATE(created_at) as date,
+            DATE(updated_at) as date,
             COUNT(*) as views
         FROM playback_history
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-        GROUP BY DATE(created_at)
+        WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY DATE(updated_at)
         ORDER BY date ASC
     ");
     $viewsTrend = $stmt->fetchAll();

@@ -211,7 +211,7 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                             <h3>Vistas Totales</h3>
                             <p class="stat-number"><?php 
                                 try {
-                                    $stmt = $db->query("SELECT SUM(view_count) as total FROM content");
+                                    $stmt = $db->query("SELECT SUM(views) as total FROM content");
                                     $views = $stmt->fetch()['total'] ?? 0;
                                     echo number_format($views);
                                 } catch (PDOException $e) {
@@ -221,6 +221,49 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                             <p class="stat-change positive">Activo</p>
                         </div>
                     </div>
+                </div>
+
+                <!-- Actualización de novedades -->
+                <div class="quick-actions" style="margin: 2rem 0; padding: 1.5rem; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div class="section-header">
+                        <h2><i class="fas fa-sync-alt"></i> Actualización Automática de Contenido</h2>
+                    </div>
+                    <p style="color: #666; margin-bottom: 1rem;">Busca y actualiza automáticamente novedades de películas y series desde TVMaze (gratuita, sin API key), incluyendo portadas, trailers y enlaces torrent.</p>
+                    
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Tipo de contenido:</label>
+                            <select id="refresh-type" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="movie">Películas</option>
+                                <option value="tv">Series</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; min-width: 150px;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Límite:</label>
+                            <input type="number" id="refresh-limit" value="30" min="1" max="100" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div style="flex: 1; min-width: 150px;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Últimos días:</label>
+                            <input type="number" id="refresh-days" value="7" min="0" max="365" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div style="flex: 1; min-width: 150px;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Mín. seeds:</label>
+                            <input type="number" id="refresh-seeds" value="10" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center;">
+                        <button id="btn-refresh-content" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem;">
+                            <i class="fas fa-sync-alt"></i> Actualizar Novedades
+                        </button>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="refresh-dry-run">
+                            <span>Modo prueba (no guarda cambios)</span>
+                        </label>
+                        <div id="refresh-status" style="margin-left: auto; font-weight: 600;"></div>
+                    </div>
+                    
+                    <div id="refresh-output" style="margin-top: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px; display: none; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9rem; white-space: pre-wrap;"></div>
                 </div>
 
                 <!-- Actividades recientes -->
@@ -647,11 +690,11 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
         window.__APP_BASE_URL = '<?php echo $baseUrl; ?>';
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="<?php echo $baseUrl; ?>/js/utils.js"></script>
-    <script src="<?php echo $baseUrl; ?>/js/admin-charts.js"></script>
-    <script src="<?php echo $baseUrl; ?>/js/admin-enhanced.js"></script>
-    <script src="<?php echo $baseUrl; ?>/js/admin.js"></script>
-    <script src="<?php echo $baseUrl; ?>/js/notifications.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/utils.js?v=<?php echo time(); ?>"></script>
+    <script src="<?php echo $baseUrl; ?>/js/admin-charts.js?v=<?php echo time(); ?>"></script>
+    <script src="<?php echo $baseUrl; ?>/js/admin-enhanced.js?v=<?php echo time(); ?>"></script>
+    <script src="<?php echo $baseUrl; ?>/js/admin.js?v=<?php echo time(); ?>"></script>
+    <script src="<?php echo $baseUrl; ?>/js/notifications.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>
 

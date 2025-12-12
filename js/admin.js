@@ -505,11 +505,15 @@ async function loadSection() {
                 content = renderDashboard(stats, recentUsers, recentContent);
 
                 // Actualizar gráficos después de renderizar
-                setTimeout(() => {
-                    if (typeof updateDashboardCharts === 'function' && stats) {
-                        updateDashboardCharts(stats);
+                setTimeout(async () => {
+                    if (typeof updateDashboardCharts === 'function') {
+                        try {
+                            await updateDashboardCharts(stats);
+                        } catch (error) {
+                            console.error('Error al actualizar gráficos:', error);
+                        }
                     }
-                }, 100);
+                }, 300);
             } catch (error) {
                 console.error('Error cargando dashboard:', error);
                 content = renderDashboard(null, [], []);
@@ -613,6 +617,15 @@ async function loadSection() {
     // Inicializar funcionalidades mejoradas
     if (typeof initEnhancedFeatures === 'function') {
         initEnhancedFeatures();
+    }
+
+    // Inicializar actualización de contenido si estamos en el dashboard
+    if (currentSection === 'dashboard') {
+        setTimeout(() => {
+            if (typeof initContentRefresh === 'function') {
+                initContentRefresh();
+            }
+        }, 100);
     }
 }
 
@@ -726,118 +739,192 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
         <h1>Panel de Control</h1>
         
         <!-- Resumen -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Usuarios Totales</h3>
-                    <p class="stat-number">${finalStats.totalUsers.toLocaleString()}</p>
-                    <p class="stat-change ${usersChangeClass}">
-                        <i class="fas fa-arrow-${finalStats.usersChangePercent >= 0 ? 'up' : 'down'}"></i>
-                        ${finalStats.newUsersThisMonth} este mes (${usersChangeText})
-                    </p>
-                </div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                    <i class="fas fa-film"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Películas</h3>
-                    <p class="stat-number">${finalStats.totalMovies.toLocaleString()}</p>
-                    <p class="stat-change ${finalStats.newMoviesThisMonth > 0 ? 'positive' : 'neutral'}">
-                        <i class="fas fa-arrow-up"></i>
-                        +${finalStats.newMoviesThisMonth} este mes
-                    </p>
+        <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
+            <div class="stat-card" style="background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.75rem; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <div style="display: flex; align-items: center; gap: 1.25rem;">
+                    <div class="stat-icon" style="width: 56px; height: 56px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);">
+                        <i class="fas fa-users" style="color: #ffffff; font-size: 1.5rem;"></i>
+                    </div>
+                    <div class="stat-info" style="flex: 1;">
+                        <h3 style="color: #b3b3b3; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 0.5rem 0;">Usuarios Totales</h3>
+                        <p class="stat-number" style="color: #ffffff; font-size: 2rem; font-weight: 700; margin: 0 0 0.5rem 0; letter-spacing: -1px;">${finalStats.totalUsers.toLocaleString()}</p>
+                        <p class="stat-change" style="color: ${finalStats.usersChangePercent >= 0 ? '#46d369' : '#e50914'}; font-size: 0.85rem; margin: 0; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-arrow-${finalStats.usersChangePercent >= 0 ? 'up' : 'down'}"></i>
+                            ${finalStats.newUsersThisMonth} este mes
+                        </p>
+                    </div>
                 </div>
             </div>
             
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                    <i class="fas fa-tv"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Series</h3>
-                    <p class="stat-number">${finalStats.totalSeries.toLocaleString()}</p>
-                    <p class="stat-change ${finalStats.newSeriesThisMonth > 0 ? 'positive' : 'neutral'}">
-                        <i class="fas fa-arrow-up"></i>
-                        +${finalStats.newSeriesThisMonth} este mes
-                    </p>
-                </div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                    <i class="fas fa-dollar-sign"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Ingresos Mensuales</h3>
-                    <p class="stat-number">$${finalStats.monthlyRevenue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    <p class="stat-change ${revenueChangeClass}">
-                        <i class="fas fa-arrow-${finalStats.revenueChangePercent >= 0 ? 'up' : 'down'}"></i>
-                        ${revenueChangeText}
-                    </p>
+            <div class="stat-card" style="background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.75rem; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <div style="display: flex; align-items: center; gap: 1.25rem;">
+                    <div class="stat-icon" style="width: 56px; height: 56px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #e50914 0%, #b20710 100%); box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);">
+                        <i class="fas fa-film" style="color: #ffffff; font-size: 1.5rem;"></i>
+                    </div>
+                    <div class="stat-info" style="flex: 1;">
+                        <h3 style="color: #b3b3b3; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 0.5rem 0;">Películas</h3>
+                        <p class="stat-number" style="color: #ffffff; font-size: 2rem; font-weight: 700; margin: 0 0 0.5rem 0; letter-spacing: -1px;">${finalStats.totalMovies.toLocaleString()}</p>
+                        <p class="stat-change" style="color: #46d369; font-size: 0.85rem; margin: 0; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-arrow-up"></i>
+                            +${finalStats.newMoviesThisMonth} este mes
+                        </p>
+                    </div>
                 </div>
             </div>
             
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
-                    <i class="fas fa-eye"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>Vistas Hoy</h3>
-                    <p class="stat-number">${(finalStats.viewsToday || 0).toLocaleString()}</p>
-                    <p class="stat-change neutral">
-                        <i class="fas fa-chart-line"></i>
-                        ${(finalStats.viewsThisMonth || 0).toLocaleString()} este mes
-                    </p>
+            <div class="stat-card" style="background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.75rem; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <div style="display: flex; align-items: center; gap: 1.25rem;">
+                    <div class="stat-icon" style="width: 56px; height: 56px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); box-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);">
+                        <i class="fas fa-tv" style="color: #ffffff; font-size: 1.5rem;"></i>
+                    </div>
+                    <div class="stat-info" style="flex: 1;">
+                        <h3 style="color: #b3b3b3; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 0.5rem 0;">Series</h3>
+                        <p class="stat-number" style="color: #ffffff; font-size: 2rem; font-weight: 700; margin: 0 0 0.5rem 0; letter-spacing: -1px;">${finalStats.totalSeries.toLocaleString()}</p>
+                        <p class="stat-change" style="color: #46d369; font-size: 0.85rem; margin: 0; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-arrow-up"></i>
+                            +${finalStats.newSeriesThisMonth} este mes
+                        </p>
+                    </div>
                 </div>
             </div>
             
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
-                    <i class="fas fa-user-check"></i>
+            <div class="stat-card" style="background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.75rem; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <div style="display: flex; align-items: center; gap: 1.25rem;">
+                    <div class="stat-icon" style="width: 56px; height: 56px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); box-shadow: 0 4px 12px rgba(67, 233, 123, 0.4);">
+                        <i class="fas fa-dollar-sign" style="color: #ffffff; font-size: 1.5rem;"></i>
+                    </div>
+                    <div class="stat-info" style="flex: 1;">
+                        <h3 style="color: #b3b3b3; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 0.5rem 0;">Ingresos Mensuales</h3>
+                        <p class="stat-number" style="color: #ffffff; font-size: 2rem; font-weight: 700; margin: 0 0 0.5rem 0; letter-spacing: -1px;">$${finalStats.monthlyRevenue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p class="stat-change" style="color: ${finalStats.revenueChangePercent >= 0 ? '#46d369' : '#e50914'}; font-size: 0.85rem; margin: 0; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-arrow-${finalStats.revenueChangePercent >= 0 ? 'up' : 'down'}"></i>
+                            ${revenueChangeText}
+                        </p>
+                    </div>
                 </div>
-                <div class="stat-info">
-                    <h3>Usuarios Activos</h3>
-                    <p class="stat-number">${(finalStats.activeUsersWeek || 0).toLocaleString()}</p>
-                    <p class="stat-change positive">
-                        <i class="fas fa-clock"></i>
-                        Últimos 7 días
-                    </p>
+            </div>
+            
+            <div class="stat-card" style="background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.75rem; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <div style="display: flex; align-items: center; gap: 1.25rem;">
+                    <div class="stat-icon" style="width: 56px; height: 56px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); box-shadow: 0 4px 12px rgba(250, 112, 154, 0.4);">
+                        <i class="fas fa-eye" style="color: #ffffff; font-size: 1.5rem;"></i>
+                    </div>
+                    <div class="stat-info" style="flex: 1;">
+                        <h3 style="color: #b3b3b3; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 0.5rem 0;">Vistas Hoy</h3>
+                        <p class="stat-number" style="color: #ffffff; font-size: 2rem; font-weight: 700; margin: 0 0 0.5rem 0; letter-spacing: -1px;">${(finalStats.viewsToday || 0).toLocaleString()}</p>
+                        <p class="stat-change" style="color: #b3b3b3; font-size: 0.85rem; margin: 0; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-chart-line"></i>
+                            ${(finalStats.viewsThisMonth || 0).toLocaleString()} este mes
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card" style="background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.75rem; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <div style="display: flex; align-items: center; gap: 1.25rem;">
+                    <div class="stat-icon" style="width: 56px; height: 56px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); box-shadow: 0 4px 12px rgba(48, 207, 208, 0.4);">
+                        <i class="fas fa-user-check" style="color: #ffffff; font-size: 1.5rem;"></i>
+                    </div>
+                    <div class="stat-info" style="flex: 1;">
+                        <h3 style="color: #b3b3b3; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 0.5rem 0;">Usuarios Activos</h3>
+                        <p class="stat-number" style="color: #ffffff; font-size: 2rem; font-weight: 700; margin: 0 0 0.5rem 0; letter-spacing: -1px;">${(finalStats.activeUsersWeek || 0).toLocaleString()}</p>
+                        <p class="stat-change" style="color: #46d369; font-size: 0.85rem; margin: 0; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-clock"></i>
+                            Últimos 7 días
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
         
+        <!-- Actualización de novedades -->
+        <div class="quick-actions" style="margin: 2rem 0; padding: 2.5rem; background: #141414; border-radius: 12px; border: 1px solid #2a2a2a; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
+            <div class="section-header" style="margin-bottom: 1.5rem;">
+                <h2 style="color: #ffffff; font-size: 1.75rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; margin: 0; letter-spacing: -0.5px;">
+                    <i class="fas fa-sync-alt" style="color: #e50914;"></i>
+                    Actualización Automática de Contenido
+                </h2>
+            </div>
+            <p style="color: #b3b3b3; margin-bottom: 2rem; line-height: 1.7; font-size: 0.95rem;">
+                Busca y actualiza automáticamente novedades de películas y series desde <strong style="color: #ffffff;">Trakt.tv</strong> y <strong style="color: #ffffff;">TVMaze</strong> (ambas gratuitas), incluyendo portadas, trailers y enlaces torrent. El sistema prioriza torrents con más seeds para mejor calidad.
+                <br><br>
+                <small style="color: #808080;">💡 Para mejores resultados, configura TRAKT_CLIENT_ID (gratis en <a href="https://trakt.tv/oauth/applications" target="_blank" style="color: #e50914;">trakt.tv/oauth/applications</a>)</small>
+            </p>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #ffffff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Tipo de contenido:</label>
+                    <select id="refresh-type" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #ffffff; font-size: 0.95rem; transition: all 0.2s ease; outline: none;">
+                        <option value="movie" style="background: #1a1a1a;">Películas</option>
+                        <option value="tv" style="background: #1a1a1a;">Series</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #ffffff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Límite:</label>
+                    <input type="number" id="refresh-limit" value="30" min="1" max="100" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #ffffff; font-size: 0.95rem; transition: all 0.2s ease; outline: none;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #ffffff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Últimos días:</label>
+                    <input type="number" id="refresh-days" value="7" min="0" max="365" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #ffffff; font-size: 0.95rem; transition: all 0.2s ease; outline: none;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #ffffff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Mín. seeds:</label>
+                    <input type="number" id="refresh-seeds" value="10" min="0" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #ffffff; font-size: 0.95rem; transition: all 0.2s ease; outline: none;">
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
+                <button id="btn-refresh-content" class="btn btn-primary" style="padding: 0.875rem 2.5rem; font-size: 1rem; background: #e50914; border: none; border-radius: 6px; color: #ffffff; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 10px rgba(229, 9, 20, 0.4); text-transform: uppercase; letter-spacing: 0.5px;">
+                    <i class="fas fa-sync-alt"></i> Actualizar Novedades
+                </button>
+                <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; color: #b3b3b3; font-size: 0.9rem;">
+                    <input type="checkbox" id="refresh-dry-run" style="width: 20px; height: 20px; cursor: pointer; accent-color: #e50914;">
+                    <span>Modo prueba (no guarda cambios)</span>
+                </label>
+                <div id="refresh-status" style="margin-left: auto; font-weight: 600; color: #e50914; font-size: 0.95rem;"></div>
+            </div>
+            
+            <div id="refresh-output" style="margin-top: 2rem; padding: 1.5rem; background: #0a0a0a; border-radius: 8px; display: none; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.85rem; white-space: pre-wrap; color: #b3b3b3; border: 1px solid #2a2a2a; line-height: 1.6;"></div>
+        </div>
+        
         <!-- Gráficos -->
-        <div class="charts-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin: 2rem 0;">
-            <div class="chart-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px;">
-                <h3 style="margin-bottom: 1rem; color: #fff;">Tendencia de Vistas (7 días)</h3>
-                <div style="height: 250px;">
+        <div class="charts-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
+            <div class="chart-card" style="background: #141414; padding: 2rem; border-radius: 8px; border: 1px solid #2a2a2a; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <h3 style="margin-bottom: 1.5rem; color: #ffffff; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <i class="fas fa-chart-line" style="color: #e50914;"></i>
+                    Tendencia de Vistas (7 días)
+                </h3>
+                <div style="height: 280px; position: relative;">
                     <canvas id="viewsTrendChart"></canvas>
                 </div>
             </div>
             
-            <div class="chart-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px;">
-                <h3 style="margin-bottom: 1rem; color: #fff;">Nuevos Usuarios (7 días)</h3>
-                <div style="height: 250px;">
+            <div class="chart-card" style="background: #141414; padding: 2rem; border-radius: 8px; border: 1px solid #2a2a2a; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <h3 style="margin-bottom: 1.5rem; color: #ffffff; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <i class="fas fa-users" style="color: #e50914;"></i>
+                    Nuevos Usuarios (7 días)
+                </h3>
+                <div style="height: 280px; position: relative;">
                     <canvas id="usersTrendChart"></canvas>
                 </div>
             </div>
             
-            <div class="chart-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px;">
-                <h3 style="margin-bottom: 1rem; color: #fff;">Distribución de Usuarios</h3>
-                <div style="height: 250px;">
+            <div class="chart-card" style="background: #141414; padding: 2rem; border-radius: 8px; border: 1px solid #2a2a2a; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <h3 style="margin-bottom: 1.5rem; color: #ffffff; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <i class="fas fa-chart-pie" style="color: #e50914;"></i>
+                    Distribución de Usuarios
+                </h3>
+                <div style="height: 280px; position: relative;">
                     <canvas id="usersDistributionChart"></canvas>
                 </div>
             </div>
             
-            <div class="chart-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px;">
-                <h3 style="margin-bottom: 1rem; color: #fff;">Contenido Más Visto (30 días)</h3>
-                <div style="height: 250px;">
+            <div class="chart-card" style="background: #141414; padding: 2rem; border-radius: 8px; border: 1px solid #2a2a2a; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+                <h3 style="margin-bottom: 1.5rem; color: #ffffff; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <i class="fas fa-fire" style="color: #e50914;"></i>
+                    Contenido Más Visto (30 días)
+                </h3>
+                <div style="height: 280px; position: relative;">
                     <canvas id="topContentChart"></canvas>
                 </div>
             </div>
@@ -5063,3 +5150,155 @@ function selectTorrent(magnetLink) {
 
 // Hacer la función selectTorrent disponible globalmente
 window.selectTorrent = selectTorrent;
+
+// ============================================
+// ACTUALIZACIÓN AUTOMÁTICA DE CONTENIDO
+// ============================================
+function initContentRefresh() {
+    const btnRefresh = document.getElementById('btn-refresh-content');
+    if (!btnRefresh) {
+        console.log('Botón btn-refresh-content no encontrado, reintentando en 500ms...');
+        setTimeout(initContentRefresh, 500);
+        return;
+    }
+
+    // Si ya tiene el listener, no hacer nada
+    if (btnRefresh.hasAttribute('data-listener-attached')) {
+        return;
+    }
+
+    btnRefresh.setAttribute('data-listener-attached', 'true');
+    console.log('Inicializando botón de actualización de contenido');
+
+    btnRefresh.addEventListener('click', async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('Botón de actualización clickeado');
+        const type = document.getElementById('refresh-type')?.value || 'movie';
+        const limit = parseInt(document.getElementById('refresh-limit')?.value || '30');
+        const sinceDays = parseInt(document.getElementById('refresh-days')?.value || '7');
+        const minSeeds = parseInt(document.getElementById('refresh-seeds')?.value || '10');
+        const dryRun = document.getElementById('refresh-dry-run')?.checked || false;
+        const statusDiv = document.getElementById('refresh-status');
+        const outputDiv = document.getElementById('refresh-output');
+        const btn = this;
+
+        // Validar parámetros
+        if (limit < 1 || limit > 100) {
+            showNotification('El límite debe estar entre 1 y 100', 'error');
+            return;
+        }
+        if (sinceDays < 0 || sinceDays > 365) {
+            showNotification('Los días deben estar entre 0 y 365', 'error');
+            return;
+        }
+
+        // Deshabilitar botón y mostrar estado
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
+        statusDiv.textContent = 'Procesando...';
+        statusDiv.style.color = '#e50914';
+        outputDiv.style.display = 'none';
+        outputDiv.textContent = '';
+
+        try {
+            const apiUrl = (baseUrl || '') + '/api/content/refresh-latest.php';
+            console.log('Llamando a:', apiUrl);
+            
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    type: type,
+                    limit: limit,
+                    since_days: sinceDays,
+                    min_seeds: minSeeds,
+                    dry_run: dryRun
+                })
+            });
+
+            console.log('Respuesta recibida:', response.status, response.statusText);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error HTTP:', response.status, errorText);
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+
+            const responseText = await response.text();
+            console.log('Respuesta texto:', responseText);
+            
+            let data;
+            try {
+                data = JSON.parse(responseText);
+                console.log('Datos parseados:', data);
+            } catch (parseError) {
+                console.error('Error al parsear JSON:', parseError);
+                console.error('Texto recibido:', responseText);
+                throw new Error('Error al parsear respuesta del servidor: ' + parseError.message);
+            }
+
+            if (data.success) {
+                statusDiv.textContent = '✅ Completado';
+                statusDiv.style.color = '#46d369';
+                
+                const result = data.data;
+                const summary = `Creados: ${result.created || 0} | Actualizados: ${result.updated || 0} | Episodios nuevos: ${result.new_episodes || 0} | Tiempo: ${result.execution_time || 'N/A'}`;
+                
+                outputDiv.textContent = summary + '\n\n' + (result.output || '');
+                outputDiv.style.display = 'block';
+                
+                showNotification(
+                    `Actualización completada: ${result.created || 0} creados, ${result.updated || 0} actualizados, ${result.new_episodes || 0} episodios nuevos`,
+                    'success'
+                );
+
+                // Recargar página después de 3 segundos si no es dry-run
+                if (!dryRun && (result.created > 0 || result.updated > 0)) {
+                    setTimeout(() => {
+                        if (confirm('¿Recargar la página para ver los cambios?')) {
+                            window.location.reload();
+                        }
+                    }, 3000);
+                }
+            } else {
+                statusDiv.textContent = '⚠️ Completado con advertencias';
+                statusDiv.style.color = '#ffa500';
+                
+                const result = data.data || {};
+                const summary = `Creados: ${result.created || 0} | Actualizados: ${result.updated || 0} | Episodios nuevos: ${result.new_episodes || 0} | Tiempo: ${result.execution_time || 'N/A'}`;
+                
+                let errorMsg = data.error || data.message || 'Error desconocido';
+                if (result.output) {
+                    errorMsg += '\n\n' + result.output;
+                }
+                
+                outputDiv.textContent = summary + '\n\n' + errorMsg;
+                outputDiv.style.display = 'block';
+                outputDiv.style.color = '#ffa500';
+                
+                showNotification('Actualización completada con advertencias. Revisa la salida para más detalles.', 'warning');
+            }
+        } catch (error) {
+            console.error('Error en actualización:', error);
+            statusDiv.textContent = '❌ Error';
+            statusDiv.style.color = '#e50914';
+            outputDiv.textContent = 'Error de conexión: ' + error.message;
+            outputDiv.style.display = 'block';
+            showNotification('Error de conexión al actualizar contenido', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt"></i> Actualizar Novedades';
+        }
+    });
+}
+
+// Inicializar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initContentRefresh);
+} else {
+    initContentRefresh();
+}

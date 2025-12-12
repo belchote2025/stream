@@ -12,13 +12,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Cargar Chart.js si no está disponible
 function loadChartJS() {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-    script.onload = () => {
-        console.log('Chart.js cargado correctamente');
-    };
-    document.head.appendChild(script);
+    return new Promise((resolve, reject) => {
+        if (typeof Chart !== 'undefined') {
+            resolve();
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        script.onload = () => {
+            console.log('Chart.js cargado correctamente');
+            resolve();
+        };
+        script.onerror = () => {
+            console.error('Error al cargar Chart.js');
+            reject(new Error('No se pudo cargar Chart.js'));
+        };
+        document.head.appendChild(script);
+    });
 }
+
+// Almacenar instancias de gráficos para poder destruirlos
+const chartInstances = {};
 
 /**
  * Crear gráfico de tendencias de vistas
@@ -27,6 +41,11 @@ function createViewsTrendChart(data) {
     const ctx = document.getElementById('viewsTrendChart');
     if (!ctx || typeof Chart === 'undefined') return;
 
+    // Destruir gráfico existente si existe
+    if (chartInstances.viewsTrend) {
+        chartInstances.viewsTrend.destroy();
+    }
+
     // Preparar datos
     const labels = data.map(item => {
         const date = new Date(item.date);
@@ -34,7 +53,7 @@ function createViewsTrendChart(data) {
     });
     const values = data.map(item => item.views);
 
-    new Chart(ctx, {
+    chartInstances.viewsTrend = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -42,7 +61,13 @@ function createViewsTrendChart(data) {
                 label: 'Vistas',
                 data: values,
                 borderColor: '#e50914',
-                backgroundColor: 'rgba(229, 9, 20, 0.1)',
+                backgroundColor: 'rgba(229, 9, 20, 0.15)',
+                borderWidth: 3,
+                pointBackgroundColor: '#e50914',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
                 tension: 0.4,
                 fill: true
             }]
@@ -55,25 +80,36 @@ function createViewsTrendChart(data) {
                     display: false
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    backgroundColor: '#1a1a1a',
                     padding: 12,
-                    titleColor: '#fff',
-                    bodyColor: '#fff'
+                    titleColor: '#e50914',
+                    bodyColor: '#ffffff',
+                    borderColor: '#2a2a2a',
+                    borderWidth: 1,
+                    titleFont: {
+                        weight: 'bold'
+                    }
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        color: '#999'
+                        color: '#b3b3b3',
+                        font: {
+                            size: 11
+                        }
                     },
                     grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
+                        color: 'rgba(255, 255, 255, 0.08)'
                     }
                 },
                 x: {
                     ticks: {
-                        color: '#999'
+                        color: '#b3b3b3',
+                        font: {
+                            size: 11
+                        }
                     },
                     grid: {
                         display: false
@@ -91,21 +127,28 @@ function createUsersTrendChart(data) {
     const ctx = document.getElementById('usersTrendChart');
     if (!ctx || typeof Chart === 'undefined') return;
 
+    // Destruir gráfico existente si existe
+    if (chartInstances.usersTrend) {
+        chartInstances.usersTrend.destroy();
+    }
+
     const labels = data.map(item => {
         const date = new Date(item.date);
         return date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
     });
     const values = data.map(item => item.users);
 
-    new Chart(ctx, {
+    chartInstances.usersTrend = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
             datasets: [{
                 label: 'Nuevos Usuarios',
                 data: values,
-                backgroundColor: '#667eea',
-                borderRadius: 4
+                backgroundColor: '#e50914',
+                borderColor: '#b20710',
+                borderWidth: 2,
+                borderRadius: 6
             }]
         },
         options: {
@@ -114,22 +157,36 @@ function createUsersTrendChart(data) {
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    padding: 12,
+                    titleColor: '#ff6b6b',
+                    bodyColor: '#fff',
+                    borderColor: '#ff6b6b',
+                    borderWidth: 1
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        color: '#999',
-                        stepSize: 1
+                        color: '#ffffff',
+                        stepSize: 1,
+                        font: {
+                            size: 12
+                        }
                     },
                     grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
+                        color: 'rgba(255, 255, 255, 0.15)'
                     }
                 },
                 x: {
                     ticks: {
-                        color: '#999'
+                        color: '#ffffff',
+                        font: {
+                            size: 12
+                        }
                     },
                     grid: {
                         display: false
@@ -147,6 +204,11 @@ function createUsersDistributionChart(data) {
     const ctx = document.getElementById('usersDistributionChart');
     if (!ctx || typeof Chart === 'undefined') return;
 
+    // Destruir gráfico existente si existe
+    if (chartInstances.usersDistribution) {
+        chartInstances.usersDistribution.destroy();
+    }
+
     const labels = Object.keys(data).map(role => {
         const roleNames = {
             'user': 'Usuarios',
@@ -157,18 +219,21 @@ function createUsersDistributionChart(data) {
     });
     const values = Object.values(data);
 
-    new Chart(ctx, {
+    chartInstances.usersDistribution = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: labels,
             datasets: [{
                 data: values,
                 backgroundColor: [
-                    '#667eea',
-                    '#f093fb',
-                    '#4facfe'
+                    '#e50914',
+                    '#b20710',
+                    '#8b0000',
+                    '#6b0000',
+                    '#4a0000'
                 ],
-                borderWidth: 0
+                borderColor: '#1a1a1a',
+                borderWidth: 3
             }]
         },
         options: {
@@ -178,11 +243,23 @@ function createUsersDistributionChart(data) {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: '#fff',
+                        color: '#b3b3b3',
                         padding: 15,
                         font: {
-                            size: 12
+                            size: 12,
+                            weight: '600'
                         }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#1a1a1a',
+                    padding: 12,
+                    titleColor: '#e50914',
+                    bodyColor: '#ffffff',
+                    borderColor: '#2a2a2a',
+                    borderWidth: 1,
+                    titleFont: {
+                        weight: 'bold'
                     }
                 }
             }
@@ -197,11 +274,16 @@ function createTopContentChart(data) {
     const ctx = document.getElementById('topContentChart');
     if (!ctx || typeof Chart === 'undefined') return;
 
+    // Destruir gráfico existente si existe
+    if (chartInstances.topContent) {
+        chartInstances.topContent.destroy();
+    }
+
     const labels = data.map(item => item.title.substring(0, 20) + (item.title.length > 20 ? '...' : ''));
     const values = data.map(item => item.views);
-    const colors = data.map(item => item.type === 'movie' ? '#f093fb' : '#4facfe');
+    const colors = data.map(item => item.type === 'movie' ? '#e50914' : '#b20710');
 
-    new Chart(ctx, {
+    chartInstances.topContent = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
@@ -209,7 +291,9 @@ function createTopContentChart(data) {
                 label: 'Vistas',
                 data: values,
                 backgroundColor: colors,
-                borderRadius: 4
+                borderColor: colors.map(c => c),
+                borderWidth: 2,
+                borderRadius: 6
             }]
         },
         options: {
@@ -221,6 +305,12 @@ function createTopContentChart(data) {
                     display: false
                 },
                 tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    padding: 12,
+                    titleColor: '#00d4ff',
+                    bodyColor: '#fff',
+                    borderColor: '#00d4ff',
+                    borderWidth: 1,
                     callbacks: {
                         title: function (context) {
                             return data[context[0].dataIndex].title;
@@ -237,15 +327,21 @@ function createTopContentChart(data) {
                 x: {
                     beginAtZero: true,
                     ticks: {
-                        color: '#999'
+                        color: '#b3b3b3',
+                        font: {
+                            size: 11
+                        }
                     },
                     grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
+                        color: 'rgba(255, 255, 255, 0.08)'
                     }
                 },
                 y: {
                     ticks: {
-                        color: '#999'
+                        color: '#b3b3b3',
+                        font: {
+                            size: 11
+                        }
                     },
                     grid: {
                         display: false
@@ -259,27 +355,61 @@ function createTopContentChart(data) {
 /**
  * Actualizar todos los gráficos con nuevos datos
  */
-function updateDashboardCharts(stats) {
-    if (!stats) return;
-
-    // Gráfico de tendencias de vistas
-    if (stats.viewsTrend && stats.viewsTrend.length > 0) {
-        createViewsTrendChart(stats.viewsTrend);
+async function updateDashboardCharts(stats) {
+    if (!stats) {
+        console.warn('No hay estadísticas para mostrar gráficos');
+        return;
     }
 
-    // Gráfico de nuevos usuarios
-    if (stats.usersTrend && stats.usersTrend.length > 0) {
-        createUsersTrendChart(stats.usersTrend);
+    // Asegurar que Chart.js esté cargado
+    if (typeof Chart === 'undefined') {
+        try {
+            await loadChartJS();
+            // Esperar un poco más para que Chart.js se inicialice completamente
+            await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+            console.error('Error al cargar Chart.js:', error);
+            return;
+        }
     }
 
-    // Gráfico de distribución de usuarios
-    if (stats.usersByRole) {
-        createUsersDistributionChart(stats.usersByRole);
-    }
+    try {
+        // Gráfico de tendencias de vistas
+        if (stats.viewsTrend && Array.isArray(stats.viewsTrend) && stats.viewsTrend.length > 0) {
+            createViewsTrendChart(stats.viewsTrend);
+        } else {
+            // Datos por defecto si no hay datos
+            createViewsTrendChart([{ date: new Date().toISOString().split('T')[0], views: 0 }]);
+        }
 
-    // Gráfico de contenido más visto
-    if (stats.topContent && stats.topContent.length > 0) {
-        createTopContentChart(stats.topContent);
+        // Gráfico de nuevos usuarios
+        if (stats.usersTrend && Array.isArray(stats.usersTrend) && stats.usersTrend.length > 0) {
+            createUsersTrendChart(stats.usersTrend);
+        } else {
+            // Datos por defecto si no hay datos
+            createUsersTrendChart([{ date: new Date().toISOString().split('T')[0], users: 0 }]);
+        }
+
+        // Gráfico de distribución de usuarios
+        if (stats.usersByRole && Object.keys(stats.usersByRole).length > 0) {
+            createUsersDistributionChart(stats.usersByRole);
+        } else {
+            // Datos por defecto si no hay datos
+            createUsersDistributionChart({ user: 0, premium: 0, admin: 0 });
+        }
+
+        // Gráfico de contenido más visto
+        if (stats.topContent && Array.isArray(stats.topContent) && stats.topContent.length > 0) {
+            createTopContentChart(stats.topContent);
+        } else {
+            // No mostrar gráfico si no hay datos
+            const ctx = document.getElementById('topContentChart');
+            if (ctx) {
+                ctx.parentElement.innerHTML = '<p style="color: #999; text-align: center; padding: 2rem;">No hay datos disponibles</p>';
+            }
+        }
+    } catch (error) {
+        console.error('Error al crear gráficos:', error);
     }
 }
 

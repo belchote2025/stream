@@ -472,6 +472,107 @@ function omdbFetch(string $title, ?string $year, string $type, string $apiKey): 
     return null;
 }
 
+// -------------------- Búsqueda de Video URL Directo --------------------
+/**
+ * Busca enlaces de video directos (streaming) para el contenido.
+ * Prioridad: OMDB (si tiene enlace), luego intenta buscar en APIs públicas.
+ */
+function searchVideoUrl(string $title, string $type, ?int $year, ?array $omdb): ?string
+{
+    // OMDB no suele tener enlaces directos, pero podemos intentar otras fuentes
+    // Por ahora, retornamos null para que se use torrent o trailer
+    // En el futuro se podría integrar con APIs de streaming o enlaces directos
+    return null;
+}
+
+// -------------------- Búsqueda de Trailer en YouTube --------------------
+/**
+ * Busca el trailer oficial en YouTube usando búsqueda web.
+ * Retorna la URL del video de YouTube o un ID de video.
+ */
+function searchYouTubeTrailer(string $title, string $type, ?int $year): string
+{
+    // Intentar primero con YouTube Data API v3 si hay API key
+    $youtubeApiKey = getenv('YOUTUBE_API_KEY') ?: (defined('YOUTUBE_API_KEY') ? YOUTUBE_API_KEY : '');
+    
+    if (!empty($youtubeApiKey)) {
+        $searchQuery = $title;
+        if ($year) {
+            $searchQuery .= " {$year}";
+        }
+        $searchQuery .= " official trailer";
+        
+        $query = urlencode($searchQuery);
+        $url = "https://www.googleapis.com/youtube/v3/search?part=snippet&q={$query}&type=video&maxResults=1&key={$youtubeApiKey}";
+        
+        $data = httpJson($url, 8);
+        if ($data && !empty($data['items'][0]['id']['videoId'])) {
+            $videoId = $data['items'][0]['id']['videoId'];
+            return "https://www.youtube.com/watch?v={$videoId}";
+        }
+    }
+    
+    // Fallback: búsqueda web (scraping)
+    $searchQuery = $title;
+    if ($year) {
+        $searchQuery .= " {$year}";
+    }
+    $searchQuery .= " official trailer";
+    
+    $query = urlencode($searchQuery);
+    $url = "https://www.youtube.com/results?search_query={$query}";
+    
+    try {
+        // Usar cURL si está disponible (más confiable)
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]);
+            $html = curl_exec($ch);
+            curl_close($ch);
+        } else {
+            $html = @file_get_contents($url, false, stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                    'timeout' => 10,
+                    'ignore_errors' => true
+                ]
+            ]));
+        }
+        
+        if ($html) {
+            // YouTube ahora usa JSON embebido en script tags con ytInitialData
+            // Buscar en el formato más común: "videoId":"..."
+            if (preg_match('/"videoId":"([a-zA-Z0-9_-]{11})"/', $html, $matches)) {
+                $videoId = $matches[1];
+                return "https://www.youtube.com/watch?v={$videoId}";
+            }
+            // Alternativa: buscar en watch?v=...
+            if (preg_match('/watch\?v=([a-zA-Z0-9_-]{11})/', $html, $matches)) {
+                $videoId = $matches[1];
+                return "https://www.youtube.com/watch?v={$videoId}";
+            }
+            // Alternativa: buscar en /watch/...
+            if (preg_match('/\/watch\/([a-zA-Z0-9_-]{11})/', $html, $matches)) {
+                $videoId = $matches[1];
+                return "https://www.youtube.com/watch?v={$videoId}";
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciar errores, simplemente retornar vacío
+    }
+    
+    return '';
+}
+
 // -------------------- Torrents --------------------
 function searchTorrentio(string $title, string $type, ?string $year, string $baseUrl): array
 {
@@ -608,12 +709,21 @@ function searchTPB(string $title): array
 
 function pickBestTorrent(array $results, int $minSeeds): ?array
 {
-    $filtered = array_filter($results, function ($r) use ($minSeeds) {
-        return ($r['seeds'] ?? 0) >= $minSeeds;
-    });
-    if (empty($filtered) && !empty($results)) {
-        $filtered = $results;
+    if (empty($results)) {
+        return null;
     }
+    
+    // Filtrar solo torrents con al menos minSeeds
+    $filtered = array_filter($results, function ($r) use ($minSeeds) {
+        return ($r['seeds'] ?? 0) >= $minSeeds && !empty($r['magnet']);
+    });
+    
+    // Si no hay torrents válidos, retornar null (no usar torrents con pocos seeds)
+    if (empty($filtered)) {
+        return null;
+    }
+    
+    // Ordenar por seeds (mayor primero), luego por calidad
     usort($filtered, function ($a, $b) {
         $seedsA = $a['seeds'] ?? 0;
         $seedsB = $b['seeds'] ?? 0;
@@ -622,6 +732,7 @@ function pickBestTorrent(array $results, int $minSeeds): ?array
         }
         return $seedsB <=> $seedsA;
     });
+    
     return $filtered[0] ?? null;
 }
 
@@ -680,8 +791,16 @@ function upsertContent(PDO $db, array $data): int
                 duration = COALESCE(:duration, duration),
                 rating = COALESCE(:rating, rating),
                 age_rating = COALESCE(NULLIF(:age_rating, ''), age_rating),
-                poster_url = CASE WHEN poster_url IS NULL OR poster_url = '' THEN :poster_url ELSE poster_url END,
-                backdrop_url = CASE WHEN backdrop_url IS NULL OR backdrop_url = '' THEN :backdrop_url ELSE backdrop_url END,
+                poster_url = CASE 
+                    WHEN poster_url IS NULL OR poster_url = '' OR poster_url LIKE '%default-poster%' OR poster_url LIKE '%default-movie%' OR poster_url LIKE '%default-tv%' 
+                    THEN :poster_url 
+                    ELSE poster_url 
+                END,
+                backdrop_url = CASE 
+                    WHEN backdrop_url IS NULL OR backdrop_url = '' OR backdrop_url LIKE '%default-backdrop%' OR backdrop_url LIKE '%default-poster%' OR backdrop_url LIKE '%default-movie%' OR backdrop_url LIKE '%default-tv%'
+                    THEN :backdrop_url 
+                    ELSE backdrop_url 
+                END,
                 trailer_url = CASE WHEN trailer_url IS NULL OR trailer_url = '' THEN :trailer_url ELSE trailer_url END,
                 video_url = CASE WHEN video_url IS NULL OR video_url = '' THEN :video_url ELSE video_url END,
                 torrent_magnet = CASE WHEN torrent_magnet IS NULL OR torrent_magnet = '' THEN :torrent_magnet ELSE torrent_magnet END,
@@ -803,11 +922,16 @@ function upsertEpisode(PDO $db, int $seriesId, int $seasonNumber, int $episodeNu
 // -------------------- Notificación simple --------------------
 function notifyAdmin(PDO $db, string $title, string $message, ?int $contentId = null): void
 {
-    $stmt = $db->prepare("INSERT INTO notifications (user_id, title, message, type, is_read, related_content_id, created_at) VALUES (1, :title, :message, 'new_content', 0, :cid, NOW())");
     try {
+        $stmt = $db->prepare("INSERT INTO notifications (user_id, title, message, type, is_read, related_content_id, created_at) VALUES (1, :title, :message, 'new_content', 0, :cid, NOW())");
         $stmt->execute([':title' => $title, ':message' => $message, ':cid' => $contentId]);
+    } catch (PDOException $e) {
+        // Si la tabla no existe (SQLSTATE 42S02), omitir silenciosamente
+        if ($e->getCode() !== '42S02') {
+            fwrite(STDERR, "Error al insertar notificación: " . $e->getMessage() . "\n");
+        }
     } catch (Exception $e) {
-        // Ignorar si falla
+        // Ignorar otros errores no críticos
     }
 }
 
@@ -1016,6 +1140,9 @@ foreach ($items as $show) {
         $description = $details['summary'] ?? '';
     }
     
+    // Inicializar OMDB (se usa en varios puntos)
+    $omdb = null;
+
     // OMDB para completar (opcional) - solo si no tenemos descripción
     if (empty($description)) {
         $omdb = omdbFetch($title, $releaseYear ? (string)$releaseYear : null, $type, $omdbKey);
@@ -1034,24 +1161,55 @@ foreach ($items as $show) {
         }
     }
     
-    // Trailer: TVMaze no tiene trailers, intentar buscar en OMDB o dejar vacío
-    $trailer = '';
-    if ($omdb && !empty($omdb['Poster'])) {
-        // OMDB no tiene trailer directo, pero podemos intentar buscar en YouTube más adelante
-    }
-
     $slug = slugify($title . '-' . ($releaseYear ?? 'na') . '-' . $type);
     $genreIds = !empty($genres) ? ensureGenres($db, $genres) : [];
 
-    // Torrents (prioridad)
-    $torrents = searchTorrentio($title, $type, $releaseYear ? (string)$releaseYear : null, $torrentioBase);
-    if ($type === 'movie') {
-        $torrents = array_merge($torrents, searchYTS($title, $releaseYear ? (string)$releaseYear : null));
+    // ========== PRIORIDAD DE BÚSQUEDA ==========
+    // 1. Poster (ya obtenido arriba)
+    // 2. Video URL directo (streaming)
+    // 3. Torrent (si no hay video URL)
+    // 4. Trailer de YouTube (si no hay video URL ni torrent)
+    
+    fwrite(STDOUT, "  Buscando enlaces de video para: {$title}...\n");
+    
+    // 2. Buscar video URL directo (streaming)
+    $videoUrl = searchVideoUrl($title, $type, $releaseYear, $omdb);
+    
+    // 3. Buscar torrents (solo si no hay video URL)
+    $torrents = [];
+    $bestTorrent = null;
+    $hasTorrent = false;
+    if (empty($videoUrl)) {
+        fwrite(STDOUT, "  No se encontró video URL directo, buscando torrents...\n");
+        $torrents = searchTorrentio($title, $type, $releaseYear ? (string)$releaseYear : null, $torrentioBase);
+        if ($type === 'movie') {
+            $torrents = array_merge($torrents, searchYTS($title, $releaseYear ? (string)$releaseYear : null));
+        } else {
+            $torrents = array_merge($torrents, searchEZTV($title));
+        }
+        $torrents = array_merge($torrents, searchTPB($title));
+        $bestTorrent = pickBestTorrent($torrents, $minSeeds);
+        $hasTorrent = !empty($bestTorrent) && !empty($bestTorrent['magnet']);
+        if ($hasTorrent) {
+            fwrite(STDOUT, "  ✓ Torrent encontrado: " . ($bestTorrent['title'] ?? 'N/A') . " (seeds: " . ($bestTorrent['seeds'] ?? 0) . ")\n");
+        } else {
+            fwrite(STDOUT, "  ✗ No se encontraron torrents válidos\n");
+        }
     } else {
-        $torrents = array_merge($torrents, searchEZTV($title));
+        fwrite(STDOUT, "  ✓ Video URL encontrado: {$videoUrl}\n");
     }
-    $torrents = array_merge($torrents, searchTPB($title));
-    $bestTorrent = pickBestTorrent($torrents, $minSeeds);
+    
+    // 4. Buscar trailer de YouTube (solo si no hay video URL ni torrent)
+    $trailer = '';
+    if (empty($videoUrl) && !$hasTorrent) {
+        fwrite(STDOUT, "  No hay video URL ni torrent, buscando trailer de YouTube...\n");
+        $trailer = searchYouTubeTrailer($title, $type, $releaseYear);
+        if (!empty($trailer)) {
+            fwrite(STDOUT, "  ✓ Trailer encontrado: {$trailer}\n");
+        } else {
+            fwrite(STDOUT, "  ✗ No se encontró trailer de YouTube\n");
+        }
+    }
 
     $contentData = [
         'title' => $title,
@@ -1065,7 +1223,7 @@ foreach ($items as $show) {
         'poster_url' => $poster,
         'backdrop_url' => $backdrop,
         'trailer_url' => $trailer,
-        'video_url' => null,
+        'video_url' => $videoUrl,
         'torrent_magnet' => $bestTorrent['magnet'] ?? null,
         'is_featured' => 0,
         'is_trending' => 1,

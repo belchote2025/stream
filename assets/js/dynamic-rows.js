@@ -79,13 +79,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
             } else if (sort === 'recent' || source === 'recent' || source === 'local') {
-                // Use recent endpoint
+                // Use recent endpoint (incluye caso 'local')
                 endpoint = `${config.apiBaseUrl}/api/content/recent`;
                 params.append('limit', limit);
 
                 // Add type if specified
                 if (type && type !== 'content') {
                     params.append('type', type);
+                }
+
+                // Filtrar por origen local (solo uploads)
+                if (source === 'local') {
+                    params.append('source', 'local');
                 }
 
             } else if (source === 'imdb') {
@@ -172,27 +177,159 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Create content card HTML
     function createContentCard(item) {
-        const posterUrl = item.poster_url || item.poster || `${config.apiBaseUrl}/assets/img/default-poster.svg`;
+        const posterUrl = item.poster_url || item.poster || '';
         const title = item.title || 'Sin título';
         const year = item.release_year || item.year || '';
         const id = item.id || '';
         const type = item.type || 'content';
+        const duration = item.duration || null;
+        const videoUrl = item.video_url || '';
+        
+        // Detectar si es video local sin poster
+        const isLocalVideo = videoUrl && (videoUrl.includes('/uploads/') || videoUrl.startsWith('/uploads/'));
+        const hasNoPoster = !posterUrl || posterUrl.trim() === '' || posterUrl.includes('default-poster.svg');
+        const showCustomPlaceholder = isLocalVideo && hasNoPoster;
+
+        // Procesar URL del poster (normalizar rutas relativas y absolutas)
+        function processImageUrl(url, defaultUrl) {
+            if (!url || url.trim() === '' || url.includes('default-poster.svg')) {
+                return defaultUrl;
+            }
+            
+            // Si ya es una URL completa, usarla directamente
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                return url;
+            }
+            
+            // Si es una ruta relativa que empieza con /, convertir a absoluta
+            if (url.startsWith('/')) {
+                return config.apiBaseUrl + url;
+            }
+            
+            // Si es una ruta relativa sin /, añadirla
+            return config.apiBaseUrl + '/' + url;
+        }
 
         // Validar y sanitizar URLs
-        const safePosterUrl = posterUrl && posterUrl.trim() !== '' ? posterUrl : `${config.apiBaseUrl}/assets/img/default-poster.svg`;
+        const safePosterUrl = processImageUrl(posterUrl, `${config.apiBaseUrl}/assets/img/default-poster.svg`);
         const safeDefaultUrl = `${config.apiBaseUrl}/assets/img/default-poster.svg`;
+
+        // Formatear duración
+        let durationText = '';
+        if (duration) {
+            const hours = Math.floor(duration / 60);
+            const minutes = duration % 60;
+            if (hours > 0) {
+                durationText = `${hours}h ${minutes}m`;
+            } else {
+                durationText = `${minutes}m`;
+            }
+        }
 
         return `
             <div class="content-item" data-id="${id}" data-type="${type}">
                 <div class="content-card">
                     <div class="content-poster">
-                        <img
-                            src="${safePosterUrl}"
-                            alt="${title}"
-                            loading="lazy"
-                            onerror="this.onerror=null; this.src='${safeDefaultUrl}'; this.style.background='linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%)';"
-                            style="background: linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%);"
-                        >
+                        ${showCustomPlaceholder ? `
+                            <div class="local-video-placeholder" style="
+                                width: 100%;
+                                height: 100%;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
+                                background-size: 400% 400%;
+                                animation: gradientShift 15s ease infinite;
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                justify-content: center;
+                                padding: 1.5rem;
+                                text-align: center;
+                                position: relative;
+                                overflow: hidden;
+                            ">
+                                <div style="
+                                    position: absolute;
+                                    top: 0;
+                                    left: 0;
+                                    right: 0;
+                                    bottom: 0;
+                                    background: rgba(0, 0, 0, 0.3);
+                                    z-index: 1;
+                                "></div>
+                                <div style="position: relative; z-index: 2; width: 100%;">
+                                    <div style="
+                                        font-size: 3rem;
+                                        margin-bottom: 1rem;
+                                        color: rgba(255, 255, 255, 0.95);
+                                        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+                                    ">
+                                        <i class="fas fa-video"></i>
+                                    </div>
+                                    <h3 style="
+                                        font-size: 1.1rem;
+                                        font-weight: 600;
+                                        color: #ffffff;
+                                        margin: 0 0 0.5rem 0;
+                                        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+                                        line-height: 1.3;
+                                        display: -webkit-box;
+                                        -webkit-line-clamp: 2;
+                                        -webkit-box-orient: vertical;
+                                        overflow: hidden;
+                                    ">${title}</h3>
+                                    ${year || durationText ? `
+                                        <div style="
+                                            display: flex;
+                                            gap: 0.75rem;
+                                            justify-content: center;
+                                            align-items: center;
+                                            margin-top: 0.5rem;
+                                            flex-wrap: wrap;
+                                        ">
+                                            ${year ? `<span style="
+                                                background: rgba(255, 255, 255, 0.2);
+                                                backdrop-filter: blur(10px);
+                                                padding: 0.25rem 0.75rem;
+                                                border-radius: 12px;
+                                                font-size: 0.85rem;
+                                                color: #ffffff;
+                                                font-weight: 500;
+                                            ">${year}</span>` : ''}
+                                            ${durationText ? `<span style="
+                                                background: rgba(255, 255, 255, 0.2);
+                                                backdrop-filter: blur(10px);
+                                                padding: 0.25rem 0.75rem;
+                                                border-radius: 12px;
+                                                font-size: 0.85rem;
+                                                color: #ffffff;
+                                                font-weight: 500;
+                                            "><i class="fas fa-clock" style="margin-right: 0.25rem;"></i>${durationText}</span>` : ''}
+                                        </div>
+                                    ` : ''}
+                                    <div style="
+                                        margin-top: 1rem;
+                                        padding: 0.5rem 1rem;
+                                        background: rgba(255, 255, 255, 0.15);
+                                        backdrop-filter: blur(10px);
+                                        border-radius: 20px;
+                                        font-size: 0.75rem;
+                                        color: #ffffff;
+                                        font-weight: 500;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                    ">
+                                        <i class="fas fa-cloud-upload-alt" style="margin-right: 0.5rem;"></i>Video Local
+                                    </div>
+                                </div>
+                            </div>
+                        ` : `
+                            <img
+                                src="${safePosterUrl}"
+                                alt="${title}"
+                                loading="lazy"
+                                onerror="this.onerror=null; this.src='${safeDefaultUrl}'; this.style.background='linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%)';"
+                                style="background: linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%);"
+                            >
+                        `}
                         <div class="content-overlay">
                             <button class="btn-play action-btn" data-action="play" data-id="${id}" data-type="${type}" title="Reproducir">
                                 <i class="fas fa-play"></i>

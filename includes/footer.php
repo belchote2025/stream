@@ -321,8 +321,8 @@
     <script src="<?php echo $baseUrl; ?>/js/notifications.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/main.js"></script>
     
-    <!-- Script de diagnóstico de botones del reproductor (solo en index.php) -->
-    <?php if (basename($_SERVER['PHP_SELF']) === 'index.php'): ?>
+    <!-- Script de diagnóstico de botones del reproductor (solo en index.php y solo en modo debug) -->
+    <?php if (basename($_SERVER['PHP_SELF']) === 'index.php' && defined('APP_ENV') && APP_ENV === 'local' && isset($_GET['debug'])): ?>
     <script src="<?php echo $baseUrl; ?>/test-player-buttons.js"></script>
     <?php endif; ?>
     

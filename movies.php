@@ -142,7 +142,7 @@ include __DIR__ . '/includes/header.php';
                 $duration = $movie['duration'] ?? '';
                 $rating = isset($movie['rating']) && $movie['rating'] > 0 ? number_format($movie['rating'], 1) : '';
             ?>
-                <div class="movie-card" onclick="window.location.href='<?php echo $baseUrl; ?>/content.php?id=<?php echo $movie['id']; ?>'">
+                <div class="movie-card" onclick="window.location.href='<?php echo $baseUrl; ?>/content-detail.php?id=<?php echo $movie['id']; ?>'">
                     <?php if ($isPremium): ?>
                         <span class="movie-badge premium">
                             <i class="fas fa-crown"></i> PREMIUM
@@ -152,8 +152,9 @@ include __DIR__ . '/includes/header.php';
                          alt="<?php echo htmlspecialchars($movie['title']); ?>" 
                          class="movie-poster poster-clickable" 
                          loading="lazy"
-                         onclick="handleMoviePosterClick(<?php echo $movie['id']; ?>, '<?php echo htmlspecialchars($movie['title'], ENT_QUOTES); ?>', <?php echo $year ?: 'null'; ?>)"
-                         style="cursor: pointer;"
+                         onclick="handleMoviePosterClick(<?php echo (int)$movie['id']; ?>, <?php echo json_encode($movie['title']); ?>, <?php echo $year ?: 'null'; ?>)"
+                         style="cursor: pointer; background: linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%);"
+                         onerror="this.onerror=null; this.src='<?php echo $baseUrl; ?>/assets/img/default-poster.svg'; this.style.background='linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%)';"
                          title="Clic para buscar torrents">
                     <div class="movie-info">
                         <div class="movie-title"><?php echo htmlspecialchars($movie['title']); ?></div>

@@ -95,9 +95,25 @@ include __DIR__ . '/includes/header.php';
 <section class="hero">
     <?php if (!empty($featuredContent)): ?>
         <?php foreach ($featuredContent as $index => $content): 
-            // Usar getImageUrl para procesar las URLs correctamente (con proxy si es necesario)
-            $backdropUrl = getImageUrl($content['backdrop_url'] ?? $content['poster_url'] ?? '', '/assets/img/default-backdrop.svg');
+            // Procesar poster_url primero
             $posterUrl = getImageUrl($content['poster_url'] ?? '', '/assets/img/default-poster.svg');
+            
+            // Procesar backdrop_url: priorizar backdrop_url, luego poster_url, luego default
+            $backdropUrl = null;
+            
+            // Si hay backdrop_url y no es default, usarlo
+            if (!empty($content['backdrop_url']) && strpos($content['backdrop_url'], 'default-') === false) {
+                $backdropUrl = getImageUrl($content['backdrop_url'], '/assets/img/default-backdrop.svg');
+            }
+            // Si no hay backdrop válido pero hay poster válido, usar el poster como backdrop
+            elseif (!empty($posterUrl) && strpos($posterUrl, 'default-poster.svg') === false) {
+                $backdropUrl = $posterUrl;
+            }
+            // Si todo falla, usar el default backdrop
+            else {
+                $backdropUrl = getImageUrl('/assets/img/default-backdrop.svg', '/assets/img/default-backdrop.svg');
+            }
+            
             $title = htmlspecialchars($content['title'] ?? '');
             $description = $content['description'] ?? $content['overview'] ?? '';
             $overview = htmlspecialchars(substr($description, 0, 200) . (strlen($description) > 200 ? '...' : ''));
@@ -105,18 +121,7 @@ include __DIR__ . '/includes/header.php';
             $contentId = $content['id'] ?? '';
         ?>
             <div class="hero-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>" data-trailer="<?php echo $trailerUrl; ?>">
-                <div class="hero-backdrop">
-                    <img 
-                        class="lazyload" 
-                        data-src="<?php echo $backdropUrl; ?>" 
-                        alt="<?php echo $title; ?>"
-                        loading="lazy"
-                        width="1920" 
-                        height="1080"
-                        style="opacity: 0; transition: opacity 0.3s;"
-                        onload="this.style.opacity=1"
-                    >
-                </div>
+                <div class="hero-backdrop" style="background-image: url('<?php echo htmlspecialchars($backdropUrl, ENT_QUOTES, 'UTF-8'); ?>'); background-size: cover; background-position: center center; background-repeat: no-repeat;"></div>
                 <div class="hero-content">
                     <h1 class="hero-title"><?php echo $title; ?></h1>
                     <p class="hero-description"><?php echo $overview; ?></p>
@@ -129,8 +134,6 @@ include __DIR__ . '/includes/header.php';
                         </button>
                     </div>
                 </div>
-                <!-- Fallback backdrop image -->
-                <div class="hero-backdrop" style="background-image: url('<?php echo htmlspecialchars($backdropUrl); ?>');"></div>
             </div>
         <?php endforeach; ?>
     <?php else: ?>
@@ -236,7 +239,7 @@ include __DIR__ . '/includes/header.php';
         <?php endif; ?>
     <?php endif; ?>
 
-    <!-- Popular Movies -->
+    <!-- Películas populares -->
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Películas populares</h2>
@@ -253,24 +256,7 @@ include __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <!-- Recent Series -->
-    <div class="row-container">
-        <div class="row-header">
-            <h2 class="row-title">Series recientes</h2>
-            <a href="<?php echo $baseUrl; ?>/series.php?sort=recent" class="row-link">Ver todo</a>
-        </div>
-        <div class="row-nav prev">
-            <i class="fas fa-chevron-left"></i>
-        </div>
-        <div class="row-content" id="recent-series" data-dynamic="true" data-type="series" data-sort="recent" data-limit="12">
-            <p class="loading-placeholder">Cargando series recientes...</p>
-        </div>
-        <div class="row-nav next">
-            <i class="fas fa-chevron-right"></i>
-        </div>
-    </div>
-
-    <!-- Popular Series -->
+    <!-- Series populares -->
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Series populares</h2>
@@ -287,7 +273,41 @@ include __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <!-- IMDb Highlighted Movies -->
+    <!-- Películas recientes -->
+    <div class="row-container">
+        <div class="row-header">
+            <h2 class="row-title">Películas recientes</h2>
+            <a href="<?php echo $baseUrl; ?>/movies.php?sort=recent" class="row-link">Ver todo</a>
+        </div>
+        <div class="row-nav prev">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="row-content" id="recent-movies" data-dynamic="true" data-type="movie" data-sort="recent" data-limit="12">
+            <p class="loading-placeholder">Cargando películas recientes...</p>
+        </div>
+        <div class="row-nav next">
+            <i class="fas fa-chevron-right"></i>
+        </div>
+    </div>
+
+    <!-- Series recientes -->
+    <div class="row-container">
+        <div class="row-header">
+            <h2 class="row-title">Series recientes</h2>
+            <a href="<?php echo $baseUrl; ?>/series.php?sort=recent" class="row-link">Ver todo</a>
+        </div>
+        <div class="row-nav prev">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="row-content" id="recent-series" data-dynamic="true" data-type="series" data-sort="recent" data-limit="12">
+            <p class="loading-placeholder">Cargando series recientes...</p>
+        </div>
+        <div class="row-nav next">
+            <i class="fas fa-chevron-right"></i>
+        </div>
+    </div>
+
+    <!-- Películas destacadas en IMDb -->
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Películas destacadas en IMDb</h2>
@@ -304,7 +324,7 @@ include __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <!-- Local Uploaded Videos -->
+    <!-- Videos locales -->
     <div class="row-container">
         <div class="row-header">
             <h2 class="row-title">Videos locales</h2>
@@ -315,23 +335,6 @@ include __DIR__ . '/includes/header.php';
         </div>
         <div class="row-content" id="local-videos" data-dynamic="true" data-type="movie" data-source="local" data-sort="recent" data-limit="12" data-cache-key="local-videos">
             <p class="loading-placeholder">Cargando videos locales...</p>
-        </div>
-        <div class="row-nav next">
-            <i class="fas fa-chevron-right"></i>
-        </div>
-    </div>
-
-    <!-- Recent Movies -->
-    <div class="row-container">
-        <div class="row-header">
-            <h2 class="row-title">Películas recientes</h2>
-            <a href="<?php echo $baseUrl; ?>/movies.php?sort=recent" class="row-link">Ver todo</a>
-        </div>
-        <div class="row-nav prev">
-            <i class="fas fa-chevron-left"></i>
-        </div>
-        <div class="row-content" id="recent-movies" data-dynamic="true" data-type="movie" data-sort="recent" data-limit="12">
-            <p class="loading-placeholder">Cargando películas recientes...</p>
         </div>
         <div class="row-nav next">
             <i class="fas fa-chevron-right"></i>
@@ -475,6 +478,94 @@ include __DIR__ . '/includes/header.php';
         }
     }
 </style>
+
+<script>
+// Verificar carga de imágenes del hero y posters
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔍 Verificando carga de imágenes...');
+    
+    // Verificar backdrops del hero
+    const heroBackdrops = document.querySelectorAll('.hero-backdrop');
+    console.log(`📸 Backdrops del hero encontrados: ${heroBackdrops.length}`);
+    
+    let backdropLoaded = 0;
+    let backdropErrors = 0;
+    
+    heroBackdrops.forEach((backdrop, index) => {
+        const bgImage = window.getComputedStyle(backdrop).backgroundImage;
+        const urlMatch = bgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+        const imageUrl = urlMatch ? urlMatch[1] : null;
+        
+        if (imageUrl && imageUrl !== 'none' && imageUrl !== 'null') {
+            console.log(`  Backdrop ${index + 1}: ${imageUrl}`);
+            
+            // Verificar si la imagen se carga
+            const img = new Image();
+            img.onload = function() {
+                backdropLoaded++;
+                console.log(`  ✅ Backdrop ${index + 1} cargado correctamente`);
+            };
+            img.onerror = function() {
+                backdropErrors++;
+                console.error(`  ❌ Backdrop ${index + 1} NO se pudo cargar: ${imageUrl}`);
+            };
+            img.src = imageUrl;
+        } else {
+            console.warn(`  ⚠️ Backdrop ${index + 1}: Sin URL configurada`);
+        }
+    });
+    
+    // Esperar a que las fichas se carguen dinámicamente
+    function checkPosters() {
+        const contentPosters = document.querySelectorAll('.content-card img, .content-poster img, .content-item img');
+        
+        if (contentPosters.length === 0) {
+            // Reintentar después de 1 segundo
+            setTimeout(checkPosters, 1000);
+            return;
+        }
+        
+        console.log(`\n📸 Posters de fichas encontrados: ${contentPosters.length}`);
+        
+        let loadedCount = 0;
+        let errorCount = 0;
+        
+        contentPosters.forEach((img, index) => {
+            if (index < 10) { // Verificar los primeros 10
+                const imgUrl = img.src || img.dataset.src;
+                
+                if (imgUrl && imgUrl !== 'no encontrada' && !imgUrl.includes('data:')) {
+                    console.log(`  Poster ${index + 1}: ${imgUrl.substring(0, 80)}...`);
+                    
+                    if (img.complete && img.naturalHeight > 0) {
+                        loadedCount++;
+                        console.log(`  ✅ Poster ${index + 1} ya estaba cargado`);
+                    } else {
+                        img.onload = function() {
+                            loadedCount++;
+                            console.log(`  ✅ Poster ${index + 1} cargado`);
+                        };
+                        img.onerror = function() {
+                            errorCount++;
+                            console.error(`  ❌ Poster ${index + 1} NO se pudo cargar`);
+                        };
+                    }
+                }
+            }
+        });
+        
+        setTimeout(() => {
+            console.log(`\n📊 Resumen de carga de imágenes:`);
+            console.log(`  Backdrops: ✅ ${backdropLoaded} | ❌ ${backdropErrors}`);
+            console.log(`  Posters: ✅ ${loadedCount} | ❌ ${errorCount}`);
+            console.log(`  📸 Total posters verificados: ${Math.min(contentPosters.length, 10)}`);
+        }, 2000);
+    }
+    
+    // Iniciar verificación de posters después de un breve delay
+    setTimeout(checkPosters, 2000);
+});
+</script>
 
 <?php
 // Include footer

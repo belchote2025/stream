@@ -21,6 +21,7 @@ try {
     
     // Obtener parámetros
     $type = isset($_GET['type']) ? $_GET['type'] : null; // 'movie' o 'series'
+    $source = isset($_GET['source']) ? $_GET['source'] : null; // 'local' para uploads
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
     $limit = max(1, min($limit, 50)); // Entre 1 y 50
     
@@ -59,6 +60,13 @@ try {
     if ($type && in_array($type, ['movie', 'series'])) {
         $query .= " AND c.type = :type";
         $params[':type'] = $type;
+    }
+    
+    // Filtrar por origen local (solo videos subidos)
+    if ($source === 'local') {
+        $query .= " AND c.video_url IS NOT NULL
+                    AND c.video_url <> ''
+                    AND (c.video_url LIKE '/uploads/%' OR c.video_url LIKE '%/uploads/%')";
     }
     
     $query .= "
@@ -109,7 +117,8 @@ try {
         'success' => true,
         'data' => $formatted,
         'count' => count($formatted),
-        'type' => $type ?: 'all'
+        'type' => $type ?: 'all',
+        'source' => $source ?: 'all'
     ]);
     
 } catch (PDOException $e) {

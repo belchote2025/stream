@@ -66,10 +66,11 @@ function getFeaturedContent($db, $limit = 5) {
                 c.poster_url,
                 c.backdrop_url,
                 c.description,
-                c.trailer_url
+                c.trailer_url,
+                c.added_date
             FROM content c
-            WHERE c.featured = 1
-            ORDER BY c.release_date DESC
+            WHERE c.is_featured = 1
+            ORDER BY c.added_date DESC, c.release_year DESC
             LIMIT :limit
         ";
         

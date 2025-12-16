@@ -13,15 +13,37 @@
  * @return string URL de la imagen o cadena vacía si no se encuentra
  */
 function getImdbImage($title, $type = 'movie', $year = null) {
+    static $imdbRequests = 0;
+    static $imdbCache = [];
+    
+    // Crear clave de caché
+    $cacheKey = md5(strtolower(trim($title)) . '|' . $type . '|' . ($year ?? ''));
+    
+    // Si ya tenemos esta imagen en caché, devolverla
+    if (isset($imdbCache[$cacheKey])) {
+        return $imdbCache[$cacheKey];
+    }
+    
+    $imdbRequests++;
+
+    // Limitar el número de llamadas por petición para evitar timeouts masivos
+    // Aumentado a 20 para permitir más imágenes en la actualización automática
+    if ($imdbRequests > 20) {
+        // Demasiadas peticiones en una sola carga de página: evitar bloquear la respuesta
+        return '';
+    }
+
     // Limpiar el título para la búsqueda
     $searchQuery = urlencode(trim($title) . ' ' . $year);
     $ttype = ($type == 'movie') ? 'ft' : 'tv';
     $searchUrl = "https://www.imdb.com/find?q={$searchQuery}&s=tt&ttype={$ttype}";
     
-    // Usar file_get_contents con un contexto que incluye un user-agent
+    // Usar file_get_contents con un contexto que incluye un user-agent y timeout corto
     $context = stream_context_create([
         'http' => [
-            'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            'timeout' => 3, // máximo 3s por petición
+            'ignore_errors' => true,
         ]
     ]);
     
@@ -43,12 +65,17 @@ function getImdbImage($title, $type = 'movie', $year = null) {
             $imageUrl = preg_replace('/V1_.*?\./', 'V1_.jpg', $imageUrl);
             
             // Devolver la URL de la imagen a través de nuestro proxy
-            return "/api/image-proxy.php?url=" . urlencode($imageUrl);
+            $result = "/api/image-proxy.php?url=" . urlencode($imageUrl);
+            // Guardar en caché
+            $imdbCache[$cacheKey] = $result;
+            return $result;
         }
     } catch (Exception $e) {
         error_log("Error en getImdbImage para {$title}: " . $e->getMessage());
     }
     
+    // Guardar resultado vacío en caché para no intentar de nuevo
+    $imdbCache[$cacheKey] = '';
     return '';
 }
 
@@ -69,9 +96,8 @@ function getPosterImage($title, $type = 'movie', $year = null) {
     }
     
     // Si no se encuentra en IMDB, usar una imagen por defecto según el tipo
-    $defaultImage = $type === 'movie' 
-        ? '/assets/img/default-movie-poster.jpg' 
-        : '/assets/img/default-tv-poster.jpg';
+    // Usar placeholders existentes en assets/img
+    $defaultImage = '/assets/img/default-poster.svg';
     
     return $defaultImage;
 }

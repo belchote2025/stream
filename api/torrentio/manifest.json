@@ -1,0 +1,29 @@
+<?php
+/**
+ * Manifest Stremio para el addon Torrentio proxy (fuente interna de búsquedas).
+ * Exponer esta URL en Stremio para registrar el addon:
+ *   http(s)://TU_DOMINIO/api/torrentio/manifest.json
+ */
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+
+$manifest = [
+    'id' => 'com.urrestv.torrentio',
+    'version' => '1.0.0',
+    'name' => 'Torrentio Proxy',
+    'description' => 'Búsqueda de torrents (Torrentio/YTS/EZTV/TPB) integrada.',
+    'types' => ['movie', 'series'],
+    'resources' => [
+        [
+            'name' => 'stream',
+            'types' => ['movie', 'series']
+        ]
+    ],
+    'catalogs' => [],
+    'idPrefixes' => ['tt', 'movie:', 'series:', 'tv:'],
+];
+
+echo json_encode($manifest, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+*** End Patch
+
+

@@ -47,8 +47,13 @@ class UnifiedVideoPlayer {
                 this.loadYouTubeAPI();
             }
             
-            // Configurar atajos de teclado
-            document.addEventListener('keydown', this.handleKeyboard.bind(this));
+            // Configurar atajos de teclado (solo si está definida la función)
+            if (typeof this.handleKeyboard === 'function') {
+                this._keyboardHandler = this.handleKeyboard.bind(this);
+                document.addEventListener('keydown', this._keyboardHandler);
+            } else {
+                console.warn('handleKeyboard no está definida, se omiten atajos');
+            }
             
             // Inicializar UI
             this.updateVolumeButton();
@@ -62,36 +67,46 @@ class UnifiedVideoPlayer {
     
     // Métodos principales
     loadVideo(source, type = null) {
-        try {
-            // Determinar el tipo de video si no se especifica
-            if (!type) {
-                type = this.detectVideoType(source);
+        return new Promise((resolve, reject) => {
+            try {
+                // Determinar el tipo de video si no se especifica
+                if (!type) {
+                    type = this.detectVideoType(source);
+                }
+                
+                // Limpiar reproductor actual (si existe)
+                this.cleanupCurrentPlayer();
+                
+                // Cargar el video según el tipo
+                this.videoType = type;
+                
+                switch (type) {
+                    case 'youtube':
+                        // Para YouTube, intentar cargar con iframe
+                        this.loadYouTube(source).then(resolve).catch(reject);
+                        return;
+                    case 'torrent':
+                        // Para torrents, usar WebTorrent
+                        this.loadTorrent(source).then(resolve).catch(reject);
+                        return;
+                    case 'local':
+                    case 'url':
+                    default:
+                        // Para videos locales o URLs directas, usar HTML5
+                        try {
+                            this.loadHTML5Video(source);
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
+                        return;
+                }
+            } catch (error) {
+                console.error('Error al cargar el video:', error);
+                this.handleError(error);
+                reject(error);
             }
-            
-            // Limpiar reproductor actual
-            this.cleanupCurrentPlayer();
-            
-            // Cargar el video según el tipo
-            this.videoType = type;
-            
-            switch (type) {
-                case 'youtube':
-                    this.loadYouTube(source);
-                    break;
-                case 'torrent':
-                    this.loadTorrent(source);
-                    break;
-                case 'local':
-                case 'url':
-                default:
-                    this.loadHTML5Video(source);
-                    break;
-            }
-            
-        } catch (error) {
-            console.error('Error al cargar el video:', error);
-            this.handleError(error);
-        }
+        });
     }
     
     // Métodos de control
@@ -256,6 +271,326 @@ class UnifiedVideoPlayer {
         const minutes = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // Carga un video HTML5 simple en el elemento <video>
+    loadHTML5Video(source) {
+        try {
+            // Asegurar que el contenedor existe
+            if (!this.container) {
+                throw new Error('No se encontró el contenedor del reproductor');
+            }
+            
+            // Crear estructura si no existe
+            if (!this.videoElement) {
+                this.createPlayerStructure();
+            }
+            
+            if (!this.videoElement) {
+                throw new Error('No se pudo crear el elemento de video HTML5');
+            }
+
+            // Normalizar la URL si es relativa
+            let normalizedSource = source;
+            if (source && !source.startsWith('http://') && !source.startsWith('https://') && !source.startsWith('magnet:')) {
+                if (source.startsWith('/')) {
+                    normalizedSource = window.location.origin + source;
+                } else {
+                    normalizedSource = window.location.origin + '/' + source;
+                }
+            }
+
+            console.log('Cargando video HTML5:', normalizedSource);
+            this.showLoading();
+            
+            // Ocultar otros reproductores
+            const youtubeContainer = this.container.querySelector('#youtubePlayerContainer');
+            const torrentContainer = this.container.querySelector('#torrentPlayerContainer');
+            if (youtubeContainer) youtubeContainer.style.display = 'none';
+            if (torrentContainer) torrentContainer.style.display = 'none';
+            
+            // Mostrar y configurar el video HTML5
+            this.videoElement.style.display = 'block';
+            this.videoElement.src = normalizedSource;
+            this.videoElement.load(); // Forzar recarga
+
+            this.videoElement.onloadeddata = () => {
+                console.log('Video HTML5 cargado correctamente');
+                this.hideLoading();
+                if (this.options.autoplay) {
+                    this.play().catch(err => {
+                        console.warn('No se pudo reproducir automáticamente:', err);
+                    });
+                }
+            };
+
+            this.videoElement.onerror = (e) => {
+                console.error('Error al cargar el video HTML5:', e);
+                this.hideLoading();
+                this.handleError(new Error('No se pudo cargar el archivo de video. Verifica que la URL sea válida.'));
+            };
+            
+            this.videoElement.oncanplay = () => {
+                console.log('Video HTML5 listo para reproducir');
+            };
+        } catch (error) {
+            console.error('Error en loadHTML5Video():', error);
+            this.hideLoading();
+            this.handleError(error);
+            throw error;
+        }
+    }
+
+    // Carga videos de YouTube usando iframe
+    loadYouTube(source) {
+        return new Promise((resolve, reject) => {
+            try {
+                // Extraer ID de YouTube
+                let videoId = '';
+                if (source.includes('youtube.com/watch?v=')) {
+                    videoId = source.split('v=')[1].split('&')[0];
+                } else if (source.includes('youtu.be/')) {
+                    videoId = source.split('youtu.be/')[1].split('?')[0];
+                } else if (source.includes('youtube.com/embed/')) {
+                    videoId = source.split('embed/')[1].split('?')[0];
+                } else if (/^[\w-]{11}$/.test(source)) {
+                    videoId = source;
+                }
+                
+                if (!videoId) {
+                    throw new Error('No se pudo extraer el ID de YouTube de la URL');
+                }
+                
+                // Limpiar contenedor
+                if (this.container) {
+                    this.container.innerHTML = '';
+                }
+                
+                // Crear iframe de YouTube
+                const iframe = document.createElement('iframe');
+                iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&origin=${window.location.origin}`;
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.border = 'none';
+                iframe.allow = 'autoplay; encrypted-media';
+                iframe.allowFullscreen = true;
+                
+                if (this.container) {
+                    this.container.appendChild(iframe);
+                }
+                
+                this.videoType = 'youtube';
+                this.hideLoading();
+                resolve();
+            } catch (error) {
+                console.error('Error en loadYouTube():', error);
+                this.handleError(error);
+                reject(error);
+            }
+        });
+    }
+
+    // Carga torrents usando WebTorrent
+    loadTorrent(source) {
+        return new Promise((resolve, reject) => {
+            try {
+                if (typeof WebTorrent === 'undefined') {
+                    throw new Error('WebTorrent no está disponible. Por favor, recarga la página.');
+                }
+                
+                if (!this.torrentClient) {
+                    this.initWebTorrent();
+                }
+                
+                if (!this.torrentClient) {
+                    throw new Error('No se pudo inicializar el cliente WebTorrent');
+                }
+                
+                this.showLoading();
+                
+                // Limpiar torrent anterior
+                if (this.currentTorrent) {
+                    this.currentTorrent.destroy();
+                    this.currentTorrent = null;
+                }
+                
+                // Crear elemento de video si no existe
+                if (!this.videoElement) {
+                    this.createPlayerStructure();
+                }
+                
+                // Agregar torrent al cliente
+                this.torrentClient.add(source, (torrent) => {
+                    this.currentTorrent = torrent;
+                    
+                    // Buscar el archivo de video más grande
+                    const videoFile = torrent.files.find(file => {
+                        const name = file.name.toLowerCase();
+                        return name.endsWith('.mp4') || name.endsWith('.webm') || 
+                               name.endsWith('.mkv') || name.endsWith('.avi');
+                    }) || torrent.files[0];
+                    
+                    if (!videoFile) {
+                        throw new Error('No se encontró ningún archivo de video en el torrent');
+                    }
+                    
+                    // Crear URL del blob
+                    videoFile.renderTo(this.videoElement, {
+                        autoplay: this.options.autoplay,
+                        controls: false
+                    }, (err) => {
+                        if (err) {
+                            console.error('Error al renderizar el video:', err);
+                            this.handleError(err);
+                            reject(err);
+                        } else {
+                            this.hideLoading();
+                            this.videoType = 'torrent';
+                            resolve();
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('Error en loadTorrent():', error);
+                this.handleError(error);
+                reject(error);
+            }
+        });
+    }
+
+    // Inicializa listeners básicos del elemento de video (protección contra undefined)
+    setupEventListeners() {
+        // Si no hay elemento de video, salir silenciosamente
+        if (!this.videoElement) {
+            return;
+        }
+
+        // Asegurar que los handlers estén ligados al contexto correcto
+        const updateTime = () => {
+            if (!this.videoElement) return;
+            this.currentTime = this.videoElement.currentTime;
+            this.duration = this.videoElement.duration || 0;
+        };
+
+        const handleEnded = () => {
+            this.isPlaying = false;
+            if (this.options.onEnded) {
+                try { this.options.onEnded(); } catch (e) { console.error(e); }
+            }
+        };
+
+        this.videoElement.addEventListener('timeupdate', updateTime);
+        this.videoElement.addEventListener('ended', handleEnded);
+    }
+
+    // Actualiza el botón de volumen (placeholder seguro)
+    updateVolumeButton() {
+        // Si en el futuro añadimos un botón de volumen personalizado,
+        // aquí se sincronizaría su icono/estado. De momento no hace falta.
+        return;
+    }
+
+    // Actualiza el botón de play/pausa (placeholder seguro)
+    updatePlayPauseButton() {
+        // Similar al de volumen: actualmente usamos controles nativos.
+        return;
+    }
+
+    // Actualiza la barra de progreso (placeholder seguro)
+    updateProgress() {
+        // La UI externa ya actualiza la barra leyendo eventos de videoPlayer en watch.php.
+        return;
+    }
+
+    // Inicializa controles personalizados (placeholder seguro)
+    setupCustomControls() {
+        // Si en el futuro se agregan controles personalizados, inicializarlos aquí.
+        // De momento, usar los controles nativos ya habilitados en el <video>.
+        return;
+    }
+
+    // Atajos de teclado básicos
+    handleKeyboard(event) {
+        if (!event) return;
+        const key = event.key?.toLowerCase();
+
+        // Si el foco está en un input/textarea, no interceptar
+        const tag = (event.target && event.target.tagName) ? event.target.tagName.toLowerCase() : '';
+        if (['input', 'textarea', 'select', 'button'].includes(tag)) return;
+
+        switch (key) {
+            case ' ':
+            case 'k':
+                event.preventDefault();
+                this.togglePlayPause();
+                break;
+            case 'm':
+                event.preventDefault();
+                this.toggleMute();
+                break;
+            case 'f':
+                event.preventDefault();
+                this.toggleFullscreen();
+                break;
+            case 'arrowright':
+                event.preventDefault();
+                this.seek(Math.min((this.videoElement?.currentTime || 0) + 10, this.duration || Infinity));
+                break;
+            case 'arrowleft':
+                event.preventDefault();
+                this.seek(Math.max((this.videoElement?.currentTime || 0) - 10, 0));
+                break;
+            case 'arrowup':
+                event.preventDefault();
+                this.setVolume(Math.min((this.videoElement?.volume ?? this.volume) + 0.1, 1));
+                break;
+            case 'arrowdown':
+                event.preventDefault();
+                this.setVolume(Math.max((this.videoElement?.volume ?? this.volume) - 0.1, 0));
+                break;
+            default:
+                break;
+        }
+    }
+
+    // Inicializa cliente WebTorrent de forma segura
+    initWebTorrent() {
+        try {
+            if (window.WebTorrent && !this.torrentClient) {
+                this.torrentClient = new WebTorrent();
+            }
+        } catch (e) {
+            console.warn('No se pudo inicializar WebTorrent:', e);
+        }
+    }
+
+    // Limpia cualquier reproductor/carga previa antes de cargar un nuevo video
+    cleanupCurrentPlayer() {
+        try {
+            // Pausar video HTML5 si existe
+            if (this.videoElement) {
+                this.videoElement.pause();
+                this.videoElement.removeAttribute('src');
+                this.videoElement.load();
+            }
+
+            // Detener YouTube si existe
+            if (this.youtubePlayer) {
+                try {
+                    this.youtubePlayer.stopVideo();
+                } catch (e) {}
+            }
+
+            // Detener torrent actual si existe
+            if (this.currentTorrent) {
+                try {
+                    this.currentTorrent.destroy();
+                } catch (e) {}
+                this.currentTorrent = null;
+            }
+        } catch (e) {
+            console.warn('Error en cleanupCurrentPlayer:', e);
+        }
     }
     
     // Crear estructura del reproductor

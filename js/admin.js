@@ -849,6 +849,10 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
                 Busca y actualiza automáticamente novedades de películas y series desde <strong style="color: #ffffff;">Trakt.tv</strong> y <strong style="color: #ffffff;">TVMaze</strong> (ambas gratuitas), incluyendo portadas, trailers y enlaces torrent. El sistema prioriza torrents con más seeds para mejor calidad.
                 <br><br>
                 <small style="color: #808080;">💡 Para mejores resultados, configura TRAKT_CLIENT_ID (gratis en <a href="https://trakt.tv/oauth/applications" target="_blank" style="color: #e50914;">trakt.tv/oauth/applications</a>)</small>
+                <br>
+                <small style="color: #808080;">🔗 Addon Torrentio oficial para Stremio: <code style="color: #e50914;">https://torrentio.strem.fun/lite/manifest.json</code></small>
+                <br>
+                <small style="color: #808080;">(Opcional) Proxy interno de respaldo: <code style="color: #e50914;">/api/torrentio/manifest.json</code></small>
             </p>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
@@ -3616,6 +3620,9 @@ async function apiRequest(endpoint, options = {}) {
             }
         }
 
+        // Log de depuración para ver la URL final
+        console.log('[apiRequest] Llamando a:', fullEndpoint);
+
         // Añadir headers por defecto
         const defaultHeaders = {
             'Content-Type': 'application/json',
@@ -3625,7 +3632,8 @@ async function apiRequest(endpoint, options = {}) {
         options.headers = { ...defaultHeaders, ...(options.headers || {}) };
 
         // Incluir credenciales (cookies de sesión) en las peticiones
-        options.credentials = 'same-origin';
+        // Usamos 'include' para funcionar incluso si el panel se sirve desde otro subdominio/origen
+        options.credentials = 'include';
 
         const response = await fetch(fullEndpoint, options);
 
@@ -5211,6 +5219,7 @@ function initContentRefresh() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     type: type,
                     limit: limit,
@@ -5222,15 +5231,20 @@ function initContentRefresh() {
 
             console.log('Respuesta recibida:', response.status, response.statusText);
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Error HTTP:', response.status, errorText);
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-
             const responseText = await response.text();
             console.log('Respuesta texto:', responseText);
             
+            if (!response.ok) {
+                console.error('Error HTTP:', response.status, responseText);
+                // Intentar parsear JSON de error
+                try {
+                    const errJson = JSON.parse(responseText);
+                    throw new Error(`Error ${response.status}: ${errJson.error || response.statusText}`);
+                } catch (_) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+            }
+
             let data;
             try {
                 data = JSON.parse(responseText);

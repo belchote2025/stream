@@ -390,136 +390,93 @@ $baseUrl = rtrim(SITE_URL, '/');
 </style>
 
 <div class="watch-page">
-    <div id="videoPlayer" class="video-player">
-    <!-- Contenedor principal del reproductor -->
-    <div class="video-container">
-        <!-- Contenedor para YouTube -->
-        <div id="youtubePlayerContainer" style="display: none;"></div>
+    <div class="video-container-full">
+        <?php
+        // Determinar si tenemos algo reproducible
+        $hasVideo = false;
+        $torrentMagnet = null;
+        $videoUrl = $videoUrl ?? '';
         
-        <!-- Contenedor para WebTorrent -->
-        <div id="torrentPlayerContainer" style="display: none;">
-            <video id="torrentPlayer" controls></video>
-        </div>
+        // Verificar si hay un enlace torrent en la URL
+        if (isset($_GET['torrent']) && !empty($_GET['torrent'])) {
+            $torrentMagnet = urldecode($_GET['torrent']);
+            $hasVideo = true;
+        } elseif ($episode && !empty($episode['video_url'])) {
+            $videoUrl = $episode['video_url'];
+            $hasVideo = true;
+        } elseif (!empty($content['video_url'])) {
+            $videoUrl = $content['video_url'];
+            $hasVideo = true;
+        } elseif (!empty($content['trailer_url'])) {
+            $videoUrl = $content['trailer_url'];
+            $hasVideo = true;
+        } elseif (!empty($content['torrent_magnet'])) {
+            $torrentMagnet = $content['torrent_magnet'];
+            $hasVideo = true;
+        }
         
-        <!-- Reproductor HTML5 nativo -->
-        <video id="html5Player" style="display: none;" controls></video>
+        // Convertir URL relativa a absoluta si es necesario
+        if ($videoUrl && !empty($videoUrl)) {
+            // Si es una ruta relativa que empieza con /uploads/, convertirla a URL absoluta
+            if (strpos($videoUrl, '/uploads/') === 0 || strpos($videoUrl, '/streaming-platform/uploads/') === 0) {
+                // Remover /streaming-platform si existe
+                $videoUrl = str_replace('/streaming-platform', '', $videoUrl);
+                // Si no empieza con http, convertir a URL absoluta
+                if (strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0) {
+                    $baseUrl = rtrim(SITE_URL, '/');
+                    $videoUrl = $baseUrl . $videoUrl;
+                }
+            } elseif (strpos($videoUrl, '/') === 0 && strpos($videoUrl, 'http') !== 0) {
+                // Otra ruta relativa que empieza con /
+                $baseUrl = rtrim(SITE_URL, '/');
+                $videoUrl = $baseUrl . $videoUrl;
+            } elseif (strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0 && strpos($videoUrl, '/') !== 0) {
+                // Si es una ruta relativa sin / al inicio, añadirla
+                $baseUrl = rtrim(SITE_URL, '/');
+                $videoUrl = $baseUrl . '/' . ltrim($videoUrl, '/');
+            }
+        }
+        ?>
         
-        <!-- Indicador de carga -->
-        <div id="videoLoading" class="loading-indicator" style="display: none;">
-            <div class="spinner"></div>
-            <p>Cargando video...</p>
-        </div>
-        
-        <!-- Mensaje de error -->
-        <div id="videoError" class="error-message" style="display: none;">
-            <i class="fas fa-exclamation-triangle"></i>
-            <p id="errorMessage">Error al cargar el video</p>
-        </div>
-        
-        <!-- Controles personalizados -->
-        <div class="video-controls">
-            <!-- Barra de progreso -->
-            <div class="progress-container">
-                <div class="progress-bar">
-                    <div class="buffer"></div>
-                    <div class="progress"></div>
-                    <div class="hover-time">
-                        <div class="hover-time-text">0:00</div>
-                        <div class="hover-thumbnail"></div>
-                    </div>
-                </div>
-                <div class="time-display">
-                    <span class="current-time">0:00</span> / <span class="duration">0:00</span>
-                </div>
-            </div>
-            
-            <!-- Controles inferiores -->
-            <div class="controls-bottom">
-                <div class="controls-left">
-                    <button id="playPauseBtn" class="control-btn" title="Reproducir/Pausar">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <div class="volume-control">
-                        <button id="volumeBtn" class="control-btn" title="Silenciar/Activar sonido">
-                            <i class="fas fa-volume-up"></i>
-                        </button>
-                        <div class="volume-slider">
-                            <div class="slider-track">
-                                <div class="slider-fill" style="width: 100%;"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="time-display">
-                        <span class="current-time">0:00</span> / <span class="duration">0:00</span>
-                    </div>
-                </div>
-                
-                <div class="controls-right">
-                    <div class="settings-menu">
-                        <button id="settingsBtn" class="control-btn" title="Ajustes">
-                            <i class="fas fa-cog"></i>
-                        </button>
-                        <div id="settingsMenu" class="settings-dropdown">
-                            <div class="settings-section">
-                                <label>Velocidad de reproducción</label>
-                                <select id="playbackSpeed">
-                                    <option value="0.5">0.5x</option>
-                                    <option value="0.75">0.75x</option>
-                                    <option value="1" selected>Normal</option>
-                                    <option value="1.25">1.25x</option>
-                                    <option value="1.5">1.5x</option>
-                                    <option value="2">2x</option>
-                                </select>
-                            </div>
-                            <div class="settings-section">
-                                <label>Calidad</label>
-                                <select id="qualitySelector">
-                                    <option value="auto" selected>Auto</option>
-                                    <option value="1080">1080p</option>
-                                    <option value="720">720p</option>
-                                    <option value="480">480p</option>
-                                    <option value="360">360p</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <button id="fullscreenBtn" class="control-btn" title="Pantalla completa">
-                        <i class="fas fa-expand"></i>
-                    </button>
+        <?php if ($hasVideo): ?>
+            <!-- Reproductor de video -->
+            <div id="unifiedVideoContainer">
+                <div class="video-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Cargando reproductor...</p>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<!-- Contenido adicional -->
-<div class="content-details">
-    <h1><?php echo htmlspecialchars($content['title']); ?></h1>
-    <?php if ($content['type'] === 'series' && $episode): ?>
-        <h2>Capítulo <?php echo $episode['episode_number'] . ': ' . htmlspecialchars($episode['title']); ?></h2>
-    <?php endif; ?>
-    
-    <div class="content-meta">
-        <?php if ($content['release_year']): ?>
-            <span class="meta-item"><?php echo $content['release_year']; ?></span>
-        <?php endif; ?>
-        
-        <?php if ($content['duration']): ?>
-            <span class="meta-item"><?php echo formatDuration($content['duration']); ?></span>
-        <?php endif; ?>
-        
-        <?php if ($content['rating']): ?>
-            <span class="meta-item">
-                <i class="fas fa-star"></i> <?php echo number_format($content['rating'], 1); ?>/10
-            </span>
+            <!-- Mensaje de error (oculto por defecto) -->
+            <div id="videoError" class="video-error" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Error al cargar el video</h3>
+                <p id="errorMessage">No se pudo cargar el reproductor de video.</p>
+                <button class="btn btn-primary" onclick="window.location.reload()">
+                    <i class="fas fa-sync-alt"></i> Reintentar
+                </button>
+            </div>
+        <?php else: ?>
+            <div class="no-video-message">
+                <div class="no-video-content">
+                    <i class="fas fa-video-slash"></i>
+                    <h3>Video no disponible</h3>
+                    <p>Este contenido no tiene un video disponible para reproducir.</p>
+                    <?php if (!empty($content['trailer_url'])): ?>
+                        <button class="btn btn-primary" onclick="playTrailer()">
+                            <i class="fas fa-play"></i> Ver Tráiler
+                        </button>
+                    <?php endif; ?>
+                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/content-detail.php?id=<?php echo $contentId; ?>" class="btn btn-outline">
+                        <i class="fas fa-arrow-left"></i> Volver a detalles
+                    </a>
+                </div>
+            </div>
         <?php endif; ?>
     </div>
     
-    <div class="content-description">
-        <p><?php echo nl2br(htmlspecialchars($content['description'])); ?></p>
-    </div>
-    
-    <?php if ($content['type'] === 'series'): ?>
+    <div class="video-info">
+        <?php if ($content['type'] === 'series'): ?>
         <div class="episodes-container">
             <h3>Temporadas y Episodios</h3>
             <?php
@@ -578,351 +535,24 @@ $baseUrl = rtrim(SITE_URL, '/');
             ?>
         </div>
     <?php endif; ?>
+    </div>
 </div>
 
 <!-- Scripts del reproductor -->
-<script src="<?php echo $baseUrl; ?>/js/player/config.js"></script>
-<script src="<?php echo $baseUrl; ?>/js/player/main.js"></script>
-<script src="<?php echo $baseUrl; ?>/js/player/init.js"></script>
-
-<script>
-// Inicializar el reproductor cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', function() {
-    // Obtener la URL del video desde PHP
-    const videoUrl = <?php 
-        if ($content['type'] === 'series' && $episode) {
-            echo json_encode($episode['video_url'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-        } else {
-            echo json_encode($content['video_url'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-        }
-    ?>;
-    
-    // Determinar el tipo de video
-    let videoType = '<?php echo $content['video_type'] ?? 'local'; ?>';
-    
-    // Si no se especificó el tipo, intentar detectarlo
-    if (!videoType || videoType === 'auto') {
-        if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-            videoType = 'youtube';
-        } else if (videoUrl.startsWith('magnet:') || videoUrl.endsWith('.torrent')) {
-            videoType = 'torrent';
-        } else if (videoUrl.startsWith('http')) {
-            videoType = 'url';
-        } else {
-            videoType = 'local';
-        }
-    }
-    
-    // Inicializar el reproductor
-    if (window.videoPlayer && videoUrl) {
-        window.videoPlayer.loadVideo(videoUrl, videoType);
-        
-        // Configurar eventos
-        window.videoPlayer.on('ready', function() {
-            console.log('Reproductor listo');
-            // Ocultar indicador de carga
-            const loadingElement = document.getElementById('videoLoading');
-            if (loadingElement) loadingElement.style.display = 'none';
-        });
-        
-        window.videoPlayer.on('error', function(error) {
-            console.error('Error en el reproductor:', error);
-            // Mostrar mensaje de error
-            const errorElement = document.getElementById('videoError');
-            if (errorElement) {
-                const errorMessage = errorElement.querySelector('#errorMessage') || errorElement;
-                errorMessage.textContent = error.message || 'Error al cargar el video';
-                errorElement.style.display = 'flex';
-            }
-        });
-        
-        // Configurar controles personalizados
-        const playPauseBtn = document.getElementById('playPauseBtn');
-        const volumeBtn = document.getElementById('volumeBtn');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
-        const progressBar = document.querySelector('.progress-bar');
-        const progress = document.querySelector('.progress-bar .progress');
-        const currentTimeElement = document.querySelector('.time-display .current-time');
-        const durationElement = document.querySelector('.time-display .duration');
-        const volumeSlider = document.querySelector('.volume-slider .slider-track');
-        const playbackSpeed = document.getElementById('playbackSpeed');
-        
-        // Eventos de los controles
-        if (playPauseBtn) {
-            playPauseBtn.addEventListener('click', function() {
-                if (window.videoPlayer) {
-                    window.videoPlayer.togglePlayPause();
-                }
-            });
-        }
-        
-        if (volumeBtn) {
-            volumeBtn.addEventListener('click', function() {
-                if (window.videoPlayer) {
-                    window.videoPlayer.toggleMute();
-                }
-            });
-        }
-        
-        if (fullscreenBtn) {
-            fullscreenBtn.addEventListener('click', function() {
-                if (window.videoPlayer) {
-                    window.videoPlayer.toggleFullscreen();
-                }
-            });
-        }
-        
-        if (progressBar) {
-            progressBar.addEventListener('click', function(e) {
-                if (window.videoPlayer) {
-                    const rect = this.getBoundingClientRect();
-                    const pos = (e.clientX - rect.left) / rect.width;
-                    window.videoPlayer.seek(pos * window.videoPlayer.duration);
-                }
-            });
-        }
-        
-        if (volumeSlider) {
-            volumeSlider.addEventListener('click', function(e) {
-                if (window.videoPlayer) {
-                    const rect = this.getBoundingClientRect();
-                    let volume = (e.clientX - rect.left) / rect.width;
-                    volume = Math.max(0, Math.min(1, volume));
-                    window.videoPlayer.setVolume(volume);
-                }
-            });
-        }
-        
-        if (playbackSpeed) {
-            playbackSpeed.addEventListener('change', function() {
-                if (window.videoPlayer) {
-                    window.videoPlayer.setPlaybackRate(parseFloat(this.value));
-                }
-            });
-        }
-        
-        // Actualizar la interfaz de usuario cuando cambia el tiempo
-        window.videoPlayer.on('timeupdate', function(time) {
-            if (progress) {
-                const percentage = (time.currentTime / time.duration) * 100;
-                progress.style.width = percentage + '%';
-            }
-            
-            if (currentTimeElement) {
-                currentTimeElement.textContent = formatTime(time.currentTime);
-            }
-            
-            if (durationElement && time.duration) {
-                durationElement.textContent = formatTime(time.duration);
-            }
-        });
-        
-        // Actualizar el botón de reproducción/pausa
-        window.videoPlayer.on('play', function() {
-            if (playPauseBtn) {
-                playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                playPauseBtn.setAttribute('title', 'Pausar');
-            }
-        });
-        
-        window.videoPlayer.on('pause', function() {
-            if (playPauseBtn) {
-                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                playPauseBtn.setAttribute('title', 'Reproducir');
-            }
-        });
-        
-        // Actualizar el botón de volumen
-        window.videoPlayer.on('volumechange', function(volume) {
-            if (volumeBtn) {
-                if (volume.muted || volume.volume === 0) {
-                    volumeBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-                    volumeBtn.setAttribute('title', 'Activar sonido');
-                } else if (volume.volume < 0.5) {
-                    volumeBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
-                    volumeBtn.setAttribute('title', 'Silenciar');
-                } else {
-                    volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                    volumeBtn.setAttribute('title', 'Silenciar');
-                }
-            }
-            
-            if (volumeSlider) {
-                const fill = volumeSlider.querySelector('.slider-fill');
-                if (fill) {
-                    fill.style.width = (volume.volume * 100) + '%';
-                }
-            }
-        });
-        
-        // Función para formatear el tiempo
-        function formatTime(seconds) {
-            if (isNaN(seconds)) return '0:00';
-            
-            const minutes = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${minutes}:${secs.toString().padStart(2, '0')}`;
-        }
-    }
-});
-</script>
-        $hasVideo = false;
-        $torrentMagnet = null;
-        
-        // Verificar si hay un enlace torrent en la URL
-        if (isset($_GET['torrent']) && !empty($_GET['torrent'])) {
-            $torrentMagnet = urldecode($_GET['torrent']);
-            $hasVideo = true;
-        } elseif ($episode && !empty($episode['video_url'])) {
-            $videoUrl = $episode['video_url'];
-            $hasVideo = true;
-        } elseif (!empty($content['video_url'])) {
-            $videoUrl = $content['video_url'];
-            $hasVideo = true;
-        } elseif (!empty($content['trailer_url'])) {
-            $videoUrl = $content['trailer_url'];
-            $hasVideo = true;
-        } elseif (!empty($content['torrent_magnet'])) {
-            $torrentMagnet = $content['torrent_magnet'];
-            $hasVideo = true;
-        }
-        
-        // Convertir URL relativa a absoluta si es necesario
-        if ($videoUrl && !empty($videoUrl)) {
-            // Si es una ruta relativa que empieza con /uploads/, convertirla a URL absoluta
-            if (strpos($videoUrl, '/uploads/') === 0 || strpos($videoUrl, '/streaming-platform/uploads/') === 0) {
-                // Remover /streaming-platform si existe
-                $videoUrl = str_replace('/streaming-platform', '', $videoUrl);
-                // Si no empieza con http, convertir a URL absoluta
-                if (strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0) {
-                    $baseUrl = rtrim(SITE_URL, '/');
-                    $videoUrl = $baseUrl . $videoUrl;
-                }
-            } elseif (strpos($videoUrl, '/') === 0 && strpos($videoUrl, 'http') !== 0) {
-                // Otra ruta relativa que empieza con /
-                $baseUrl = rtrim(SITE_URL, '/');
-                $videoUrl = $baseUrl . $videoUrl;
-            } elseif (strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0 && strpos($videoUrl, '/') !== 0) {
-                // Si es una ruta relativa sin / al inicio, añadirla
-                $baseUrl = rtrim(SITE_URL, '/');
-                $videoUrl = $baseUrl . '/' . ltrim($videoUrl, '/');
-            }
-        }
-        ?>
-        
-        <?php if ($hasVideo): ?>
-            <!-- Reproductor de video -->
-<div id="unifiedVideoContainer">
-    <div class="video-loading">
-        <i class="fas fa-spinner"></i>
-        <p>Cargando reproductor...</p>
-    </div>
-</div>
-
-<!-- Mensaje de error (oculto por defecto) -->
-<div id="videoError" class="video-error" style="display: none;">
-    <i class="fas fa-exclamation-triangle"></i>
-    <h3>Error al cargar el video</h3>
-    <p id="errorMessage">No se pudo cargar el reproductor de video.</p>
-    <button class="btn btn-primary" onclick="window.location.reload()">
-        <i class="fas fa-sync-alt"></i> Reintentar
-    </button>
-</div>
-        <?php else: ?>
-            <div class="no-video-message">
-                <div class="no-video-content">
-                    <i class="fas fa-video-slash"></i>
-                    <h3>Video no disponible</h3>
-                    <p>Este contenido no tiene un video disponible para reproducir.</p>
-                    <?php if (!empty($content['trailer_url'])): ?>
-                        <button class="btn btn-primary" onclick="playTrailer()">
-                            <i class="fas fa-play"></i> Ver Tráiler
-                        </button>
-                    <?php endif; ?>
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/content-detail.php?id=<?php echo $contentId; ?>" class="btn btn-outline">
-                        <i class="fas fa-arrow-left"></i> Volver a detalles
-                    </a>
-                </div>
-            </div>
-        <?php endif; ?>
-    </div>
-    
-    <div class="video-info">
-        <div class="video-title-section">
-            <h1><?php echo htmlspecialchars($content['title']); ?></h1>
-            <?php if ($episode): ?>
-                <h2 style="font-size: 1.2rem; color: #999; margin-top: 0.5rem;">
-                    Temporada <?php echo $episode['season_number']; ?>, Episodio <?php echo $episode['episode_number']; ?>: <?php echo htmlspecialchars($episode['title']); ?>
-                </h2>
-            <?php endif; ?>
-            <div class="video-meta">
-                <span><?php echo $content['release_year']; ?></span>
-                <span>•</span>
-                <span><?php echo $content['type'] === 'movie' ? floor($content['duration'] / 60) . 'h ' . ($content['duration'] % 60) . 'm' : $content['duration'] . ' min'; ?></span>
-                <?php if ($content['rating']): ?>
-                    <span>•</span>
-                    <span>⭐ <?php echo number_format($content['rating'], 1); ?>/10</span>
-                <?php endif; ?>
-            </div>
-        </div>
-        
-        <?php if ($content['type'] === 'series'): ?>
-            <?php
-            // Obtener todos los episodios
-            $episodesQuery = "
-                SELECT * FROM episodes 
-                WHERE series_id = :series_id 
-                ORDER BY season_number ASC, episode_number ASC
-            ";
-            $episodesStmt = $db->prepare($episodesQuery);
-            $episodesStmt->bindValue(':series_id', $contentId, PDO::PARAM_INT);
-            $episodesStmt->execute();
-            $allEpisodes = $episodesStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            if (!empty($allEpisodes)):
-                $currentSeason = 0;
-            ?>
-                <div class="episode-selector">
-                    <h3>Episodios</h3>
-                    <div class="episode-list">
-                        <?php foreach ($allEpisodes as $ep): ?>
-                            <?php if ($ep['season_number'] != $currentSeason): 
-                                $currentSeason = $ep['season_number'];
-                            ?>
-                                <div style="grid-column: 1 / -1; margin-top: 1rem; margin-bottom: 0.5rem;">
-                                    <h4 style="color: #fff; font-size: 1.1rem;">Temporada <?php echo $currentSeason; ?></h4>
-                                </div>
-                            <?php endif; ?>
-                            <div 
-                                class="episode-item <?php echo $episodeId == $ep['id'] ? 'active' : ''; ?>"
-                                onclick="playEpisode(<?php echo $ep['id']; ?>)"
-                            >
-                                <div style="font-weight: 600; margin-bottom: 0.5rem;">
-                                    Episodio <?php echo $ep['episode_number']; ?>: <?php echo htmlspecialchars($ep['title']); ?>
-                                </div>
-                                <?php if ($ep['description']): ?>
-                                    <div style="font-size: 0.85rem; color: #999;">
-                                        <?php echo mb_strimwidth(htmlspecialchars($ep['description']), 0, 100, '...'); ?>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-        <?php endif; ?>
-    </div>
-</div>
+<?php
+// Versión de cache-busting basada en la fecha de modificación de main.js
+$playerVersion = @filemtime(__DIR__ . '/js/player/main.js') ?: time();
+?>
+<script src="<?php echo $baseUrl; ?>/js/player/config.js?v=<?php echo $playerVersion; ?>"></script>
+<script src="<?php echo $baseUrl; ?>/js/player/main.js?v=<?php echo $playerVersion; ?>"></script>
+<script src="<?php echo $baseUrl; ?>/js/player/init.js?v=<?php echo $playerVersion; ?>"></script>
 
 <script>
 // Configuración global
 const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
 
-// Verificar si WebTorrent está disponible
-if (typeof WebTorrent === 'undefined') {
-    console.error('WebTorrent no está disponible');
-    showVideoError('El reproductor de video no pudo cargarse correctamente. Por favor, recarga la página.');
-}
+// WebTorrent se cargará de forma asíncrona, no verificar aquí
+// La verificación se hará cuando realmente se necesite usar WebTorrent
 
 // Función para mostrar errores de video
 function showVideoError(message) {
@@ -942,33 +572,36 @@ function showVideoError(message) {
     
     console.error('Error en el reproductor:', message);
 }
-const contentId = <?php echo $contentId; ?>;
-const episodeId = <?php echo $episodeId ? $episodeId : 'null'; ?>;
-const duration = <?php echo $episode ? ($episode['duration'] * 60) : ($content['duration'] * 60); ?>;
-const videoUrlGlobal = <?php echo ($hasVideo && $videoUrl) ? json_encode($videoUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
-const torrentMagnet = <?php echo ($hasVideo && $torrentMagnet) ? json_encode($torrentMagnet, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
+var contentId = <?php echo $contentId; ?>;
+var episodeId = <?php echo $episodeId ? $episodeId : 'null'; ?>;
+var duration = <?php echo $episode ? ($episode['duration'] * 60) : ($content['duration'] * 60); ?>;
+var videoUrlGlobal = <?php echo ($hasVideo && $videoUrl) ? json_encode($videoUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
+var torrentMagnet = <?php echo ($hasVideo && $torrentMagnet) ? json_encode($torrentMagnet, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'null'; ?>;
 
-let player = null;
-let saveInterval;
-let hasStartedPlaying = false;
+var player = null;
+var saveInterval;
+var hasStartedPlaying = false;
 
-// Solo inicializar si hay video
 <?php if ($hasVideo): ?>
-// Esperar a que el reproductor esté disponible
-// Esta función ha sido reemplazada por el nuevo sistema de inicialización
-// en los archivos de configuración del reproductor
-        return;
-    }
-    
+// Inicializar el reproductor una vez que el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('unifiedVideoContainer');
-    if (!container || !videoUrl) {
-        console.error('Contenedor de video o URL no encontrados', { container, videoUrl });
+    const videoUrl = videoUrlGlobal;
+
+    if (!container) {
+        console.error('Contenedor de video no encontrado');
+        showVideoError('No se pudo encontrar el reproductor de video.');
         return;
     }
     
-    // Inicializar el reproductor unificado
+    if (!videoUrl && !torrentMagnet) {
+        console.warn('No hay URL de video ni torrent disponible');
+        showVideoError('Este contenido no tiene una fuente de video disponible. Por favor, contacta al administrador.');
+        return;
+    }
+
     const startTime = <?php echo ($savedProgress && $savedProgress['progress'] > 10) ? $savedProgress['progress'] : 0; ?>;
-    
+
     try {
         player = new UnifiedVideoPlayer('unifiedVideoContainer', {
             autoplay: false,
@@ -979,7 +612,7 @@ let hasStartedPlaying = false;
                     clearTimeout(saveInterval);
                     saveInterval = setTimeout(() => {
                         saveProgress(currentTime, totalDuration);
-                    }, 5000); // Guardar cada 5 segundos
+                    }, 5000);
                 }
             },
             onEnded: () => {
@@ -991,60 +624,102 @@ let hasStartedPlaying = false;
                 showVideoError(error);
             }
         });
-        
-        // Determinar qué cargar: torrent o video normal
+
         const urlToLoad = torrentMagnet || videoUrl;
-        
+
         if (!urlToLoad) {
-            throw new Error('No hay URL de video o enlace torrent disponible');
+            console.error('No hay URL de video ni torrent disponible');
+            showVideoError('Este contenido no tiene una fuente de video disponible. Por favor, contacta al administrador o intenta más tarde.');
+            return;
         }
+
+        console.log('Inicializando reproductor con URL:', urlToLoad);
+        console.log('Tipo de URL:', torrentMagnet ? 'torrent' : 'video');
         
-        // Cargar el video o torrent
-        player.loadVideo(urlToLoad).then(() => {
-            console.log('Video cargado correctamente');
-            
-            // Restaurar progreso guardado si existe
-            <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
-                const progressPercent = Math.round((startTime / duration) * 100);
-                if (progressPercent < 90) {
-                    // Esperar a que el video tenga metadata antes de hacer seek
-                    if (player.videoElement) {
-                        player.videoElement.addEventListener('loadedmetadata', function() {
-                            if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
-                                player.seek(startTime);
-                            }
-                        }, { once: true });
-                    } else {
-                        // Si no hay videoElement, intentar después de un delay
-                        setTimeout(() => {
-                            if (player && player.seek) {
-                                if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
-                                    player.seek(startTime);
-                                }
-                            }
-                        }, 1000);
+        // Si es un torrent, esperar a que WebTorrent se cargue
+        if (torrentMagnet) {
+            console.log('Esperando a que WebTorrent se cargue...');
+            // Esperar a que WebTorrent esté disponible
+            const checkWebTorrent = setInterval(() => {
+                if (typeof WebTorrent !== 'undefined') {
+                    clearInterval(checkWebTorrent);
+                    console.log('WebTorrent cargado, iniciando reproducción de torrent...');
+                    try {
+                        player.loadVideo(urlToLoad).then(() => {
+                            console.log('Torrent cargado correctamente');
+                        }).catch(error => {
+                            console.error('Error al cargar el torrent:', error);
+                            showVideoError('Error al cargar el torrent. Por favor, intenta más tarde.');
+                        });
+                    } catch (error) {
+                        console.error('Error al cargar el torrent:', error);
+                        showVideoError('Error al cargar el torrent. Por favor, intenta más tarde.');
                     }
                 }
-            <?php endif; ?>
+            }, 100);
             
-            // Incrementar contador de vistas cuando el video comience
+            // Timeout después de 10 segundos
+            setTimeout(() => {
+                clearInterval(checkWebTorrent);
+                if (typeof WebTorrent === 'undefined') {
+                    console.error('WebTorrent no se cargó a tiempo');
+                    showVideoError('El reproductor de torrents no pudo cargarse. Por favor, recarga la página.');
+                }
+            }, 10000);
+        } else {
+            // Video directo, cargar inmediatamente
+            console.log('Cargando video directo...');
+            try {
+                player.loadVideo(urlToLoad).then(() => {
+                    console.log('Video cargado correctamente');
+                }).catch(error => {
+                    console.error('Error al cargar el video:', error);
+                    showVideoError('Error al cargar el video. Por favor, intenta más tarde.');
+                });
+            } catch (error) {
+                console.error('Error al cargar el video:', error);
+                showVideoError('Error al cargar el video. Por favor, intenta más tarde.');
+                return;
+            }
+        }
+
+        <?php if ($savedProgress && $savedProgress['progress'] > 10): ?>
+        const progressPercent = Math.round((startTime / duration) * 100);
+        if (progressPercent < 90) {
             if (player.videoElement) {
-                player.videoElement.addEventListener('play', function() {
-                    if (!hasStartedPlaying) {
-                        hasStartedPlaying = true;
-                        incrementViews();
+                player.videoElement.addEventListener('loadedmetadata', function() {
+                    if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
+                        player.seek(startTime);
                     }
                 }, { once: true });
+            } else {
+                setTimeout(() => {
+                    if (player && player.seek) {
+                        if (confirm(`¿Continuar desde ${formatTime(startTime)}?`)) {
+                            player.seek(startTime);
+                        }
+                    }
+                }, 1000);
             }
-        }).catch(error => {
-            console.error('Error al cargar el video:', error);
-            showVideoError(error);
-        });
+        }
+        <?php endif; ?>
+
+        if (player.videoElement) {
+            player.videoElement.addEventListener('play', function() {
+                if (!hasStartedPlaying) {
+                    hasStartedPlaying = true;
+                    incrementViews();
+                }
+            }, { once: true });
+        }
     } catch (error) {
         console.error('Error al inicializar el reproductor:', error);
         showVideoError(error);
     }
-}
+});
+<?php else: ?>
+console.warn('Este contenido no tiene video ni torrent configurado para reproducir.');
+<?php endif; ?>
 
 function showVideoError(error) {
     const container = document.getElementById('unifiedVideoContainer');
@@ -1065,14 +740,6 @@ function showVideoError(error) {
             </div>
         `;
     }
-}
-
-// Inicializar cuando el DOM esté listo
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initVideoPlayer);
-} else {
-    // DOM ya está listo
-    initVideoPlayer();
 }
 
 function saveProgress(currentTime, duration, completed = false) {
@@ -1122,10 +789,13 @@ function playEpisode(epId) {
 }
 
 function retryVideo() {
-    if (player && videoUrl) {
-        player.loadVideo(videoUrl).catch(error => {
+    const urlToLoad = torrentMagnet || videoUrlGlobal;
+    if (player && urlToLoad) {
+        player.loadVideo(urlToLoad).catch(error => {
             console.error('Error al reintentar:', error);
         });
+    } else {
+        window.location.reload();
     }
 }
 
@@ -1154,7 +824,6 @@ function playTrailer() {
             saveProgress(player.currentTime, player.duration);
         }
     });
-<?php endif; ?>
 </script>
 
 <?php

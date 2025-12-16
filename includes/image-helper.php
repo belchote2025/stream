@@ -27,6 +27,11 @@ function buildAbsoluteUrl($path) {
 }
 
 function getImageUrl($url, $default = '/assets/img/default-poster.svg') {
+    // Normalizar urls legacy inexistentes
+    if (preg_match('/default-(movie|tv)-poster\.jpg$/i', trim((string)$url))) {
+        $url = '/assets/img/default-poster.svg';
+    }
+
     if (empty($url) || $url === 'null' || $url === 'NULL') {
         return buildAbsoluteUrl($default);
     }

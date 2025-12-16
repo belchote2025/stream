@@ -787,9 +787,18 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log('[playContent] URL de reproducción:', playbackUrl);
             
             if (!playbackUrl) {
-                console.warn('[playContent] No hay URL de reproducción, redirigiendo a watch.php');
-                showVideoLoading('Abriendo reproductor avanzado...');
-                redirectToWatch(contentId);
+                // Si hay torrent_magnet, redirigir a watch.php donde se maneja WebTorrent
+                if (contentData.torrent_magnet && contentData.torrent_magnet.trim() !== '') {
+                    console.log('[playContent] Torrent detectado, redirigiendo a watch.php para usar WebTorrent');
+                    showVideoLoading('Abriendo reproductor avanzado...');
+                    redirectToWatch(contentId);
+                    return;
+                }
+                
+                // Si no hay ninguna fuente de video, mostrar error
+                console.warn('[playContent] No hay URL de reproducción disponible');
+                hideVideoLoading();
+                alert('Este contenido no tiene una fuente de video disponible.\n\nPor favor, contacta al administrador o intenta más tarde.');
                 return;
             }
 
@@ -995,10 +1004,46 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function resolvePlaybackUrl(content) {
-        if (content.video_url) return content.video_url;
-        if (content.preview_url) return content.preview_url;
-        if (content.trailer_url && isDirectVideo(content.trailer_url)) return content.trailer_url;
+        // Prioridad 1: Video URL directo (local o streaming)
+        if (content.video_url && content.video_url.trim() !== '') {
+            return content.video_url;
+        }
+        
+        // Prioridad 2: Preview URL
+        if (content.preview_url && content.preview_url.trim() !== '') {
+            return content.preview_url;
+        }
+        
+        // Prioridad 3: Trailer URL (video directo o YouTube)
+        if (content.trailer_url && content.trailer_url.trim() !== '') {
+            // Si es un video directo, usarlo
+            if (isDirectVideo(content.trailer_url)) {
+                return content.trailer_url;
+            }
+            // Si es YouTube, también se puede usar (el reproductor lo manejará)
+            if (isYouTubeUrl(content.trailer_url)) {
+                return content.trailer_url;
+            }
+        }
+        
+        // Prioridad 4: Torrent magnet (se manejará en watch.php)
+        if (content.torrent_magnet && content.torrent_magnet.trim() !== '') {
+            // Retornar null para que se redirija a watch.php donde se maneja WebTorrent
+            return null;
+        }
+        
         return null;
+    }
+    
+    function isYouTubeUrl(url) {
+        if (!url) return false;
+        const ytPatterns = [
+            /youtube\.com\/watch\?v=/i,
+            /youtube\.com\/embed\//i,
+            /youtu\.be\//i,
+            /^[\w-]{11}$/ // Solo ID de YouTube
+        ];
+        return ytPatterns.some(pattern => pattern.test(url));
     }
 
     function normalizeVideoUrl(url) {

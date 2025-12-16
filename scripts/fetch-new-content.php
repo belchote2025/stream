@@ -258,6 +258,15 @@ function traktGetTrending(string $type, string $clientId, int $limit = 30): arra
         foreach ($data as $item) {
             $show = $item[$endpoint === 'shows' ? 'show' : 'movie'] ?? null;
             if ($show) {
+                // Trakt.tv no devuelve URLs de imágenes directamente, solo IDs
+                // Necesitamos obtener las imágenes de TMDB usando el ID de TMDB
+                $tmdbId = $show['ids']['tmdb'] ?? null;
+                $posterUrl = '';
+                $backdropUrl = '';
+                
+                // Si tenemos ID de TMDB, construir URLs (aunque Trakt no devuelve poster_path directamente)
+                // Usaremos el título para buscar en IMDb como fallback
+                
                 $results[] = [
                     'id' => $show['ids']['trakt'] ?? $show['ids']['tmdb'] ?? null,
                     'name' => $show['title'] ?? '',
@@ -267,9 +276,11 @@ function traktGetTrending(string $type, string $clientId, int $limit = 30): arra
                     'rating' => ['average' => $show['rating'] ?? 0],
                     'genres' => $show['genres'] ?? [],
                     'image' => [
-                        'medium' => $show['poster'] ?? '',
-                        'original' => $show['poster'] ?? ''
+                        'medium' => $posterUrl,
+                        'original' => $posterUrl
                     ],
+                    'backdrop' => $backdropUrl,
+                    'tmdb_id' => $tmdbId, // Guardar ID de TMDB para uso posterior
                     'trakt_data' => $show // Guardar datos completos de Trakt
                 ];
             }

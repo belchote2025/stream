@@ -53,15 +53,8 @@
     background-attachment: fixed; /* Efecto parallax en desktop */
 }
 
-/* Lazy loading mejorado */
-.hero-slide:not(.active) .hero-backdrop {
-    background-image: none !important;
-}
-
-.hero-slide.active .hero-backdrop,
-.hero-slide.next .hero-backdrop {
-    background-image: var(--hero-bg-image);
-}
+/* Lazy loading mejorado (desactivado para usar los backdrops generados por PHP)
+   Dejamos que cada slide use su propio background-image inline. */
 
 /* Mejora de gradiente para mejor legibilidad */
 .hero-backdrop::after {

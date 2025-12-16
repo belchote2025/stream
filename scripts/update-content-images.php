@@ -60,6 +60,10 @@ foreach ($contents as $content) {
     // Esto se hace llamando a la función directamente sin límites
     $newPoster = $needsPoster ? getPosterImage($title, $type, $year) : $currentPoster;
     $newBackdrop = $needsBackdrop ? getBackdropImage($title, $type, $year) : $currentBackdrop;
+
+    // Normalizar errores comunes de doble extensión
+    $newPoster = preg_replace('/\.jpgjpg$/i', '.jpg', $newPoster);
+    $newBackdrop = preg_replace('/\.jpgjpg$/i', '.jpg', $newBackdrop);
     
     // Si getImdbImage devolvió vacío, intentar obtener de TVMaze/Trakt directamente
     if ($needsPoster && (empty($newPoster) || strpos($newPoster, 'default-') !== false)) {

@@ -18,16 +18,33 @@ if (empty($url)) {
 }
 
 // Validar que la URL sea de un dominio permitido
+// Añadimos dominios de IMDb/Amazon, TVMaze e iTunes (mzstatic)
 $allowedDomains = [
     'image.tmdb.org',
     'via.placeholder.com',
-    'images.unsplash.com'
+    'images.unsplash.com',
+    'm.media-amazon.com',
+    'ia.media-imdb.com',
+    'static.tvmaze.com',
+    'tvmaze.com',
+    'mzstatic.com'
 ];
 
 $parsedUrl = parse_url($url);
 $domain = $parsedUrl['host'] ?? '';
 
-if (!in_array($domain, $allowedDomains)) {
+// Permitir subdominios de tvmaze.com y mzstatic.com
+$isAllowedSubdomain = false;
+if ($domain) {
+    foreach (['tvmaze.com', 'mzstatic.com'] as $allowedRoot) {
+        if ($domain === $allowedRoot || str_ends_with($domain, '.' . $allowedRoot)) {
+            $isAllowedSubdomain = true;
+            break;
+        }
+    }
+}
+
+if (!in_array($domain, $allowedDomains) && !$isAllowedSubdomain) {
     http_response_code(403);
     header('Content-Type: image/svg+xml');
     readfile(__DIR__ . '/../assets/img/default-poster.svg');

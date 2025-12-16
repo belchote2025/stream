@@ -128,12 +128,19 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.3) 0%,
+        rgba(0, 0, 0, 0.5) 50%,
+        rgba(0, 0, 0, 0.7) 100%
+    );
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0.75rem;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.3s ease, background 0.3s ease;
+    backdrop-filter: blur(2px);
 }
 
 .content-item:hover .content-overlay {
@@ -142,36 +149,72 @@
 
 .btn-play,
 .btn-info {
-    background: rgba(30, 30, 30, 0.9);
     border: none;
     color: white;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 5px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    font-size: 16px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-play::before,
+.btn-info::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.4s ease, height 0.4s ease;
+}
+
+.btn-play:hover::before,
+.btn-info:hover::before {
+    width: 100%;
+    height: 100%;
 }
 
 .btn-play {
     background: #e50914;
+    border: 2px solid rgba(255, 255, 255, 0.1);
 }
 
 .btn-play:hover {
-    background: #ff0a16;
-    transform: scale(1.1);
+    background: #f40612;
+    transform: scale(1.15);
+    box-shadow: 0 6px 20px rgba(229, 9, 20, 0.5);
+}
+
+.btn-play:active {
+    transform: scale(1.05);
 }
 
 .btn-info {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(42, 42, 42, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
 }
 
 .btn-info:hover {
-    background: rgba(255, 255, 255, 0.4);
-    transform: scale(1.1);
+    background: rgba(109, 109, 110, 0.8);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.15);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+}
+
+.btn-info:active {
+    transform: scale(1.05);
 }
 
 .content-details {

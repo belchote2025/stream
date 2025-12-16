@@ -271,6 +271,17 @@ function setupEventListeners() {
     if (contentForm) {
         contentForm.addEventListener('submit', handleContentSubmit);
 
+        // Opciones mutuamente excluyentes para póster y backdrop
+        setupMutuallyExclusiveOptions('poster_source', {
+            'url': { input: 'poster_url', otherInput: 'poster_file', otherOption: 'poster_source_file' },
+            'file': { input: 'poster_file', otherInput: 'poster_url', otherOption: 'poster_source_url' }
+        });
+
+        setupMutuallyExclusiveOptions('backdrop_source', {
+            'url': { input: 'backdrop_url', otherInput: 'backdrop_file', otherOption: 'backdrop_source_file' },
+            'file': { input: 'backdrop_file', otherInput: 'backdrop_url', otherOption: 'backdrop_source_url' }
+        });
+
         // Manejo de opciones mutuamente excluyentes para video
         setupMutuallyExclusiveOptions('video_source', {
             'url': {
@@ -317,6 +328,26 @@ function setupEventListeners() {
             videoFileInput.addEventListener('change', function (e) {
                 if (e.target.files && e.target.files[0]) {
                     validateFileInput(e.target, 'video_file_info', 2147483648); // 2GB
+                }
+            });
+        }
+
+        // Validación de archivos de póster
+        const posterFileInput = document.getElementById('poster_file');
+        if (posterFileInput) {
+            posterFileInput.addEventListener('change', function (e) {
+                if (e.target.files && e.target.files[0]) {
+                    validateImageInput(e.target, 'poster_file_info', 5242880); // 5MB
+                }
+            });
+        }
+
+        // Validación de archivos de backdrop
+        const backdropFileInput = document.getElementById('backdrop_file');
+        if (backdropFileInput) {
+            backdropFileInput.addEventListener('change', function (e) {
+                if (e.target.files && e.target.files[0]) {
+                    validateImageInput(e.target, 'backdrop_file_info', 6291456); // 6MB
                 }
             });
         }
@@ -3368,6 +3399,62 @@ async function handleContentSubmit(e) {
             }
         }
 
+        // Procesar póster
+        const posterSource = formData.get('poster_source') || 'url';
+        let posterUrl = '';
+        if (posterSource === 'file') {
+            const posterFileInput = document.getElementById('poster_file');
+            if (!posterFileInput || !posterFileInput.files || !posterFileInput.files[0]) {
+                throw new Error('Selecciona un archivo de póster');
+            }
+            if (!validateImageInput(posterFileInput, 'poster_file_info', 5242880)) {
+                throw new Error('El póster no es válido');
+            }
+            showNotification('Subiendo póster...', 'info');
+            const uploadData = new FormData();
+            uploadData.append('file', posterFileInput.files[0]);
+            const posterResp = await fetch(`${baseUrl}/api/upload/image.php`, {
+                method: 'POST',
+                body: uploadData,
+                credentials: 'same-origin'
+            });
+            const posterJson = await posterResp.json();
+            if (!posterJson.success || !posterJson.data?.url) {
+                throw new Error(posterJson.error || 'Error al subir el póster');
+            }
+            posterUrl = posterJson.data.url;
+        } else {
+            posterUrl = (formData.get('poster_url') || '').trim();
+        }
+
+        // Procesar backdrop
+        const backdropSource = formData.get('backdrop_source') || 'url';
+        let backdropUrl = '';
+        if (backdropSource === 'file') {
+            const backdropFileInput = document.getElementById('backdrop_file');
+            if (!backdropFileInput || !backdropFileInput.files || !backdropFileInput.files[0]) {
+                throw new Error('Selecciona un archivo de backdrop');
+            }
+            if (!validateImageInput(backdropFileInput, 'backdrop_file_info', 6291456)) {
+                throw new Error('El backdrop no es válido');
+            }
+            showNotification('Subiendo backdrop...', 'info');
+            const uploadData = new FormData();
+            uploadData.append('file', backdropFileInput.files[0]);
+            const bdResp = await fetch(`${baseUrl}/api/upload/image.php`, {
+                method: 'POST',
+                body: uploadData,
+                credentials: 'same-origin'
+            });
+            const bdJson = await bdResp.json();
+            if (!bdJson.success || !bdJson.data?.url) {
+                throw new Error(bdJson.error || 'Error al subir el backdrop');
+            }
+            backdropUrl = bdJson.data.url;
+        } else {
+            backdropUrl = (formData.get('backdrop_url') || '').trim();
+        }
+
         // Determinar qué fuente de video usar (URL o archivo)
         let videoUrl = '';
 
@@ -3466,8 +3553,8 @@ async function handleContentSubmit(e) {
             release_year: parseInt(data.release_year),
             duration: parseInt(data.duration),
             type: contentType,
-            poster_url: data.poster_url || '',
-            backdrop_url: data.backdrop_url || '',
+            poster_url: posterUrl,
+            backdrop_url: backdropUrl,
             video_url: videoUrl,
             trailer_url: trailerUrl,
             torrent_magnet: data.torrent_magnet || null,
@@ -3770,6 +3857,55 @@ function validateFileInput(input, infoId, maxSize) {
 
     return true;
 }
+
+// Validar archivo de imagen (póster / backdrop)
+function validateImageInput(input, infoId, maxSize) {
+    const file = input.files[0];
+    const infoDiv = document.getElementById(infoId);
+
+    if (!file) {
+        if (infoDiv) infoDiv.style.display = 'none';
+        return true;
+    }
+
+    if (file.size > maxSize) {
+        const maxSizeMB = Math.round(maxSize / (1024 * 1024));
+        showNotification(`La imagen es demasiado grande. Máximo: ${maxSizeMB}MB`, 'error');
+        input.value = '';
+        if (infoDiv) infoDiv.style.display = 'none';
+        return false;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const allowedExt = ['jpg', 'jpeg', 'png', 'webp'];
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    if (!allowedTypes.includes(file.type) && !allowedExt.includes(ext)) {
+        showNotification('Formato no permitido. Usa JPG, PNG o WEBP.', 'error');
+        input.value = '';
+        if (infoDiv) infoDiv.style.display = 'none';
+        return false;
+    }
+
+    if (infoDiv) {
+        const fileName = infoDiv.querySelector('.file-name');
+        const fileSize = infoDiv.querySelector('.file-size');
+        if (fileName) fileName.textContent = `Archivo: ${file.name}`;
+        if (fileSize) fileSize.textContent = `Tamaño: ${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+        infoDiv.style.display = 'block';
+    }
+
+    return true;
+}
+
+// Limpiar archivo de imagen
+window.clearImageFile = function (inputId) {
+    const input = document.getElementById(inputId);
+    const infoId = inputId === 'poster_file' ? 'poster_file_info' : 'backdrop_file_info';
+    const infoDiv = document.getElementById(infoId);
+    if (input) input.value = '';
+    if (infoDiv) infoDiv.style.display = 'none';
+};
 
 // Configurar opciones mutuamente excluyentes
 function setupMutuallyExclusiveOptions(radioGroupName, options) {

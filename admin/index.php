@@ -355,18 +355,16 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                         <input type="hidden" id="content-id" name="id" value="">
                         <input type="hidden" id="content-type" name="type" value="movie">
                         
-                        <div class="form-group">
-                            <label for="title">Título *</label>
-                            <input type="text" id="title" name="title" required>
-                        </div>
-                        
                         <div class="form-row">
-                            <div class="form-group">
+                            <div class="form-group" style="flex: 2;">
+                                <label for="title">Título *</label>
+                                <input type="text" id="title" name="title" required>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
                                 <label for="release_year">Año *</label>
                                 <input type="number" id="release_year" name="release_year" min="1900" max="<?php echo date('Y') + 5; ?>" required>
                             </div>
-                            
-                            <div class="form-group">
+                            <div class="form-group" style="flex: 1;">
                                 <label for="duration">Duración (min) *</label>
                                 <input type="number" id="duration" name="duration" min="1" required>
                             </div>
@@ -376,16 +374,65 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                             <label for="description">Descripción *</label>
                             <textarea id="description" name="description" rows="4" required></textarea>
                         </div>
-                        
+
+                        <!-- Imágenes (estilo Netflix) -->
                         <div class="form-row">
-                            <div class="form-group">
-                                <label for="poster_url">URL del Póster</label>
-                                <input type="url" id="poster_url" name="poster_url" placeholder="https://...">
+                            <div class="form-group" style="flex:1; min-width:260px;">
+                                <label style="font-weight: 600; margin-bottom: 0.5rem; display:block; color:#fff;">
+                                    <i class="fas fa-image"></i> Póster
+                                </label>
+                                <div class="poster-option-card" style="padding: 0.75rem; border-radius: 10px; background: linear-gradient(135deg,#181818,#111); border: 1px solid rgba(255,255,255,0.08); margin-bottom:0.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
+                                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                                        <input type="radio" id="poster_source_url" name="poster_source" value="url" checked style="margin-right:0.5rem;">
+                                        <label for="poster_source_url" style="margin:0; cursor:pointer; font-weight:600; flex:1; color:#e5e5e5;">Usar URL</label>
+                                    </div>
+                                    <input type="url" id="poster_url" name="poster_url" placeholder="https://..." style="width:100%; padding:0.6rem 0.75rem; border:1px solid rgba(255,255,255,0.12); border-radius:6px; background:#141414; color:#fff;">
+                                </div>
+                                <div class="poster-option-card" style="padding: 0.75rem; border-radius: 10px; background: linear-gradient(135deg,#181818,#111); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
+                                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                                        <input type="radio" id="poster_source_file" name="poster_source" value="file" style="margin-right:0.5rem;">
+                                        <label for="poster_source_file" style="margin:0; cursor:pointer; font-weight:600; flex:1; color:#e5e5e5;">Subir póster local</label>
+                                    </div>
+                                    <input type="file" id="poster_file" name="poster_file" accept="image/*" data-max-size="5242880" style="width:100%; padding:0.5rem; border:1px solid rgba(255,255,255,0.12); border-radius:6px; background:#141414; color:#e5e5e5;" disabled>
+                                    <small class="form-text" style="display:block; margin-top:0.35rem; color:#999;">JPG, PNG, WEBP (máx. 5MB)</small>
+                                    <div id="poster_file_info" class="file-info" style="display:none; margin-top:0.5rem; padding:0.6rem; background: rgba(0,0,0,0.35); border-left:3px solid #28a745; border-radius:4px;">
+                                        <div style="display:flex; align-items:center; gap:0.4rem;">
+                                            <i class="fas fa-check-circle" style="color:#28a745;"></i>
+                                            <div class="file-name" style="font-weight:600; flex:1;"></div>
+                                            <div class="file-size" style="font-size:0.85rem; color:#666;"></div>
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="clearImageFile('poster_file')" style="padding:0.25rem 0.5rem;"><i class="fas fa-times"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="backdrop_url">URL del Backdrop</label>
-                                <input type="url" id="backdrop_url" name="backdrop_url" placeholder="https://...">
+
+                            <div class="form-group" style="flex:1; min-width:260px;">
+                                <label style="font-weight: 600; margin-bottom: 0.5rem; display:block; color:#fff;">
+                                    <i class="fas fa-images"></i> Backdrop
+                                </label>
+                                <div class="backdrop-option-card" style="padding: 0.75rem; border-radius: 10px; background: linear-gradient(135deg,#181818,#111); border: 1px solid rgba(255,255,255,0.08); margin-bottom:0.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
+                                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                                        <input type="radio" id="backdrop_source_url" name="backdrop_source" value="url" checked style="margin-right:0.5rem;">
+                                        <label for="backdrop_source_url" style="margin:0; cursor:pointer; font-weight:600; flex:1; color:#e5e5e5;">Usar URL</label>
+                                    </div>
+                                    <input type="url" id="backdrop_url" name="backdrop_url" placeholder="https://..." style="width:100%; padding:0.6rem 0.75rem; border:1px solid rgba(255,255,255,0.12); border-radius:6px; background:#141414; color:#fff;">
+                                </div>
+                                <div class="backdrop-option-card" style="padding: 0.75rem; border-radius: 10px; background: linear-gradient(135deg,#181818,#111); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
+                                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                                        <input type="radio" id="backdrop_source_file" name="backdrop_source" value="file" style="margin-right:0.5rem;">
+                                        <label for="backdrop_source_file" style="margin:0; cursor:pointer; font-weight:600; flex:1; color:#e5e5e5;">Subir backdrop local</label>
+                                    </div>
+                                    <input type="file" id="backdrop_file" name="backdrop_file" accept="image/*" data-max-size="6291456" style="width:100%; padding:0.5rem; border:1px solid rgba(255,255,255,0.12); border-radius:6px; background:#141414; color:#e5e5e5;" disabled>
+                                    <small class="form-text" style="display:block; margin-top:0.35rem; color:#999;">JPG, PNG, WEBP (máx. 6MB)</small>
+                                    <div id="backdrop_file_info" class="file-info" style="display:none; margin-top:0.5rem; padding:0.6rem; background: rgba(0,0,0,0.35); border-left:3px solid #28a745; border-radius:4px;">
+                                        <div style="display:flex; align-items:center; gap:0.4rem;">
+                                            <i class="fas fa-check-circle" style="color:#28a745;"></i>
+                                            <div class="file-name" style="font-weight:600; flex:1;"></div>
+                                            <div class="file-size" style="font-size:0.85rem; color:#666;"></div>
+                                            <button type="button" class="btn btn-sm btn-danger" onclick="clearImageFile('backdrop_file')" style="padding:0.25rem 0.5rem;"><i class="fas fa-times"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         

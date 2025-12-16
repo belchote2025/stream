@@ -1,0 +1,470 @@
+/* ============================================
+   PWA STYLES - INSTALACIÓN Y OFFLINE
+   ============================================ */
+
+/* Botón de instalación en navbar */
+.pwa-install-button {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    background: linear-gradient(135deg, var(--netflix-red) 0%, #c40812 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(229, 9, 20, 0.3);
+    margin-right: 1rem;
+}
+
+.pwa-install-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(229, 9, 20, 0.5);
+    background: linear-gradient(135deg, #f40612 0%, var(--netflix-red) 100%);
+}
+
+.pwa-install-button:active {
+    transform: translateY(0);
+}
+
+.pwa-install-button i {
+    font-size: 1.1em;
+}
+
+/* Botón de notificaciones */
+.notification-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-right: 1rem;
+    position: relative;
+}
+
+.notification-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.notification-toggle.active {
+    background: var(--netflix-red);
+    border-color: var(--netflix-red);
+}
+
+.notification-toggle.active::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    background: #28a745;
+    border-radius: 50%;
+    border: 2px solid white;
+    animation: pulse-notification 2s ease-in-out infinite;
+}
+
+@keyframes pulse-notification {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.7;
+        transform: scale(1.2);
+    }
+}
+
+
+/* Banner de instalación */
+.pwa-install-banner {
+    position: fixed;
+    bottom: -200px;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    border-top: 3px solid var(--netflix-red);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+}
+
+.pwa-install-banner.show {
+    bottom: 0;
+}
+
+.pwa-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem 4%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.pwa-banner-icon {
+    flex-shrink: 0;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--netflix-red) 0%, #ff1a1a 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(229, 9, 20, 0.4);
+}
+
+.pwa-banner-icon i {
+    font-size: 1.8rem;
+    color: white;
+}
+
+.pwa-banner-text {
+    flex: 1;
+    color: white;
+}
+
+.pwa-banner-text strong {
+    display: block;
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+    font-weight: 700;
+}
+
+.pwa-banner-text p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.pwa-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.pwa-banner-install {
+    padding: 0.75rem 1.5rem;
+    background: var(--netflix-red);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(229, 9, 20, 0.3);
+}
+
+.pwa-banner-install:hover {
+    background: #f40612;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(229, 9, 20, 0.5);
+}
+
+.pwa-banner-close {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pwa-banner-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+/* Notificación de actualización */
+.pwa-update-notification {
+    position: fixed;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    border: 2px solid var(--netflix-red);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    transition: top 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+}
+
+.pwa-update-notification.show {
+    top: 100px;
+}
+
+.pwa-update-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    color: white;
+}
+
+.pwa-update-content i {
+    font-size: 1.5rem;
+    color: var(--netflix-red);
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.pwa-update-content span {
+    font-weight: 600;
+}
+
+.pwa-update-content button {
+    padding: 0.6rem 1.2rem;
+    background: var(--netflix-red);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.pwa-update-content button:hover {
+    background: #f40612;
+    transform: scale(1.05);
+}
+
+/* Indicador de estado de conexión */
+#connection-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 0.75rem 1.25rem;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    z-index: 9998;
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+#connection-status.online {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    display: flex;
+}
+
+#connection-status.offline {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    display: flex;
+    animation: pulse-offline 2s ease-in-out infinite;
+}
+
+@keyframes pulse-offline {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+
+#connection-status::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* Modo standalone (app instalada) */
+@media (display-mode: standalone) {
+
+    /* Ocultar elementos específicos del navegador */
+    .browser-only {
+        display: none !important;
+    }
+
+    /* Ajustar navbar para modo app */
+    .navbar {
+        padding-top: env(safe-area-inset-top);
+    }
+
+    /* Ajustar contenido para safe areas */
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+}
+
+/* Responsive para móvil */
+@media (max-width: 768px) {
+    .pwa-banner-content {
+        flex-direction: column;
+        text-align: center;
+        padding: 1.25rem;
+    }
+
+    .pwa-banner-icon {
+        width: 50px;
+        height: 50px;
+    }
+
+    .pwa-banner-icon i {
+        font-size: 1.5rem;
+    }
+
+    .pwa-banner-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .pwa-banner-install {
+        width: 100%;
+    }
+
+    .pwa-install-button span {
+        display: none;
+    }
+
+    .pwa-install-button {
+        padding: 0.6rem;
+        min-width: 44px;
+        justify-content: center;
+    }
+}
+
+/* Animación de carga offline */
+.offline-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 2rem;
+    text-align: center;
+}
+
+.offline-content i {
+    font-size: 4rem;
+    color: var(--netflix-gray);
+    margin-bottom: 1.5rem;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.offline-content h2 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    color: white;
+}
+
+.offline-content p {
+    font-size: 1.1rem;
+    color: var(--netflix-gray);
+    max-width: 500px;
+    margin-bottom: 2rem;
+}
+
+.offline-content button {
+    padding: 0.875rem 2rem;
+    background: var(--netflix-red);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.offline-content button:hover {
+    background: #f40612;
+    transform: scale(1.05);
+}
+
+/* Badge de "Instalada" */
+.pwa-installed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.pwa-installed-badge i {
+    font-size: 0.9em;
+}
+
+/* Skeleton loading para contenido offline */
+.skeleton {
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.03) 0%,
+            rgba(255, 255, 255, 0.08) 50%,
+            rgba(255, 255, 255, 0.03) 100%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}

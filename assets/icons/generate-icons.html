@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Iconos UrresTV</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #141414;
+            color: white;
+        }
+
+        h1 {
+            color: #E50914;
+        }
+
+        .icon-preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .icon-item {
+            text-align: center;
+            padding: 20px;
+            background: #1f1f1f;
+            border-radius: 10px;
+        }
+
+        canvas {
+            border: 2px solid #333;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        button {
+            background: #E50914;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #f40612;
+        }
+
+        .instructions {
+            background: #1f1f1f;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎬 Generador de Iconos UrresTV</h1>
+
+    <div class="instructions">
+        <h3>Instrucciones:</h3>
+        <ol>
+            <li>Los iconos se generarán automáticamente al cargar la página</li>
+            <li>Haz clic en "Descargar" debajo de cada icono</li>
+            <li>Guarda cada icono con el nombre indicado en <code>assets/icons/</code></li>
+        </ol>
+    </div>
+
+    <div class="icon-preview" id="iconPreview"></div>
+
+    <script>
+        const sizes = [16, 32, 72, 96, 128, 144, 152, 192, 384, 512];
+        const iconPreview = document.getElementById('iconPreview');
+
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            canvas.width = size;
+            canvas.height = size;
+
+            // Fondo oscuro con bordes redondeados
+            ctx.fillStyle = '#141414';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, size * 0.15);
+            ctx.fill();
+
+            // Círculo rojo para el play button
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = size * 0.28;
+
+            ctx.fillStyle = '#E50914';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Triángulo de play (blanco)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            const triangleSize = radius * 0.6;
+            ctx.moveTo(centerX - triangleSize * 0.4, centerY - triangleSize * 0.7);
+            ctx.lineTo(centerX - triangleSize * 0.4, centerY + triangleSize * 0.7);
+            ctx.lineTo(centerX + triangleSize * 0.8, centerY);
+            ctx.closePath();
+            ctx.fill();
+
+            // Texto "UrresTV" (solo en iconos grandes)
+            if (size >= 128) {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = `bold ${size * 0.09}px Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('UrresTV', centerX, size * 0.82);
+            }
+        }
+
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // Generar todos los iconos
+        sizes.forEach(size => {
+            const item = document.createElement('div');
+            item.className = 'icon-item';
+
+            const title = document.createElement('h4');
+            title.textContent = `${size}x${size}`;
+            item.appendChild(title);
+
+            const canvas = document.createElement('canvas');
+            drawIcon(canvas, size);
+            item.appendChild(canvas);
+
+            const filename = document.createElement('div');
+            filename.style.fontSize = '12px';
+            filename.style.color = '#999';
+            filename.style.marginTop = '10px';
+            filename.textContent = `icon-${size}x${size}.png`;
+            item.appendChild(filename);
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = 'Descargar';
+            downloadBtn.onclick = () => downloadCanvas(canvas, `icon-${size}x${size}.png`);
+            item.appendChild(downloadBtn);
+
+            iconPreview.appendChild(item);
+        });
+
+        // Botón para descargar todos
+        const downloadAllBtn = document.createElement('button');
+        downloadAllBtn.textContent = '📥 Descargar Todos los Iconos';
+        downloadAllBtn.style.fontSize = '16px';
+        downloadAllBtn.style.padding = '15px 30px';
+        downloadAllBtn.style.display = 'block';
+        downloadAllBtn.style.margin = '30px auto';
+        downloadAllBtn.onclick = () => {
+            const canvases = document.querySelectorAll('canvas');
+            canvases.forEach((canvas, index) => {
+                setTimeout(() => {
+                    downloadCanvas(canvas, `icon-${sizes[index]}x${sizes[index]}.png`);
+                }, index * 200);
+            });
+        };
+        document.body.appendChild(downloadAllBtn);
+
+        console.log('✅ Generador de iconos UrresTV cargado');
+    </script>
+</body>
+
+</html>

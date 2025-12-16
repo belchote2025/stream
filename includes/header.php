@@ -3,8 +3,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' . SITE_NAME : SITE_NAME; ?></title>
+    
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="<?php echo $baseUrl; ?>/manifest.json">
+    <meta name="theme-color" content="#E50914">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="<?php echo SITE_NAME; ?>">
+    
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="<?php echo $baseUrl; ?>/assets/icons/icon.svg">
+    <link rel="apple-touch-icon" href="<?php echo $baseUrl; ?>/assets/icons/icon.svg">
+    
+    <!-- Microsoft Tiles -->
+    <meta name="msapplication-TileColor" content="#E50914">
+    <meta name="msapplication-TileImage" content="<?php echo $baseUrl; ?>/assets/icons/icon.svg">
+    <meta name="msapplication-config" content="<?php echo $baseUrl; ?>/browserconfig.xml">
     
     <!-- Estilos del carrusel -->
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/assets/css/carousel.css">
@@ -373,6 +390,7 @@
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/hero-trailer.css">
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/font-awesome-fallback.css">
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/fix-visibility.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/pwa-styles.css">
     
     <script>
         // Marcar que los estilos están cargados - versión simplificada

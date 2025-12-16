@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Fondo oscuro -->
+  <rect width="192" height="192" fill="#141414" rx="30"/>
+  
+  <!-- Círculo rojo -->
+  <circle cx="96" cy="96" r="52" fill="#E50914"/>
+  
+  <!-- Play button -->
+  <path d="M 82 70 L 82 122 L 128 96 Z" fill="#FFFFFF"/>
+  
+  <!-- Texto UV -->
+  <text x="96" y="160" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF" text-anchor="middle">UrresTV</text>
+</svg>

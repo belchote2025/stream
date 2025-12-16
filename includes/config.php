@@ -44,7 +44,7 @@ if (file_exists($envFile) && is_readable($envFile)) {
 
 $httpHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $isCli = php_sapi_name() === 'cli';
-$isLocalHost = in_array($httpHost, ['localhost', '127.0.0.1'], true) || strpos($httpHost, '.local') !== false;
+$isLocalHost = in_array($httpHost, ['localhost', '127.0.0.1'], true) || strpos($httpHost, '.local') !== false || strpos($httpHost, 'ngrok') !== false;
 $appEnv = getenv('APP_ENV') ?: (($isCli || $isLocalHost) ? 'local' : 'production');
 $appEnv = strtolower($appEnv) === 'local' ? 'local' : 'production';
 define('APP_ENV', $appEnv);
@@ -97,7 +97,8 @@ if (!defined('SITE_URL')) {
         if ($host) {
             $usesHttps = (
                 (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-                (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443)
+                (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) ||
+                (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
             );
             $scheme = $usesHttps ? 'https' : 'http';
             

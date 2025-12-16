@@ -413,5 +413,14 @@
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     </script>
+    
+    <!-- PWA Installer -->
+    <script src="<?php echo $baseUrl; ?>/js/pwa-installer.js"></script>
+    
+    <!-- Push Notifications (opcional) -->
+    <script src="<?php echo $baseUrl; ?>/js/push-notifications.js"></script>
+    
+    <!-- Connection Status Indicator -->
+    <div id="connection-status"></div>
 </body>
 </html>

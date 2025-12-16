@@ -494,6 +494,12 @@ include __DIR__ . '/includes/header.php';
                         </button>
                     </div>
                 </div>
+                <div id="videoEpisodeSelector" class="video-episode-selector" style="display:none;">
+                    <label for="videoEpisodeSelect" class="form-label text-muted mb-1">Episodios</label>
+                    <select id="videoEpisodeSelect" class="form-select form-select-sm bg-dark text-light border-secondary">
+                        <!-- Opciones generadas dinámicamente -->
+                    </select>
+                </div>
                 <div class="video-player-wrapper">
                     <div class="video-player-loading" id="videoPlayerLoading">
                         <div class="spinner-border text-light" role="status">
@@ -547,6 +553,13 @@ include __DIR__ . '/includes/header.php';
     .video-player-description {
         font-size: 0.95rem;
         line-height: 1.5;
+    }
+    .video-episode-selector {
+        margin-top: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+    .video-episode-selector .form-select {
+        max-width: 260px;
     }
     .video-player-loading {
         position: absolute;

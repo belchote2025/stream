@@ -5207,16 +5207,107 @@ async function handleSearchTorrent(event, presetQuery = null) {
     resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem;"><i class="fas fa-spinner fa-spin"></i> Buscando torrents...</p>';
 
     try {
-        const url = `/api/torrent/search.php?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`;
+        // Función auxiliar para obtener baseUrl
+        function getBaseUrl() {
+            // Primero intentar desde window.__APP_BASE_URL
+            if (typeof window !== 'undefined' && window.__APP_BASE_URL) {
+                return window.__APP_BASE_URL;
+            }
 
+            // Detectar automáticamente desde la ruta actual
+            const pathname = window.location.pathname;
+
+            // Si la ruta contiene /streaming-platform, usarlo
+            if (pathname.includes('/streaming-platform')) {
+                return '/streaming-platform';
+            }
+
+            // Si estamos en /admin, extraer la ruta base
+            if (pathname.includes('/admin')) {
+                const pathParts = pathname.split('/').filter(p => p);
+                const adminIndex = pathParts.indexOf('admin');
+                if (adminIndex > 0) {
+                    return '/' + pathParts.slice(0, adminIndex).join('/');
+                }
+            }
+
+            // Si no se puede detectar, usar la ruta base del script actual
+            const scripts = document.getElementsByTagName('script');
+            for (let script of scripts) {
+                if (script.src && script.src.includes('/js/admin.js')) {
+                    const scriptPath = new URL(script.src).pathname;
+                    const match = scriptPath.match(/^(\/.+?)\/js\/admin\.js/);
+                    if (match && match[1]) {
+                        return match[1];
+                    }
+                }
+            }
+
+            return '';
+        }
+
+        const baseUrl = getBaseUrl();
+        // Construir URL usando la misma lógica que apiRequest
+        let apiPath = '/api/torrent/search.php';
+        if (baseUrl) {
+            apiPath = baseUrl + (apiPath.startsWith('/') ? apiPath : '/' + apiPath);
+        }
+        const url = `${apiPath}?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`;
+
+        console.log('[handleSearchTorrent] baseUrl detectado:', baseUrl);
+        console.log('[handleSearchTorrent] window.__APP_BASE_URL:', window.__APP_BASE_URL);
+        console.log('[handleSearchTorrent] window.location.pathname:', window.location.pathname);
+        console.log('[handleSearchTorrent] URL construida:', url);
+
+        console.log('[handleSearchTorrent] Iniciando petición fetch...');
         const response = await fetch(url, {
             credentials: 'same-origin'
         });
 
-        const data = await response.json();
+        console.log('[handleSearchTorrent] Respuesta recibida:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            contentType: response.headers.get('content-type')
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[handleSearchTorrent] Error HTTP ${response.status}:`, errorText.substring(0, 500));
+            throw new Error(`HTTP ${response.status}: ${response.statusText}. ${errorText.substring(0, 200)}`);
+        }
+
+        const text = await response.text();
+        console.log('[handleSearchTorrent] Respuesta texto (primeros 500 chars):', text.substring(0, 500));
+
+        let data;
+        try {
+            data = JSON.parse(text);
+            console.log('[handleSearchTorrent] JSON parseado correctamente:', {
+                success: data.success,
+                count: data.count,
+                resultsCount: data.results ? data.results.length : 0
+            });
+        } catch (parseError) {
+            console.error('[handleSearchTorrent] Error parsing JSON response:', parseError);
+            console.error('[handleSearchTorrent] Response text completo:', text);
+            console.error('[handleSearchTorrent] URL llamada:', url);
+            throw new Error('La respuesta del servidor no es JSON válido. Ver consola para más detalles.');
+        }
 
         if (data.success && data.results && data.results.length > 0) {
             let html = '<div style="margin-bottom: 0.5rem; font-weight: 600;">Encontrados ' + data.count + ' resultados:</div>';
+
+            // Mostrar información de debug si está disponible
+            if (data.debug && data.debug.length > 0) {
+                html += '<div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8f9fa; border-left: 3px solid #007bff; border-radius: 4px;">';
+                html += '<div style="font-weight: 600; margin-bottom: 0.5rem; color: #007bff;"><i class="fas fa-info-circle"></i> Información de búsqueda:</div>';
+                html += '<div style="font-size: 0.85rem; color: #666;">';
+                data.debug.forEach(info => {
+                    html += `<div style="margin-bottom: 0.25rem;">• ${info}</div>`;
+                });
+                html += '</div></div>';
+            }
 
             data.results.forEach((torrent) => {
                 const safeMagnet = (torrent.magnet || '').replace(/'/g, "\\'");
@@ -5249,7 +5340,21 @@ async function handleSearchTorrent(event, presetQuery = null) {
 
             resultsContent.innerHTML = html;
         } else {
-            resultsContent.innerHTML = '<p style="text-align: center; padding: 1rem; color: #666;">No se encontraron resultados. Puedes ingresar el enlace magnet manualmente.</p>';
+            let html = '<p style="text-align: center; padding: 1rem; color: #666;">No se encontraron resultados. Puedes ingresar el enlace magnet manualmente.</p>';
+
+            // Mostrar información de debug incluso si no hay resultados
+            if (data.debug && data.debug.length > 0) {
+                html = '<div style="margin-bottom: 1rem; padding: 0.75rem; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 4px;">';
+                html += '<div style="font-weight: 600; margin-bottom: 0.5rem; color: #856404;"><i class="fas fa-exclamation-triangle"></i> Información de búsqueda:</div>';
+                html += '<div style="font-size: 0.85rem; color: #856404;">';
+                data.debug.forEach(info => {
+                    html += `<div style="margin-bottom: 0.25rem;">• ${info}</div>`;
+                });
+                html += '</div></div>';
+                html += '<p style="text-align: center; padding: 1rem; color: #666;">No se encontraron resultados en ninguna fuente. Intenta con otro título o ingresa el enlace magnet manualmente.</p>';
+            }
+
+            resultsContent.innerHTML = html;
         }
     } catch (error) {
         console.error('Error al buscar torrents:', error);
@@ -5314,10 +5419,10 @@ function initContentRefresh() {
     btnRefresh.setAttribute('data-listener-attached', 'true');
     console.log('Inicializando botón de actualización de contenido');
 
-    btnRefresh.addEventListener('click', async function(e) {
+    btnRefresh.addEventListener('click', async function (e) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         console.log('Botón de actualización clickeado');
         const type = document.getElementById('refresh-type')?.value || 'movie';
         const limit = parseInt(document.getElementById('refresh-limit')?.value || '30');
@@ -5349,7 +5454,7 @@ function initContentRefresh() {
         try {
             const apiUrl = (baseUrl || '') + '/api/content/refresh-latest.php';
             console.log('Llamando a:', apiUrl);
-            
+
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -5369,7 +5474,7 @@ function initContentRefresh() {
 
             const responseText = await response.text();
             console.log('Respuesta texto:', responseText);
-            
+
             if (!response.ok) {
                 console.error('Error HTTP:', response.status, responseText);
                 // Intentar parsear JSON de error
@@ -5394,13 +5499,13 @@ function initContentRefresh() {
             if (data.success) {
                 statusDiv.textContent = '✅ Completado';
                 statusDiv.style.color = '#46d369';
-                
+
                 const result = data.data;
                 const summary = `Creados: ${result.created || 0} | Actualizados: ${result.updated || 0} | Episodios nuevos: ${result.new_episodes || 0} | Tiempo: ${result.execution_time || 'N/A'}`;
-                
+
                 outputDiv.textContent = summary + '\n\n' + (result.output || '');
                 outputDiv.style.display = 'block';
-                
+
                 showNotification(
                     `Actualización completada: ${result.created || 0} creados, ${result.updated || 0} actualizados, ${result.new_episodes || 0} episodios nuevos`,
                     'success'
@@ -5417,19 +5522,19 @@ function initContentRefresh() {
             } else {
                 statusDiv.textContent = '⚠️ Completado con advertencias';
                 statusDiv.style.color = '#ffa500';
-                
+
                 const result = data.data || {};
                 const summary = `Creados: ${result.created || 0} | Actualizados: ${result.updated || 0} | Episodios nuevos: ${result.new_episodes || 0} | Tiempo: ${result.execution_time || 'N/A'}`;
-                
+
                 let errorMsg = data.error || data.message || 'Error desconocido';
                 if (result.output) {
                     errorMsg += '\n\n' + result.output;
                 }
-                
+
                 outputDiv.textContent = summary + '\n\n' + errorMsg;
                 outputDiv.style.display = 'block';
                 outputDiv.style.color = '#ffa500';
-                
+
                 showNotification('Actualización completada con advertencias. Revisa la salida para más detalles.', 'warning');
             }
         } catch (error) {

@@ -489,49 +489,56 @@ $baseUrl = rtrim(SITE_URL, '/');
             $seasonsStmt->execute();
             $seasons = $seasonsStmt->fetchAll(PDO::FETCH_COLUMN);
             
-            foreach ($seasons as $season):
-                // Obtener episodios de esta temporada
-                $episodesQuery = "SELECT * FROM episodes 
-                                WHERE series_id = :series_id AND season_number = :season_number 
-                                ORDER BY episode_number ASC";
-                $episodesStmt = $db->prepare($episodesQuery);
-                $episodesStmt->bindValue(':series_id', $contentId, PDO::PARAM_INT);
-                $episodesStmt->bindValue(':season_number', $season, PDO::PARAM_INT);
-                $episodesStmt->execute();
-                $episodes = $episodesStmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                if (count($episodes) > 0):
+            if (!$seasons || count($seasons) === 0): ?>
+                <div class="episodes-empty">
+                    <p>No hay episodios cargados para esta serie.</p>
+                </div>
+            <?php
+            else:
+                foreach ($seasons as $season):
+                    // Obtener episodios de esta temporada
+                    $episodesQuery = "SELECT * FROM episodes 
+                                    WHERE series_id = :series_id AND season_number = :season_number 
+                                    ORDER BY episode_number ASC";
+                    $episodesStmt = $db->prepare($episodesQuery);
+                    $episodesStmt->bindValue(':series_id', $contentId, PDO::PARAM_INT);
+                    $episodesStmt->bindValue(':season_number', $season, PDO::PARAM_INT);
+                    $episodesStmt->execute();
+                    $episodes = $episodesStmt->fetchAll(PDO::FETCH_ASSOC);
+                    
+                    if (count($episodes) > 0):
             ?>
-                    <div class="season">
-                        <h4>Temporada <?php echo $season; ?></h4>
-                        <div class="episodes-list">
-                            <?php foreach ($episodes as $ep): ?>
-                                <a href="watch.php?id=<?php echo $contentId; ?>&episode_id=<?php echo $ep['id']; ?>" 
-                                   class="episode-card <?php echo ($episodeId == $ep['id']) ? 'active' : ''; ?>">
-                                    <div class="episode-number"><?php echo $ep['episode_number']; ?></div>
-                                    <div class="episode-info">
-                                        <div class="episode-title"><?php echo htmlspecialchars($ep['title']); ?></div>
-                                        <div class="episode-meta">
-                                            <?php if ($ep['duration']): ?>
-                                                <span><?php echo formatDuration($ep['duration']); ?></span>
-                                            <?php endif; ?>
-                                            <?php if ($ep['release_date']): ?>
-                                                <span><?php echo date('d M, Y', strtotime($ep['release_date'])); ?></span>
-                                            <?php endif; ?>
+                        <div class="season">
+                            <h4>Temporada <?php echo $season; ?></h4>
+                            <div class="episodes-list">
+                                <?php foreach ($episodes as $ep): ?>
+                                    <a href="watch.php?id=<?php echo $contentId; ?>&episode_id=<?php echo $ep['id']; ?>" 
+                                       class="episode-card <?php echo ($episodeId == $ep['id']) ? 'active' : ''; ?>">
+                                        <div class="episode-number"><?php echo $ep['episode_number']; ?></div>
+                                        <div class="episode-info">
+                                            <div class="episode-title"><?php echo htmlspecialchars($ep['title']); ?></div>
+                                            <div class="episode-meta">
+                                                <?php if ($ep['duration']): ?>
+                                                    <span><?php echo formatDuration($ep['duration']); ?></span>
+                                                <?php endif; ?>
+                                                <?php if ($ep['release_date']): ?>
+                                                    <span><?php echo date('d M, Y', strtotime($ep['release_date'])); ?></span>
+                                                <?php endif; ?>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <?php if ($episodeId == $ep['id']): ?>
-                                        <div class="now-playing">
-                                            <i class="fas fa-play"></i> Reproduciendo
-                                        </div>
-                                    <?php endif; ?>
-                                </a>
-                            <?php endforeach; ?>
+                                        <?php if ($episodeId == $ep['id']): ?>
+                                            <div class="now-playing">
+                                                <i class="fas fa-play"></i> Reproduciendo
+                                            </div>
+                                        <?php endif; ?>
+                                    </a>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                    </div>
-                <?php
-                endif;
-            endforeach;
+                    <?php
+                    endif;
+                endforeach;
+            endif;
             ?>
         </div>
     <?php endif; ?>

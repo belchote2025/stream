@@ -31,7 +31,9 @@ document.addEventListener('DOMContentLoaded', function () {
             videoMeta: '#videoPlayerMeta',
             videoDescription: '#videoPlayerDescription',
             videoLoading: '#videoPlayerLoading',
-            videoAction: '#videoOpenPageBtn'
+            videoAction: '#videoOpenPageBtn',
+            videoEpisodeSelector: '#videoEpisodeSelector',
+            videoEpisodeSelect: '#videoEpisodeSelect'
         },
         defaultBackdrop: FALLBACK_BACKDROP,
         defaultPoster: FALLBACK_POSTER,
@@ -782,8 +784,25 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             console.log('[playContent] Datos del contenido obtenidos:', contentData);
-            updateVideoModalInfo(contentData, contentType);
-            const playbackUrl = resolvePlaybackUrl(contentData);
+
+            state.currentContentData = contentData;
+            let episodeToPlay = null;
+            if (contentType === 'series' && Array.isArray(contentData.episodes) && contentData.episodes.length > 0) {
+                const episodes = [...contentData.episodes].sort((a, b) => (a.season_number - b.season_number) || (a.episode_number - b.episode_number));
+                const selected = state.currentEpisodeId
+                    ? episodes.find(ep => ep.id === state.currentEpisodeId)
+                    : episodes[0];
+                episodeToPlay = selected || episodes[0];
+                state.currentEpisodeId = episodeToPlay ? episodeToPlay.id : null;
+                buildEpisodeSelector(episodes, state.currentEpisodeId);
+            } else {
+                buildEpisodeSelector([], null);
+            }
+
+            updateVideoModalInfo(contentData, contentType, episodeToPlay);
+            const playbackUrl = episodeToPlay
+                ? resolveEpisodePlaybackUrl(episodeToPlay, contentData)
+                : resolvePlaybackUrl(contentData);
             console.log('[playContent] URL de reproducción:', playbackUrl);
             
             if (!playbackUrl) {
@@ -825,6 +844,7 @@ document.addEventListener('DOMContentLoaded', function () {
             state.currentContentId = contentId;
             state.currentContentType = contentType;
             state.currentContentData = contentData;
+            state.currentEpisodeId = episodeToPlay ? episodeToPlay.id : null;
 
             // Eventos del video
             videoEl.onloadeddata = () => {
@@ -861,6 +881,35 @@ document.addEventListener('DOMContentLoaded', function () {
                 showVideoLoading('Redirigiendo al reproductor completo...');
                 redirectToWatch(contentId);
             };
+
+            // Selector de episodios (solo series)
+            if (elements.videoEpisodeSelect && contentType === 'series') {
+                elements.videoEpisodeSelect.onchange = () => {
+                    if (!state.currentContentData || !Array.isArray(state.currentContentData.episodes)) return;
+                    const epId = parseInt(elements.videoEpisodeSelect.value, 10);
+                    const episodes = [...state.currentContentData.episodes].sort((a, b) => (a.season_number - b.season_number) || (a.episode_number - b.episode_number));
+                    const nextEpisode = episodes.find(ep => ep.id === epId);
+                    if (!nextEpisode) return;
+                    state.currentEpisodeId = nextEpisode.id;
+                    const nextUrl = resolveEpisodePlaybackUrl(nextEpisode, state.currentContentData);
+                    if (!nextUrl) {
+                        alert('Este episodio no tiene video disponible.');
+                        return;
+                    }
+                    updateVideoModalInfo(state.currentContentData, 'series', nextEpisode);
+                    showVideoLoading('Cargando episodio...');
+                    const normalizedNext = normalizeVideoUrl(nextUrl);
+                    videoEl.pause();
+                    videoEl.removeAttribute('src');
+                    videoEl.load();
+                    videoEl.src = normalizedNext;
+                    videoEl.play().catch(() => {
+                        showVideoLoading('Pulsa play para iniciar');
+                    });
+                    state.currentVideo = videoEl;
+                    state.lastProgressSave = Date.now();
+                };
+            }
 
             // Cargar progreso guardado si existe
             loadPlaybackProgress(contentId).then(progress => {
@@ -962,18 +1011,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function updateVideoModalInfo(content, contentType) {
+    function updateVideoModalInfo(content, contentType, episode = null) {
         if (elements.videoTitle) {
-            elements.videoTitle.textContent = content.title || 'Reproduciendo';
+            const epLabel = episode ? ` • T${episode.season_number}E${episode.episode_number}` : '';
+            elements.videoTitle.textContent = (content.title || 'Reproducir') + epLabel;
         }
 
         if (elements.videoMeta) {
             const parts = [];
             if (content.release_year) parts.push(content.release_year);
-            if (content.duration) {
-                const durationLabel = contentType === 'series'
-                    ? `${content.duration} min`
-                    : `${content.duration} min`;
+            if (episode && episode.duration) {
+                parts.push(`${episode.duration} min`);
+            } else if (content.duration) {
+                const durationLabel = `${content.duration} min`;
                 parts.push(durationLabel);
             }
             if (content.rating) parts.push(`⭐ ${parseFloat(content.rating).toFixed(1)}`);
@@ -1135,6 +1185,31 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Error guardando progreso:', error);
         }
+    }
+
+    function buildEpisodeSelector(episodes, selectedId) {
+        if (!elements.videoEpisodeSelector || !elements.videoEpisodeSelect) return;
+        if (!episodes || episodes.length === 0) {
+            elements.videoEpisodeSelector.style.display = 'none';
+            return;
+        }
+        elements.videoEpisodeSelector.style.display = 'block';
+        const select = elements.videoEpisodeSelect;
+        select.innerHTML = '';
+        episodes.forEach(ep => {
+            const option = document.createElement('option');
+            option.value = ep.id;
+            option.textContent = `T${ep.season_number}E${ep.episode_number} - ${ep.title || 'Episodio'}`;
+            if (ep.id === selectedId) option.selected = true;
+            select.appendChild(option);
+        });
+    }
+
+    function resolveEpisodePlaybackUrl(episode, seriesContent) {
+        if (episode && episode.video_url && episode.video_url.trim() !== '') {
+            return episode.video_url;
+        }
+        return resolvePlaybackUrl(seriesContent);
     }
 
     // Cargar progreso guardado

@@ -3,14 +3,54 @@
  * API para buscar enlaces de torrents de películas y series
  * Utiliza APIs públicas legítimas para obtener información de torrents
  */
-require_once __DIR__ . '/../../includes/config.php';
-requireAdmin(); // Solo administradores pueden buscar torrents
 
-header('Content-Type: application/json');
+// Prevenir cualquier output antes del JSON
+ob_start();
+
+require_once __DIR__ . '/../../includes/config.php';
+
+// Limpiar cualquier output que haya generado config.php
+ob_clean();
+
+// Establecer headers JSON
+header('Content-Type: application/json; charset=utf-8');
+
+// Verificar autenticación y rol de administrador sin hacer redirect
+// config.php ya inicia la sesión, así que solo verificamos
+if (!isset($_SESSION['user_id'])) {
+    ob_clean();
+    http_response_code(401);
+    echo json_encode([
+        'success' => false,
+        'error' => 'No autorizado. Debes iniciar sesión.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// Verificar si es administrador
+$db = getDbConnection();
+$userId = $_SESSION['user_id'];
+$stmt = $db->prepare("SELECT role FROM users WHERE id = ?");
+$stmt->execute([$userId]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$user || $user['role'] !== 'admin') {
+    ob_clean();
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'error' => 'No autorizado. Se requiere rol de administrador.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    ob_clean();
     http_response_code(405);
-    echo json_encode(['error' => 'Método no permitido']);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Método no permitido'
+    ]);
     exit;
 }
 
@@ -26,52 +66,109 @@ if (empty($title)) {
 
 try {
     $results = [];
+    $searchLog = []; // Para debugging
+    
+    // Normalizar título para búsquedas
+    $titleClean = trim($title);
+    $titleVariants = [
+        $titleClean, // Título original
+        strtolower($titleClean), // Minúsculas
+        ucwords(strtolower($titleClean)), // Capitalizado
+    ];
     
     // Opción 1: YTS API (solo películas, API pública y legal)
     if ($type === 'movie') {
-        $ytsResults = searchYTS($title, $year);
-        if (!empty($ytsResults)) {
-            $results = array_merge($results, $ytsResults);
+        // Buscar primero con año si está disponible
+        if (!empty($year)) {
+            $ytsResults = searchYTS($titleClean, $year);
+            $searchLog[] = "YTS con año ({$year}): " . count($ytsResults) . " resultados";
+            if (!empty($ytsResults)) {
+                $results = array_merge($results, $ytsResults);
+            }
+        }
+        // Buscar también sin año para encontrar todas las versiones
+        $ytsResultsNoYear = searchYTS($titleClean, '');
+        $searchLog[] = "YTS sin año: " . count($ytsResultsNoYear) . " resultados";
+        if (!empty($ytsResultsNoYear)) {
+            $results = array_merge($results, $ytsResultsNoYear);
         }
     }
     
     // Opción 2: EZTV API (solo series, API pública)
     if ($type === 'series') {
-        $eztvResults = searchEZTV($title);
+        $eztvResults = searchEZTV($titleClean);
+        $searchLog[] = "EZTV: " . count($eztvResults) . " resultados";
         if (!empty($eztvResults)) {
             $results = array_merge($results, $eztvResults);
         }
     }
     
-    // Opción 3: Torrentio (addon de Stremio, búsqueda agregada)
-    $torrentioResults = searchTorrentio($title, $type, $year);
+    // Opción 3: 1337x API (búsqueda general - nueva fuente)
+    foreach ($titleVariants as $idx => $variant) {
+        $leetxResults = search1337x($variant, $type);
+        $searchLog[] = "1337x variante #{$idx} ('{$variant}'): " . count($leetxResults) . " resultados";
+        if (!empty($leetxResults)) {
+            $results = array_merge($results, $leetxResults);
+        }
+    }
+    
+    // Opción 4: Torrentio (addon de Stremio, búsqueda agregada)
+    // Buscar siempre con y sin año para encontrar todas las versiones
+    $torrentioResults = searchTorrentio($titleClean, $type, $year);
+    $searchLog[] = "Torrentio con año: " . count($torrentioResults) . " resultados";
     if (!empty($torrentioResults)) {
         $results = array_merge($results, $torrentioResults);
     }
-    
-    // Opción 4: The Pirate Bay API (búsqueda general)
-    // Nota: TPB puede no estar siempre disponible, usar con precaución
-    $tpbResults = searchTPB($title, $type);
-    if (!empty($tpbResults)) {
-        $results = array_merge($results, $tpbResults);
+    // Siempre buscar sin año también
+    $torrentioResultsNoYear = searchTorrentio($titleClean, $type, '');
+    $searchLog[] = "Torrentio sin año: " . count($torrentioResultsNoYear) . " resultados";
+    if (!empty($torrentioResultsNoYear)) {
+        $results = array_merge($results, $torrentioResultsNoYear);
     }
     
-    // Eliminar duplicados y ordenar por calidad
+    // Opción 5: The Pirate Bay API (búsqueda general)
+    // Buscar con diferentes variantes del título
+    foreach ($titleVariants as $idx => $variant) {
+        $tpbResults = searchTPB($variant, $type);
+        $searchLog[] = "TPB variante #{$idx} ('{$variant}'): " . count($tpbResults) . " resultados";
+        if (!empty($tpbResults)) {
+            $results = array_merge($results, $tpbResults);
+        }
+    }
+    
+    // Eliminar duplicados y ordenar por calidad y seeds
+    $beforeDedupe = count($results);
     $results = removeDuplicates($results);
+    $afterDedupe = count($results);
     $results = sortByQuality($results);
     
-    echo json_encode([
+    // Log detallado para debugging
+    $logMessage = "Búsqueda torrents - Título: '{$title}', Tipo: {$type}, Año: {$year}\n";
+    $logMessage .= "Detalles por fuente:\n" . implode("\n", $searchLog) . "\n";
+    $logMessage .= "Total antes de eliminar duplicados: {$beforeDedupe}\n";
+    $logMessage .= "Total después de eliminar duplicados: {$afterDedupe}\n";
+    $logMessage .= "Resultados finales: " . count($results);
+    error_log($logMessage);
+    
+    ob_clean();
+    $response = [
         'success' => true,
         'count' => count($results),
-        'results' => array_slice($results, 0, 10) // Limitar a 10 resultados
-    ]);
+        'results' => array_slice($results, 0, 50), // Aumentado a 50 resultados
+        'debug' => $searchLog // Incluir info de debug en respuesta
+    ];
+    
+    echo json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
     
 } catch (Exception $e) {
+    ob_clean();
     http_response_code(500);
     echo json_encode([
         'success' => false,
         'error' => 'Error al buscar torrents: ' . $e->getMessage()
-    ]);
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
 /**
@@ -80,6 +177,18 @@ try {
 function searchTorrentio($title, $type = 'movie', $year = '') {
     $results = [];
     $baseUrl = getenv('TORRENTIO_BASE_URL') ?: 'https://torrentio.strem.fun';
+    
+    // Trackers populares para agregar a los magnet links
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
     
     try {
         $queryTerm = trim($title . ' ' . $year);
@@ -106,13 +215,24 @@ function searchTorrentio($title, $type = 'movie', $year = '') {
                         if (!empty($stream['title'])) {
                             $magnet .= '&dn=' . urlencode($stream['title']);
                         }
+                        // Agregar trackers de la fuente
                         if (!empty($stream['sources']) && is_array($stream['sources'])) {
                             foreach ($stream['sources'] as $tracker) {
                                 $magnet .= '&tr=' . urlencode($tracker);
                             }
                         }
+                        // Agregar trackers adicionales
+                        foreach ($trackers as $tracker) {
+                            $magnet .= '&tr=' . urlencode($tracker);
+                        }
                     } elseif (!empty($stream['url']) && strpos($stream['url'], 'magnet:?') === 0) {
                         $magnet = $stream['url'];
+                        // Agregar trackers adicionales si no están ya
+                        foreach ($trackers as $tracker) {
+                            if (strpos($magnet, urlencode($tracker)) === false) {
+                                $magnet .= '&tr=' . urlencode($tracker);
+                            }
+                        }
                     }
                     
                     if (empty($magnet)) {
@@ -146,9 +266,22 @@ function searchTorrentio($title, $type = 'movie', $year = '') {
 function searchYTS($title, $year = '') {
     $results = [];
     
+    // Trackers populares para agregar a los magnet links
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
+    
     try {
         $query = urlencode($title);
-        $url = "https://yts.mx/api/v2/list_movies.json?query_term={$query}&sort_by=download_count&order_by=desc";
+        // Aumentar límite de resultados
+        $url = "https://yts.mx/api/v2/list_movies.json?query_term={$query}&sort_by=download_count&order_by=desc&limit=50";
         
         if (!empty($year)) {
             $url .= "&year={$year}";
@@ -156,8 +289,9 @@ function searchYTS($title, $year = '') {
         
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -166,6 +300,7 @@ function searchYTS($title, $year = '') {
             $data = json_decode($response, true);
             
             if (isset($data['data']['movies']) && is_array($data['data']['movies'])) {
+                // Incluir TODAS las películas devueltas por YTS (la API ya filtra por relevancia)
                 foreach ($data['data']['movies'] as $movie) {
                     if (isset($movie['torrents']) && is_array($movie['torrents'])) {
                         foreach ($movie['torrents'] as $torrent) {
@@ -173,6 +308,11 @@ function searchYTS($title, $year = '') {
                             $hash = $torrent['hash'] ?? '';
                             if (!empty($hash)) {
                                 $magnet = "magnet:?xt=urn:btih:" . $hash . "&dn=" . urlencode($movie['title']);
+                                
+                                // Agregar trackers
+                                foreach ($trackers as $tracker) {
+                                    $magnet .= "&tr=" . urlencode($tracker);
+                                }
                                 
                                 $results[] = [
                                     'title' => $movie['title'] . ' (' . $movie['year'] . ')',
@@ -204,14 +344,28 @@ function searchYTS($title, $year = '') {
 function searchEZTV($title) {
     $results = [];
     
+    // Trackers populares para agregar a los magnet links
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
+    
     try {
         $query = urlencode($title);
-        $url = "https://eztv.re/api/get-torrents?imdb_id=&limit=10&page=1&keywords={$query}";
+        // Aumentar límite para obtener más resultados
+        $url = "https://eztv.re/api/get-torrents?imdb_id=&limit=100&page=1&keywords={$query}";
         
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -223,12 +377,20 @@ function searchEZTV($title) {
                 foreach ($data['torrents'] as $torrent) {
                     $magnet = $torrent['magnet_url'] ?? '';
                     if (!empty($magnet)) {
+                        // Agregar trackers adicionales
+                        foreach ($trackers as $tracker) {
+                            if (strpos($magnet, urlencode($tracker)) === false) {
+                                $magnet .= '&tr=' . urlencode($tracker);
+                            }
+                        }
+                        
+                        $size = $torrent['size_bytes'] ?? 0;
                         $results[] = [
                             'title' => $torrent['title'] ?? 'Unknown',
-                            'quality' => 'HD', // EZTV generalmente es HD
-                            'size' => $torrent['size_bytes'] ?? 'Unknown',
-                            'seeds' => $torrent['seeds'] ?? 0,
-                            'peers' => $torrent['peers'] ?? 0,
+                            'quality' => extractQuality($torrent['title'] ?? '') ?: 'HD',
+                            'size' => is_numeric($size) ? formatBytes((int)$size) : ($size ?: 'Unknown'),
+                            'seeds' => (int)($torrent['seeds'] ?? 0),
+                            'peers' => (int)($torrent['peers'] ?? 0),
                             'magnet' => $magnet,
                             'source' => 'EZTV',
                             'episode' => $torrent['episode'] ?? null,
@@ -240,6 +402,83 @@ function searchEZTV($title) {
         }
     } catch (Exception $e) {
         error_log('Error en EZTV API: ' . $e->getMessage());
+    }
+    
+    return $results;
+}
+
+/**
+ * Buscar en 1337x (búsqueda general)
+ */
+function search1337x($title, $type = 'movie') {
+    $results = [];
+    
+    try {
+        $query = urlencode($title);
+        
+        // Usar API pública de 1337x
+        $apiUrls = [
+            "https://1337x.unblockit.how/api/search/{$query}/1/",
+            "https://1337x.to/api/search/{$query}/1/",
+        ];
+        
+        foreach ($apiUrls as $apiUrl) {
+            $ch = curl_init($apiUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($httpCode === 200 && $response) {
+                $data = json_decode($response, true);
+                
+                if (isset($data['torrents']) && is_array($data['torrents'])) {
+                    foreach ($data['torrents'] as $torrent) {
+                        if (isset($torrent['magnet']) && !empty($torrent['magnet'])) {
+                            $name = $torrent['name'] ?? 'Unknown';
+                            $size = $torrent['size'] ?? 'Unknown';
+                            
+                            $results[] = [
+                                'title' => $name,
+                                'quality' => extractQuality($name),
+                                'size' => $size,
+                                'seeds' => (int)($torrent['seeders'] ?? 0),
+                                'peers' => (int)($torrent['leechers'] ?? 0),
+                                'magnet' => $torrent['magnet'],
+                                'source' => '1337x'
+                            ];
+                        }
+                    }
+                    
+                    if (count($results) > 0) {
+                        break; // Si encontramos resultados, no intentar más URLs
+                    }
+                }
+            }
+        }
+        
+        // Si la API no funciona, intentar scraping alternativo
+        if (count($results) === 0) {
+            // Usar un servicio de proxy/API alternativo
+            $proxyUrl = "https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all";
+            
+            // Intentar búsqueda directa con diferentes mirrors
+            $mirrors = [
+                "https://www.1377x.to/search/{$query}/1/",
+                "https://1337x.st/search/{$query}/1/",
+            ];
+            
+            // Por ahora, si la API falla, simplemente retornamos vacío
+            // En el futuro se puede implementar scraping web
+        }
+    } catch (Exception $e) {
+        error_log('Error en 1337x API: ' . $e->getMessage());
     }
     
     return $results;
@@ -260,14 +499,30 @@ function searchTPB($title, $type = 'movie') {
         // Intentar múltiples proxies de TPB
         $proxies = [
             "https://apibay.org/q.php?q={$query}&cat={$category}",
-            // Agregar más proxies si es necesario
+            "https://apibay.org/q.php?q={$query}", // Sin categoría para búsqueda más amplia
+        ];
+        
+        // Trackers populares para agregar a los magnet links
+        $trackers = [
+            'udp://tracker.opentrackr.org:1337/announce',
+            'udp://open.stealth.si:80/announce',
+            'udp://tracker.torrent.eu.org:451/announce',
+            'udp://tracker.bittor.pw:1337/announce',
+            'udp://public.popcorn-tracker.org:6969/announce',
+            'udp://tracker.dler.org:6969/announce',
+            'udp://exodus.desync.com:6969',
+            'udp://open.demonii.com:1337/announce'
         ];
         
         foreach ($proxies as $proxyUrl) {
             $ch = curl_init($proxyUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 8);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ]);
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -275,12 +530,24 @@ function searchTPB($title, $type = 'movie') {
             if ($httpCode === 200 && $response) {
                 $data = json_decode($response, true);
                 
-                if (is_array($data)) {
+                if (is_array($data) && count($data) > 0) {
+                    // Incluir TODOS los resultados (hasta 100 por proxy)
+                    $count = 0;
                     foreach ($data as $torrent) {
-                        if (isset($torrent['info_hash'])) {
+                        if ($count >= 100) break; // Aumentado a 100 resultados
+                        
+                        // Filtrar resultados inválidos o de baja calidad
+                        if (isset($torrent['info_hash']) && !empty($torrent['info_hash']) && 
+                            $torrent['info_hash'] !== '0000000000000000000000000000000000000000') {
+                            
                             $hash = $torrent['info_hash'];
                             $name = $torrent['name'] ?? 'Unknown';
+                            
+                            // Construir magnet link con trackers
                             $magnet = "magnet:?xt=urn:btih:" . $hash . "&dn=" . urlencode($name);
+                            foreach ($trackers as $tracker) {
+                                $magnet .= "&tr=" . urlencode($tracker);
+                            }
                             
                             $results[] = [
                                 'title' => $name,
@@ -291,9 +558,12 @@ function searchTPB($title, $type = 'movie') {
                                 'magnet' => $magnet,
                                 'source' => 'TPB'
                             ];
+                            $count++;
                         }
                     }
-                    break; // Si encontramos resultados, no intentar más proxies
+                    if (count($results) > 0) {
+                        break; // Si encontramos resultados, no intentar más proxies
+                    }
                 }
             }
         }

@@ -29,6 +29,10 @@ if ($token) {
     ]);
 }
 
+// Detectar si viene del panel de administración antes de cerrar sesión
+$isFromAdmin = isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], '/admin/') !== false;
+$isAdminPanel = isset($_GET['from']) && $_GET['from'] === 'admin';
+
 // Cerrar la sesión
 $auth->logout();
 
@@ -39,8 +43,21 @@ $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
 if ($isAjax) {
     // Si es AJAX, devolver JSON
     header('Content-Type: application/json');
-    echo json_encode(['message' => 'Sesión cerrada correctamente']);
+    echo json_encode([
+        'message' => 'Sesión cerrada correctamente',
+        'redirect' => '/'
+    ]);
 } else {
-    // Si es un enlace directo, redirigir a la página principal
-    redirect('/');
+    // Siempre redirigir a la página principal después del logout
+    // Si viene del panel de administración, asegurar que vaya a index.php
+    $redirectUrl = rtrim(SITE_URL, '/') . '/index.php';
+    
+    // Si viene del panel de admin, usar la URL completa para asegurar la redirección
+    if ($isFromAdmin || $isAdminPanel) {
+        header('Location: ' . $redirectUrl);
+        exit;
+    } else {
+        // Para otros casos, usar la función redirect
+        redirect('/index.php');
+    }
 }

@@ -1437,7 +1437,7 @@ function handleUserDropdownAction(event) {
             showNotification('Tema actualizado', 'success');
             break;
         case 'logout':
-            window.location.href = '/api/auth/logout.php';
+            window.location.href = '/api/auth/logout.php?from=admin';
             break;
         default:
             break;

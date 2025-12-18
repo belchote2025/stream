@@ -1,0 +1,386 @@
+/**
+ * Estilos para la página splash/landing
+ * Diseño con logo animado de UrresTV
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+.splash-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+}
+
+.splash-container.loaded {
+    opacity: 1;
+}
+
+.splash-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 50%, rgba(229, 9, 20, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(229, 9, 20, 0.1) 0%, transparent 50%),
+        linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+    z-index: 0;
+}
+
+/* Logo Container */
+.logo-container {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 3rem;
+    animation: fadeInUp 1s ease-out 0.3s both;
+}
+
+/* Círculo rojo con animación */
+.logo-circle {
+    width: 180px;
+    height: 180px;
+    background: linear-gradient(135deg, #E50914 0%, #B20710 100%);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    box-shadow: 
+        0 0 40px rgba(229, 9, 20, 0.5),
+        0 0 80px rgba(229, 9, 20, 0.3),
+        inset 0 0 20px rgba(255, 255, 255, 0.1);
+    animation: pulse 2s ease-in-out infinite, rotate 20s linear infinite;
+}
+
+.logo-circle::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+    animation: shimmer 3s ease-in-out infinite;
+}
+
+/* Botón de play dentro del círculo */
+.logo-play-button {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    z-index: 3;
+}
+
+.logo-play-button i {
+    font-size: 3rem;
+    color: white;
+    margin-left: 8px; /* Ajuste para centrar visualmente el triángulo */
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    animation: playPulse 1.5s ease-in-out infinite;
+}
+
+/* Texto UrresTV */
+.logo-text {
+    font-size: 4rem;
+    font-weight: 700;
+    color: white;
+    margin-top: 2rem;
+    letter-spacing: 2px;
+    text-shadow: 
+        0 0 20px rgba(229, 9, 20, 0.5),
+        0 4px 10px rgba(0, 0, 0, 0.8);
+    animation: textGlow 2s ease-in-out infinite alternate;
+    font-family: 'Arial', sans-serif;
+}
+
+/* Botones de acción */
+.splash-actions {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    z-index: 2;
+    animation: fadeInUp 1s ease-out 0.6s both;
+}
+
+.btn-splash {
+    padding: 1rem 2.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-splash::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-splash:hover::before {
+    left: 100%;
+}
+
+.btn-login {
+    background: linear-gradient(135deg, #E50914 0%, #B20710 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);
+}
+
+.btn-login:hover {
+    background: linear-gradient(135deg, #F40612 0%, #C40812 100%);
+    box-shadow: 0 6px 20px rgba(229, 9, 20, 0.6);
+    transform: translateY(-2px);
+}
+
+.btn-register {
+    background: transparent;
+    color: white;
+    border: 2px solid white;
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+}
+
+.btn-register:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #E50914;
+    color: #E50914;
+    box-shadow: 0 6px 20px rgba(229, 9, 20, 0.4);
+    transform: translateY(-2px);
+}
+
+.btn-splash i {
+    font-size: 1.2rem;
+}
+
+/* Subtítulo */
+.splash-subtitle {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.2rem;
+    margin-top: 2rem;
+    z-index: 2;
+    animation: fadeInUp 1s ease-out 0.9s both;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+/* Partículas de fondo (opcional) */
+.particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.particles::before,
+.particles::after {
+    content: '';
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: rgba(229, 9, 20, 0.5);
+    border-radius: 50%;
+    animation: float 15s infinite ease-in-out;
+}
+
+.particles::before {
+    top: 20%;
+    left: 20%;
+    animation-delay: 0s;
+}
+
+.particles::after {
+    top: 60%;
+    left: 80%;
+    animation-delay: 7.5s;
+}
+
+/* Animaciones */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 
+            0 0 40px rgba(229, 9, 20, 0.5),
+            0 0 80px rgba(229, 9, 20, 0.3),
+            inset 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 
+            0 0 60px rgba(229, 9, 20, 0.7),
+            0 0 120px rgba(229, 9, 20, 0.5),
+            inset 0 0 30px rgba(255, 255, 255, 0.15);
+    }
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes shimmer {
+    0%, 100% {
+        opacity: 0.3;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+@keyframes playPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+@keyframes textGlow {
+    from {
+        text-shadow: 
+            0 0 20px rgba(229, 9, 20, 0.5),
+            0 4px 10px rgba(0, 0, 0, 0.8);
+    }
+    to {
+        text-shadow: 
+            0 0 30px rgba(229, 9, 20, 0.8),
+            0 4px 15px rgba(0, 0, 0, 0.8),
+            0 0 50px rgba(229, 9, 20, 0.3);
+    }
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0) translateX(0);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    50% {
+        transform: translateY(-100px) translateX(50px);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .logo-circle {
+        width: 140px;
+        height: 140px;
+    }
+    
+    .logo-play-button i {
+        font-size: 2.5rem;
+    }
+    
+    .logo-text {
+        font-size: 3rem;
+        margin-top: 1.5rem;
+    }
+    
+    .splash-actions {
+        flex-direction: column;
+        width: 80%;
+        max-width: 300px;
+    }
+    
+    .btn-splash {
+        width: 100%;
+        justify-content: center;
+        padding: 1rem 2rem;
+    }
+    
+    .splash-subtitle {
+        font-size: 1rem;
+        padding: 0 2rem;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .logo-circle {
+        width: 120px;
+        height: 120px;
+    }
+    
+    .logo-play-button i {
+        font-size: 2rem;
+    }
+    
+    .logo-text {
+        font-size: 2.5rem;
+    }
+    
+    .btn-splash {
+        font-size: 1rem;
+        padding: 0.9rem 1.5rem;
+    }
+}
+
+/* Efecto de carga inicial */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+

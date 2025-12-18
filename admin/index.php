@@ -133,7 +133,7 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                 </ul>
             </nav>
             <div class="logout">
-                <a href="<?php echo $baseUrl; ?>/api/auth/logout.php">
+                <a href="<?php echo $baseUrl; ?>/api/auth/logout.php?from=admin">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Cerrar Sesión</span>
                 </a>

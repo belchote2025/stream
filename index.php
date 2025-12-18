@@ -87,6 +87,12 @@ foreach ($contentTypes as $key => $callback) {
 
 extract($results);
 
+// Si el usuario no está autenticado, mostrar página splash
+if (!isLoggedIn()) {
+    include __DIR__ . '/splash.php';
+    exit;
+}
+
 // Include header
 include __DIR__ . '/includes/header.php';
 ?>

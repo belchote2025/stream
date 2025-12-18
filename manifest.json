@@ -2,20 +2,20 @@
     "name": "UrresTV - Plataforma de Streaming",
     "short_name": "UrresTV",
     "description": "Tu plataforma de streaming favorita - Películas y series en alta calidad",
-    "start_url": "/streaming-platform/",
+    "start_url": "./",
     "display": "standalone",
     "background_color": "#141414",
     "theme_color": "#E50914",
     "orientation": "any",
     "icons": [
         {
-            "src": "/streaming-platform/assets/icons/icon.svg",
+            "src": "assets/icons/icon.svg",
             "sizes": "48x48 72x72 96x96 128x128 256x256 512x512",
             "type": "image/svg+xml",
             "purpose": "any maskable"
         },
         {
-            "src": "/streaming-platform/assets/icons/icon-192x192.svg",
+            "src": "assets/icons/icon-192x192.svg",
             "sizes": "192x192",
             "type": "image/svg+xml",
             "purpose": "any maskable"
@@ -23,13 +23,13 @@
     ],
     "screenshots": [
         {
-            "src": "/streaming-platform/assets/screenshots/mobile-1.png",
+            "src": "assets/screenshots/mobile-1.png",
             "sizes": "540x720",
             "type": "image/png",
             "form_factor": "narrow"
         },
         {
-            "src": "/streaming-platform/assets/screenshots/desktop-1.png",
+            "src": "assets/screenshots/desktop-1.png",
             "sizes": "1920x1080",
             "type": "image/png",
             "form_factor": "wide"
@@ -44,10 +44,10 @@
             "name": "Películas",
             "short_name": "Películas",
             "description": "Ver películas",
-            "url": "/streaming-platform/movies.php",
+            "url": "movies.php",
             "icons": [
                 {
-                    "src": "/streaming-platform/assets/icons/movie-icon.png",
+                    "src": "assets/icons/movie-icon.png",
                     "sizes": "96x96"
                 }
             ]
@@ -56,10 +56,10 @@
             "name": "Series",
             "short_name": "Series",
             "description": "Ver series",
-            "url": "/streaming-platform/series.php",
+            "url": "series.php",
             "icons": [
                 {
-                    "src": "/streaming-platform/assets/icons/series-icon.png",
+                    "src": "assets/icons/series-icon.png",
                     "sizes": "96x96"
                 }
             ]
@@ -68,17 +68,17 @@
             "name": "Mi Lista",
             "short_name": "Mi Lista",
             "description": "Ver mi lista",
-            "url": "/streaming-platform/my-list.php",
+            "url": "my-list.php",
             "icons": [
                 {
-                    "src": "/streaming-platform/assets/icons/list-icon.png",
+                    "src": "assets/icons/list-icon.png",
                     "sizes": "96x96"
                 }
             ]
         }
     ],
     "share_target": {
-        "action": "/streaming-platform/share",
+        "action": "./share",
         "method": "POST",
         "enctype": "multipart/form-data",
         "params": {

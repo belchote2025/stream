@@ -193,8 +193,8 @@
             timeout = setTimeout(async () => {
                 try {
                     const apiUrl = typeof getApiUrl === 'function'
-                        ? getApiUrl('/api/content/popular?limit=5')
-                        : `${BASE_URL}/api/content/popular?limit=5`;
+                        ? getApiUrl('/api/content/popular.php?limit=5')
+                        : `${BASE_URL}/api/content/popular.php?limit=5`;
 
                     const response = await fetch(apiUrl);
 

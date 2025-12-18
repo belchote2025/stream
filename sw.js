@@ -5,15 +5,15 @@ const IMAGE_CACHE = 'streaming-images-v1';
 
 // Archivos críticos para cachear durante la instalación
 const PRECACHE_URLS = [
-    '/streaming-platform/',
-    '/streaming-platform/index.php',
-    '/streaming-platform/css/styles.css',
-    '/streaming-platform/css/navbar-enhancements.css',
-    '/streaming-platform/js/main.js',
-    '/streaming-platform/js/video-player.js',
-    '/streaming-platform/assets/img/default-poster.svg',
-    '/streaming-platform/assets/img/default-backdrop.svg',
-    '/streaming-platform/manifest.json',
+    './',
+    './index.php',
+    './css/styles.css',
+    './css/navbar-enhancements.css',
+    './js/main.js',
+    './js/video-player.js',
+    './assets/img/default-poster.svg',
+    './assets/img/default-backdrop.svg',
+    './manifest.json',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
@@ -93,6 +93,19 @@ self.addEventListener('fetch', (event) => {
 
 // Estrategia Cache First
 async function cacheFirstStrategy(request, cacheName) {
+    // No cachear peticiones HEAD - no están soportadas por la Cache API
+    if (request.method === 'HEAD') {
+        try {
+            return await fetch(request);
+        } catch (error) {
+            console.error('[SW] Fetch failed for HEAD request:', error);
+            return new Response('Offline - Content not available', {
+                status: 503,
+                statusText: 'Service Unavailable'
+            });
+        }
+    }
+
     const cache = await caches.open(cacheName);
     const cachedResponse = await cache.match(request);
 
@@ -104,7 +117,8 @@ async function cacheFirstStrategy(request, cacheName) {
 
     try {
         const networkResponse = await fetch(request);
-        if (networkResponse.ok) {
+        if (networkResponse.ok && request.method === 'GET') {
+            // Solo cachear peticiones GET
             cache.put(request, networkResponse.clone());
         }
         return networkResponse;
@@ -121,9 +135,23 @@ async function cacheFirstStrategy(request, cacheName) {
 async function networkFirstStrategy(request, cacheName) {
     const cache = await caches.open(cacheName);
 
+    // No cachear peticiones HEAD - no están soportadas por la Cache API
+    if (request.method === 'HEAD') {
+        try {
+            return await fetch(request);
+        } catch (error) {
+            console.error('[SW] Fetch failed for HEAD request:', error);
+            return new Response('Offline - Content not available', {
+                status: 503,
+                statusText: 'Service Unavailable'
+            });
+        }
+    }
+
     try {
         const networkResponse = await fetch(request);
-        if (networkResponse.ok) {
+        if (networkResponse.ok && request.method === 'GET') {
+            // Solo cachear peticiones GET
             cache.put(request, networkResponse.clone());
         }
         return networkResponse;
@@ -137,7 +165,7 @@ async function networkFirstStrategy(request, cacheName) {
 
         // Si es una página, devolver página offline
         if (request.mode === 'navigate') {
-            const offlinePage = await cache.match('/streaming-platform/offline.html');
+            const offlinePage = await cache.match('./offline.html');
             if (offlinePage) {
                 return offlinePage;
             }
@@ -153,6 +181,11 @@ async function networkFirstStrategy(request, cacheName) {
 
 // Actualizar caché en background
 async function fetchAndCache(request, cacheName) {
+    // No cachear peticiones HEAD o que no sean GET
+    if (request.method !== 'GET') {
+        return;
+    }
+    
     try {
         const networkResponse = await fetch(request);
         if (networkResponse.ok) {
@@ -209,7 +242,7 @@ async function syncPlaybackProgress() {
         if (pendingSync) {
             const data = await pendingSync.json();
             // Enviar a la API
-            await fetch('/streaming-platform/api/playback/progress.php', {
+            await fetch('./api/playback/progress.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -229,8 +262,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: event.data ? event.data.text() : 'Nuevo contenido disponible',
-        icon: '/streaming-platform/assets/icons/icon-192x192.png',
-        badge: '/streaming-platform/assets/icons/badge-72x72.png',
+        icon: './assets/icons/icon-192x192.png',
+        badge: './assets/icons/badge-72x72.png',
         vibrate: [200, 100, 200],
         tag: 'streaming-notification',
         requireInteraction: false,
@@ -238,12 +271,12 @@ self.addEventListener('push', (event) => {
             {
                 action: 'view',
                 title: 'Ver ahora',
-                icon: '/streaming-platform/assets/icons/play-icon.png'
+                icon: './assets/icons/play-icon.png'
             },
             {
                 action: 'close',
                 title: 'Cerrar',
-                icon: '/streaming-platform/assets/icons/close-icon.png'
+                icon: './assets/icons/close-icon.png'
             }
         ]
     };
@@ -260,7 +293,7 @@ self.addEventListener('notificationclick', (event) => {
 
     if (event.action === 'view') {
         event.waitUntil(
-            clients.openWindow('/streaming-platform/')
+            clients.openWindow('./')
         );
     }
 });

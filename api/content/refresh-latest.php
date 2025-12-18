@@ -58,70 +58,84 @@ try {
         $type = 'tv';
     }
     
-    // Construir comando
-    $scriptPath = __DIR__ . '/../../scripts/fetch-new-content.php';
-    if (!file_exists($scriptPath)) {
-        throw new Exception('Script no encontrado: ' . $scriptPath);
-    }
+    // Verificar si exec() está disponible
+    $useExec = function_exists('exec');
     
-    // Detectar ruta de PHP
-    $phpPath = 'php'; // Por defecto
-    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-        // Windows: intentar encontrar PHP en ubicaciones comunes
-        $possiblePaths = [
-            'C:\\xampp\\php\\php.exe',
-            'C:\\wamp\\bin\\php\\php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '\\php.exe',
-            'C:\\php\\php.exe',
-            getenv('PHP_BINARY') ?: null,
-            PHP_BINARY
-        ];
-        
-        foreach ($possiblePaths as $path) {
-            if ($path && file_exists($path)) {
-                $phpPath = $path;
-                break;
-            }
+    $startTime = microtime(true);
+    $outputText = '';
+    $created = 0;
+    $updated = 0;
+    $newEpisodes = 0;
+    $returnVar = 0;
+    
+    if ($useExec) {
+        // Método 1: Usar exec() si está disponible (más eficiente)
+        $scriptPath = realpath(__DIR__ . '/../../scripts/fetch-new-content.php');
+        if (!file_exists($scriptPath)) {
+            throw new Exception('Script no encontrado: ' . $scriptPath);
         }
         
-        // Si no se encontró, intentar usar PHP_BINARY o la ruta actual
-        if ($phpPath === 'php' && defined('PHP_BINARY')) {
-            $phpPath = PHP_BINARY;
-        }
-    } else {
-        // Linux/Mac: usar PHP_BINARY si está disponible
+        // Detectar ruta de PHP
+        $phpPath = 'php';
         if (defined('PHP_BINARY') && PHP_BINARY) {
             $phpPath = PHP_BINARY;
         }
+        
+        $cmd = sprintf(
+            '%s %s --type=%s --limit=%d --since-days=%d --min-seeds=%d%s',
+            escapeshellcmd($phpPath),
+            escapeshellarg($scriptPath),
+            escapeshellarg($type),
+            $limit,
+            $sinceDays,
+            $minSeeds,
+            $dryRun ? ' --dry-run' : ''
+        );
+        
+        $output = [];
+        exec($cmd . ' 2>&1', $output, $returnVar);
+        $outputText = implode("\n", $output);
+    } else {
+        // Método 2: Ejecutar directamente sin exec() (para servidores restringidos)
+        // Simular parámetros CLI para el script
+        $_SERVER['argv'] = [
+            'fetch-new-content.php',
+            '--type=' . $type,
+            '--limit=' . $limit,
+            '--since-days=' . $sinceDays,
+            '--min-seeds=' . $minSeeds
+        ];
+        if ($dryRun) {
+            $_SERVER['argv'][] = '--dry-run';
+        }
+        
+        // Capturar salida usando output buffering
+        ob_start();
+        
+        // Incluir el script directamente
+        $scriptPath = realpath(__DIR__ . '/../../scripts/fetch-new-content.php');
+        if (!file_exists($scriptPath)) {
+            throw new Exception('Script no encontrado: ' . $scriptPath);
+        }
+        
+        // Redirigir STDOUT y STDERR a nuestro buffer
+        // Necesitamos modificar el script para que use una función de salida personalizada
+        try {
+            // Incluir el script - esto ejecutará todo el código
+            include $scriptPath;
+        } catch (Exception $e) {
+            $outputText = ob_get_clean();
+            throw new Exception('Error al ejecutar script: ' . $e->getMessage() . "\nSalida: " . $outputText);
+        }
+        
+        $outputText = ob_get_clean();
+        $returnVar = 0; // Asumir éxito si no hay excepciones
     }
-    
-    $cmd = sprintf(
-        '"%s" "%s" --type=%s --limit=%d --since-days=%d --min-seeds=%d%s',
-        $phpPath,
-        escapeshellarg($scriptPath),
-        escapeshellarg($type),
-        $limit,
-        $sinceDays,
-        $minSeeds,
-        $dryRun ? ' --dry-run' : ''
-    );
-    
-    // Ejecutar script y capturar salida
-    $output = [];
-    $returnVar = 0;
-    $startTime = microtime(true);
-    
-    exec($cmd . ' 2>&1', $output, $returnVar);
     
     $endTime = microtime(true);
     $executionTime = round($endTime - $startTime, 2);
     
-    $outputText = implode("\n", $output);
-    
     // Parsear resultados de la salida
-    $created = 0;
-    $updated = 0;
-    $newEpisodes = 0;
-    
     if (preg_match('/Creados:\s*(\d+)/', $outputText, $matches)) {
         $created = (int)$matches[1];
     }
@@ -135,13 +149,9 @@ try {
     // Determinar si fue exitoso
     $success = $returnVar === 0;
     
-    // Determinar si fue exitoso basado en el código de retorno y la salida
-    $success = $returnVar === 0;
-    
     // Si hay errores críticos en la salida, marcar como fallido
     $hasCriticalError = false;
     if (stripos($outputText, 'error') !== false || stripos($outputText, 'fatal') !== false) {
-        // Verificar si son errores críticos
         $criticalErrors = ['no se reconoce', 'command not found', 'fatal error', 'parse error', 'syntax error'];
         foreach ($criticalErrors as $criticalError) {
             if (stripos($outputText, $criticalError) !== false) {
@@ -173,7 +183,7 @@ try {
             'execution_time' => $executionTime . 's',
             'output' => $outputText,
             'return_code' => $returnVar,
-            'php_path' => $phpPath
+            'method' => $useExec ? 'exec' : 'direct'
         ]
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     

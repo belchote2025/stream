@@ -4,16 +4,44 @@
  * GET /api/content/popular?type=movie&limit=10
  */
 
+// Establecer headers ANTES de cualquier output
+ob_start(); // Iniciar buffer de salida para capturar cualquier output accidental
+
 // Desactivar mostrar errores en pantalla para APIs
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
+ini_set('log_errors', 1);
 
-header('Content-Type: application/json');
+// Configuración de encabezados HTTP
+header('Access-Control-Allow-Origin: *');
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Methods: GET');
+header('X-Content-Type-Options: nosniff');
+
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/image-helper.php';
 
+// Limpiar cualquier output accidental antes de continuar
+ob_clean();
+
 try {
-    $db = getDbConnection();
+    // Intentar conectar a la base de datos
+    try {
+        $db = getDbConnection();
+    } catch (PDOException $dbError) {
+        // Si falla la conexión, devolver JSON de error en lugar de die()
+        if (ob_get_level() > 0) {
+            ob_clean();
+        }
+        http_response_code(503);
+        header('Content-Type: application/json; charset=utf-8');
+        error_log('Error de conexión a BD en popular.php: ' . $dbError->getMessage());
+        echo json_encode([
+            'success' => false,
+            'error' => 'Error de conexión a la base de datos. Por favor, inténtelo más tarde.'
+        ]);
+        exit;
+    }
     
     // Obtener parámetros
     $type = isset($_GET['type']) ? $_GET['type'] : null; // 'movie' o 'series'
@@ -122,6 +150,11 @@ try {
         ];
     }
     
+    // Limpiar buffer antes de enviar respuesta
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    
     echo json_encode([
         'success' => true,
         'data' => $formatted,
@@ -130,8 +163,13 @@ try {
     ]);
     
 } catch (PDOException $e) {
+    // Limpiar buffer antes de enviar error
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    
     http_response_code(500);
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
     error_log('Error en popular.php: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
@@ -140,8 +178,13 @@ try {
     ]);
     exit;
 } catch (Exception $e) {
+    // Limpiar buffer antes de enviar error
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    
     http_response_code(500);
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=utf-8');
     error_log('Error en popular.php: ' . $e->getMessage());
     echo json_encode([
         'success' => false,

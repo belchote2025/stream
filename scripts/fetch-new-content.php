@@ -31,20 +31,62 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/imdb-helper.php';
 
-// -------------------- Configuración CLI --------------------
-$options = getopt('', [
-    'type::',         // movie | tv
-    'limit::',        // int
-    'since-days::',   // int
-    'min-seeds::',    // int
-    'dry-run::'       // bool
-]);
+// -------------------- Detectar contexto (CLI o Web) --------------------
+$isCli = php_sapi_name() === 'cli';
 
-$type = ($options['type'] ?? 'movie') === 'series' ? 'tv' : ($options['type'] ?? 'movie');
-$limit = isset($options['limit']) ? max(1, (int)$options['limit']) : 30;
-$sinceDays = isset($options['since-days']) ? max(0, (int)$options['since-days']) : 7;
-$minSeeds = isset($options['min-seeds']) ? max(0, (int)$options['min-seeds']) : 10;
-$dryRun = filter_var($options['dry-run'] ?? false, FILTER_VALIDATE_BOOLEAN);
+// Función de salida que funciona tanto en CLI como en Web
+function scriptOutput(string $message, bool $isError = false): void {
+    global $isCli;
+    if ($isCli) {
+        $stream = $isError ? STDERR : STDOUT;
+        fwrite($stream, $message . "\n");
+    } else {
+        // En web, la salida se captura con ob_start()
+        echo $message . "\n";
+    }
+}
+
+// -------------------- Configuración CLI/Web --------------------
+if ($isCli) {
+    // Desde CLI: usar getopt
+    $options = getopt('', [
+        'type::',         // movie | tv
+        'limit::',        // int
+        'since-days::',   // int
+        'min-seeds::',    // int
+        'dry-run::'       // bool
+    ]);
+    
+    $type = ($options['type'] ?? 'movie') === 'series' ? 'tv' : ($options['type'] ?? 'movie');
+    $limit = isset($options['limit']) ? max(1, (int)$options['limit']) : 30;
+    $sinceDays = isset($options['since-days']) ? max(0, (int)$options['since-days']) : 7;
+    $minSeeds = isset($options['min-seeds']) ? max(0, (int)$options['min-seeds']) : 10;
+    $dryRun = filter_var($options['dry-run'] ?? false, FILTER_VALIDATE_BOOLEAN);
+} else {
+    // Desde Web: leer de $_SERVER['argv'] simulado o variables globales
+    $type = 'movie';
+    $limit = 30;
+    $sinceDays = 7;
+    $minSeeds = 10;
+    $dryRun = false;
+    
+    if (isset($_SERVER['argv']) && is_array($_SERVER['argv'])) {
+        foreach ($_SERVER['argv'] as $arg) {
+            if (strpos($arg, '--type=') === 0) {
+                $type = substr($arg, 7);
+                $type = $type === 'series' ? 'tv' : $type;
+            } elseif (strpos($arg, '--limit=') === 0) {
+                $limit = max(1, (int)substr($arg, 8));
+            } elseif (strpos($arg, '--since-days=') === 0) {
+                $sinceDays = max(0, (int)substr($arg, 13));
+            } elseif (strpos($arg, '--min-seeds=') === 0) {
+                $minSeeds = max(0, (int)substr($arg, 12));
+            } elseif ($arg === '--dry-run') {
+                $dryRun = true;
+            }
+        }
+    }
+}
 
 $omdbKey = getenv('OMDB_API_KEY') ?: (defined('OMDB_API_KEY') ? OMDB_API_KEY : '');
 $torrentioBase = getenv('TORRENTIO_BASE_URL') ?: 'https://torrentio.strem.fun';
@@ -83,7 +125,7 @@ function httpJson(string $url, int $timeout = 10): ?array
                 return $data;
             }
         } elseif ($error) {
-            fwrite(STDERR, "Error cURL: {$error}\n");
+            scriptOutput("Error cURL: {$error}\n");
         }
     }
     
@@ -123,15 +165,15 @@ function tvmazeSearch(string $query, string $type): array
 {
     $results = [];
     $url = "https://api.tvmaze.com/search/shows?q=" . urlencode($query);
-    fwrite(STDOUT, "Buscando en TVMaze: {$query}...\n");
+    scriptOutput("Buscando en TVMaze: {$query}...\n");
     
     $data = httpJson($url, 15);
     if (!$data || !is_array($data)) {
-        fwrite(STDOUT, "No se recibieron datos de TVMaze para: {$query}\n");
+        scriptOutput("No se recibieron datos de TVMaze para: {$query}\n");
         return $results;
     }
     
-    fwrite(STDOUT, "TVMaze devolvió " . count($data) . " resultados para: {$query}\n");
+    scriptOutput("TVMaze devolvió " . count($data) . " resultados para: {$query}\n");
     
     foreach ($data as $item) {
         if (!isset($item['show'])) {
@@ -152,7 +194,7 @@ function tvmazeSearch(string $query, string $type): array
         }
     }
     
-    fwrite(STDOUT, "Filtrados " . count($results) . " resultados válidos para: {$query}\n");
+    scriptOutput("Filtrados " . count($results) . " resultados válidos para: {$query}\n");
     return $results;
 }
 
@@ -190,7 +232,7 @@ function tvmazeGetUpdates(): array
 function traktHttpJson(string $url, string $clientId, int $timeout = 10): ?array
 {
     if (empty($clientId)) {
-        fwrite(STDERR, "ERROR: Client ID vacío para Trakt.tv\n");
+        scriptOutput("ERROR: Client ID vacío para Trakt.tv\n");
         return null;
     }
     
@@ -222,20 +264,20 @@ function traktHttpJson(string $url, string $clientId, int $timeout = 10): ?array
             if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
                 return $data;
             } else {
-                fwrite(STDERR, "ERROR Trakt.tv: JSON inválido - " . json_last_error_msg() . "\n");
+                scriptOutput("ERROR Trakt.tv: JSON inválido - " . json_last_error_msg() . "\n");
             }
         } else {
             $errorMsg = $error ?: "HTTP $code";
             if ($code === 401) {
-                fwrite(STDERR, "ERROR Trakt.tv: No autorizado (401). Verifica que el Client ID sea correcto.\n");
+                scriptOutput("ERROR Trakt.tv: No autorizado (401). Verifica que el Client ID sea correcto.\n");
             } elseif ($code === 404) {
-                fwrite(STDERR, "ERROR Trakt.tv: Endpoint no encontrado (404). URL: $url\n");
+                scriptOutput("ERROR Trakt.tv: Endpoint no encontrado (404). URL: $url\n");
             } else {
-                fwrite(STDERR, "ERROR Trakt.tv: $errorMsg. Respuesta: " . substr($resp, 0, 200) . "\n");
+                scriptOutput("ERROR Trakt.tv: $errorMsg. Respuesta: " . substr($resp, 0, 200) . "\n");
             }
         }
     } else {
-        fwrite(STDERR, "ERROR: cURL no disponible\n");
+        scriptOutput("ERROR: cURL no disponible\n");
     }
     return null;
 }
@@ -250,11 +292,11 @@ function traktGetTrending(string $type, string $clientId, int $limit = 30): arra
     $endpoint = $type === 'tv' ? 'shows' : 'movies';
     $url = "https://api.trakt.tv/{$endpoint}/trending?limit={$limit}";
     
-    fwrite(STDOUT, "Buscando trending en Trakt.tv ({$type})...\n");
+    scriptOutput("Buscando trending en Trakt.tv ({$type})...\n");
     $data = traktHttpJson($url, $clientId, 15);
     
     if (!empty($data) && is_array($data)) {
-        fwrite(STDOUT, "Trakt.tv devolvió " . count($data) . " resultados\n");
+        scriptOutput("Trakt.tv devolvió " . count($data) . " resultados\n");
         foreach ($data as $item) {
             $show = $item[$endpoint === 'shows' ? 'show' : 'movie'] ?? null;
             if ($show) {
@@ -300,11 +342,11 @@ function traktGetPopular(string $type, string $clientId, int $limit = 30): array
     $endpoint = $type === 'tv' ? 'shows' : 'movies';
     $url = "https://api.trakt.tv/{$endpoint}/popular?limit={$limit}";
     
-    fwrite(STDOUT, "Buscando populares en Trakt.tv ({$type})...\n");
+    scriptOutput("Buscando populares en Trakt.tv ({$type})...\n");
     $data = traktHttpJson($url, $clientId, 15);
     
     if (!empty($data) && is_array($data)) {
-        fwrite(STDOUT, "Trakt.tv devolvió " . count($data) . " resultados populares\n");
+        scriptOutput("Trakt.tv devolvió " . count($data) . " resultados populares\n");
         foreach ($data as $item) {
             $show = $item[$endpoint === 'shows' ? 'show' : 'movie'] ?? null;
             if ($show) {
@@ -939,7 +981,7 @@ function notifyAdmin(PDO $db, string $title, string $message, ?int $contentId = 
     } catch (PDOException $e) {
         // Si la tabla no existe (SQLSTATE 42S02), omitir silenciosamente
         if ($e->getCode() !== '42S02') {
-            fwrite(STDERR, "Error al insertar notificación: " . $e->getMessage() . "\n");
+            scriptOutput("Error al insertar notificación: " . $e->getMessage() . "\n", true);
         }
     } catch (Exception $e) {
         // Ignorar otros errores no críticos
@@ -947,16 +989,16 @@ function notifyAdmin(PDO $db, string $title, string $message, ?int $contentId = 
 }
 
 // -------------------- Proceso principal --------------------
-fwrite(STDOUT, "Buscando novedades desde múltiples fuentes (TVMaze, Trakt.tv)...\n");
-fwrite(STDOUT, "Parámetros: tipo={$type}, límite={$limit}, días={$sinceDays}, min_seeds={$minSeeds}\n");
+scriptOutput("Buscando novedades desde múltiples fuentes (TVMaze, Trakt.tv)...\n");
+scriptOutput("Parámetros: tipo={$type}, límite={$limit}, días={$sinceDays}, min_seeds={$minSeeds}\n");
 
 $items = [];
 $seenIds = [];
 
 // Fuente 1: Trakt.tv (si está configurado)
 if (!empty($traktClientId)) {
-    fwrite(STDOUT, "\n=== Buscando en Trakt.tv ===\n");
-    fwrite(STDOUT, "Client ID configurado: " . substr($traktClientId, 0, 20) . "...\n");
+    scriptOutput("\n=== Buscando en Trakt.tv ===\n");
+    scriptOutput("Client ID configurado: " . substr($traktClientId, 0, 20) . "...\n");
     try {
         $traktTrending = traktGetTrending($type, $traktClientId, $limit);
         foreach ($traktTrending as $item) {
@@ -969,7 +1011,7 @@ if (!empty($traktClientId)) {
                 }
             }
         }
-        fwrite(STDOUT, "Trakt.tv trending: " . count($traktTrending) . " resultados\n");
+        scriptOutput("Trakt.tv trending: " . count($traktTrending) . " resultados\n");
         
         if (count($items) < $limit) {
             $traktPopular = traktGetPopular($type, $traktClientId, $limit);
@@ -983,30 +1025,30 @@ if (!empty($traktClientId)) {
                     }
                 }
             }
-            fwrite(STDOUT, "Trakt.tv popular: " . count($traktPopular) . " resultados\n");
+            scriptOutput("Trakt.tv popular: " . count($traktPopular) . " resultados\n");
         }
     } catch (Exception $e) {
-        fwrite(STDERR, "Error en Trakt.tv: " . $e->getMessage() . "\n");
+        scriptOutput("Error en Trakt.tv: " . $e->getMessage() . "\n", true);
     }
 } else {
-    fwrite(STDOUT, "Trakt.tv no configurado (TRAKT_CLIENT_ID). Obtén uno gratis en https://trakt.tv/oauth/applications\n");
+    scriptOutput("Trakt.tv no configurado (TRAKT_CLIENT_ID). Obtén uno gratis en https://trakt.tv/oauth/applications\n");
 }
 
 // Fuente 2: TVMaze
-fwrite(STDOUT, "\n=== Buscando en TVMaze ===\n");
+scriptOutput("\n=== Buscando en TVMaze ===\n");
 // Probar conexión a TVMaze primero
-fwrite(STDOUT, "Probando conexión con TVMaze...\n");
+scriptOutput("Probando conexión con TVMaze...\n");
 $testUrl = "https://api.tvmaze.com/shows/1";
 $testData = httpJson($testUrl, 10);
 if ($testData) {
-    fwrite(STDOUT, "✓ Conexión con TVMaze exitosa\n");
+    scriptOutput("✓ Conexión con TVMaze exitosa\n");
 } else {
-    fwrite(STDOUT, "✗ No se pudo conectar con TVMaze. Verifica tu conexión a internet.\n");
+    scriptOutput("✗ No se pudo conectar con TVMaze. Verifica tu conexión a internet.\n", true);
 }
 
 try {
     $tvmazeItems = tvmazeGetRecentShows($limit, $sinceDays, $type);
-    fwrite(STDOUT, "Resultados de tvmazeGetRecentShows: " . count($tvmazeItems) . " items\n");
+    scriptOutput("Resultados de tvmazeGetRecentShows: " . count($tvmazeItems) . " items\n");
     
     foreach ($tvmazeItems as $item) {
         $itemId = $item['id'] ?? null;
@@ -1020,15 +1062,15 @@ try {
     }
     
     if (empty($items)) {
-        fwrite(STDOUT, "No se encontraron resultados desde TVMaze. Intentando con búsqueda alternativa...\n");
+        scriptOutput("No se encontraron resultados desde TVMaze. Intentando con búsqueda alternativa...\n");
         
         // Estrategia alternativa: obtener shows directamente sin filtros de fecha
-        fwrite(STDOUT, "Obteniendo shows directamente (sin filtro de fecha)...\n");
+        scriptOutput("Obteniendo shows directamente (sin filtro de fecha)...\n");
         $url = "https://api.tvmaze.com/shows?page=0";
         $shows = httpJson($url, 15);
         
         if (!empty($shows) && is_array($shows)) {
-            fwrite(STDOUT, "Se obtuvieron " . count($shows) . " shows de la página 0\n");
+            scriptOutput("Se obtuvieron " . count($shows) . " shows de la página 0\n");
             $count = 0;
             foreach ($shows as $show) {
                 if ($count >= $limit) {
@@ -1068,28 +1110,31 @@ try {
                     }
                 }
             }
-            fwrite(STDOUT, "Se añadieron {$count} items después del filtrado\n");
+            scriptOutput("Se añadieron {$count} items después del filtrado\n");
         } else {
-            fwrite(STDOUT, "No se pudieron obtener shows de TVMaze\n");
+            scriptOutput("No se pudieron obtener shows de TVMaze\n");
         }
     }
 } catch (Exception $e) {
-    fwrite(STDERR, "Error al buscar en TVMaze: " . $e->getMessage() . "\n");
-    fwrite(STDERR, "Trace: " . $e->getTraceAsString() . "\n");
+    scriptOutput("Error al buscar en TVMaze: " . $e->getMessage() . "\n", true);
+    scriptOutput("Trace: " . $e->getTraceAsString() . "\n", true);
     $items = [];
 }
 
 if (empty($items)) {
-    fwrite(STDOUT, "No se encontraron resultados. El script se ejecutó correctamente pero no hay contenido nuevo disponible.\n");
-    fwrite(STDOUT, "Sugerencias:\n");
-    fwrite(STDOUT, "  - Aumenta el valor de 'Últimos días' (ej: 30 o 365)\n");
-    fwrite(STDOUT, "  - Verifica tu conexión a internet\n");
-    fwrite(STDOUT, "  - TVMaze puede estar temporalmente no disponible\n");
-    fwrite(STDOUT, "Listo. Creados: 0, actualizados: 0, episodios nuevos: 0\n");
-    exit(0);
+    scriptOutput("No se encontraron resultados. El script se ejecutó correctamente pero no hay contenido nuevo disponible.\n");
+    scriptOutput("Sugerencias:\n");
+    scriptOutput("  - Aumenta el valor de 'Últimos días' (ej: 30 o 365)\n");
+    scriptOutput("  - Verifica tu conexión a internet\n");
+    scriptOutput("  - TVMaze puede estar temporalmente no disponible\n");
+    scriptOutput("Listo. Creados: 0, actualizados: 0, episodios nuevos: 0\n");
+    if ($isCli) {
+        exit(0);
+    }
+    // En web, continuar para que el API pueda parsear la salida
 }
 
-fwrite(STDOUT, "Se encontraron " . count($items) . " items para procesar\n");
+scriptOutput("Se encontraron " . count($items) . " items para procesar\n");
 
 $created = 0;
 $updated = 0;
@@ -1129,7 +1174,7 @@ foreach ($items as $show) {
         // Obtener detalles completos
         $details = tvmazeGetShow($tvmazeId);
         if (!$details) {
-            fwrite(STDERR, "Sin detalles TVMaze para ID {$tvmazeId}\n");
+            scriptOutput("Sin detalles TVMaze para ID {$tvmazeId}\n", true);
             continue;
         }
 
@@ -1181,7 +1226,7 @@ foreach ($items as $show) {
     // 3. Torrent (si no hay video URL)
     // 4. Trailer de YouTube (si no hay video URL ni torrent)
     
-    fwrite(STDOUT, "  Buscando enlaces de video para: {$title}...\n");
+    scriptOutput("  Buscando enlaces de video para: {$title}...\n");
     
     // 2. Buscar video URL directo (streaming)
     $videoUrl = searchVideoUrl($title, $type, $releaseYear, $omdb);
@@ -1191,7 +1236,7 @@ foreach ($items as $show) {
     $bestTorrent = null;
     $hasTorrent = false;
     if (empty($videoUrl)) {
-        fwrite(STDOUT, "  No se encontró video URL directo, buscando torrents...\n");
+        scriptOutput("  No se encontró video URL directo, buscando torrents...\n");
         $torrents = searchTorrentio($title, $type, $releaseYear ? (string)$releaseYear : null, $torrentioBase);
         if ($type === 'movie') {
             $torrents = array_merge($torrents, searchYTS($title, $releaseYear ? (string)$releaseYear : null));
@@ -1202,23 +1247,23 @@ foreach ($items as $show) {
         $bestTorrent = pickBestTorrent($torrents, $minSeeds);
         $hasTorrent = !empty($bestTorrent) && !empty($bestTorrent['magnet']);
         if ($hasTorrent) {
-            fwrite(STDOUT, "  ✓ Torrent encontrado: " . ($bestTorrent['title'] ?? 'N/A') . " (seeds: " . ($bestTorrent['seeds'] ?? 0) . ")\n");
+            scriptOutput("  ✓ Torrent encontrado: " . ($bestTorrent['title'] ?? 'N/A') . " (seeds: " . ($bestTorrent['seeds'] ?? 0) . ")\n");
         } else {
-            fwrite(STDOUT, "  ✗ No se encontraron torrents válidos\n");
+            scriptOutput("  ✗ No se encontraron torrents válidos\n");
         }
     } else {
-        fwrite(STDOUT, "  ✓ Video URL encontrado: {$videoUrl}\n");
+        scriptOutput("  ✓ Video URL encontrado: {$videoUrl}\n");
     }
     
     // 4. Buscar trailer de YouTube (solo si no hay video URL ni torrent)
     $trailer = '';
     if (empty($videoUrl) && !$hasTorrent) {
-        fwrite(STDOUT, "  No hay video URL ni torrent, buscando trailer de YouTube...\n");
+        scriptOutput("  No hay video URL ni torrent, buscando trailer de YouTube...\n");
         $trailer = searchYouTubeTrailer($title, $type, $releaseYear);
         if (!empty($trailer)) {
-            fwrite(STDOUT, "  ✓ Trailer encontrado: {$trailer}\n");
+            scriptOutput("  ✓ Trailer encontrado: {$trailer}\n");
         } else {
-            fwrite(STDOUT, "  ✗ No se encontró trailer de YouTube\n");
+            scriptOutput("  ✗ No se encontró trailer de YouTube\n");
         }
     }
 
@@ -1242,7 +1287,7 @@ foreach ($items as $show) {
     ];
 
     if ($dryRun) {
-        fwrite(STDOUT, "[DRY-RUN] {$title} ({$contentData['release_year']})\n");
+        scriptOutput("[DRY-RUN] {$title} ({$contentData['release_year']})\n");
         continue;
     }
 
@@ -1325,7 +1370,7 @@ foreach ($items as $show) {
     }
 
     notifyAdmin($db, "Nuevo/actualizado: {$title}", "Se procesó contenido {$title}", $contentId);
-    fwrite(STDOUT, "Procesado: {$title}\n");
+    scriptOutput("Procesado: {$title}\n");
 }
 
-fwrite(STDOUT, "\n✅ Listo. Creados: {$created}, actualizados: {$updated}, episodios nuevos: {$newEpisodes}\n");
+scriptOutput("\n✅ Listo. Creados: {$created}, actualizados: {$updated}, episodios nuevos: {$newEpisodes}\n");

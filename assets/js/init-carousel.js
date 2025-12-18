@@ -13,9 +13,10 @@ document.addEventListener('DOMContentLoaded', function () {
             recentSeriesContainer.innerHTML = '<div class="loading-skeleton" style="height: 300px; width: 100%;"></div>';
 
             // Construir la URL de la API usando el helper global
-            const apiUrl = typeof getApiUrl === 'function'
-                ? getApiUrl('/api/content/recent?type=series&limit=12')
-                : (window.__APP_BASE_URL || '') + '/api/content/recent?type=series&limit=12';
+            const baseUrl = typeof getApiUrl === 'function'
+                ? getApiUrl('').replace(/\/$/, '')
+                : (window.__APP_BASE_URL || window.location.origin);
+            const apiUrl = `${baseUrl}/api/content/recent.php?type=series&limit=12`;
             console.log('Fetching from:', apiUrl);
 
             const response = await fetch(apiUrl, {
@@ -24,6 +25,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     'Content-Type': 'application/json'
                 }
             });
+
+            // Verificar que la respuesta sea JSON
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Respuesta no es JSON:', text.substring(0, 300));
+                throw new Error('El servidor devolvió HTML en lugar de JSON');
+            }
 
             if (!response.ok) {
                 const errorText = await response.text();

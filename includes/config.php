@@ -181,7 +181,51 @@ function getDbConnection() {
     } catch (PDOException $e) {
         // En producción, registrar el error en un archivo de log
         error_log("Error de conexión: " . $e->getMessage());
-        die("Error de conexión a la base de datos. Por favor, inténtelo más tarde.");
+        
+        // Detectar si estamos en un contexto de API de forma más robusta
+        $isApiContext = false;
+        
+        // Método 1: Verificar la URI de la petición (más confiable)
+        $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+        if (strpos($requestUri, '/api/') !== false) {
+            $isApiContext = true;
+        }
+        
+        // Método 2: Verificar el script que se está ejecutando
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+        if (strpos($scriptName, '/api/') !== false) {
+            $isApiContext = true;
+        }
+        
+        // Método 3: Verificar el archivo que está llamando usando debug_backtrace
+        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5);
+        foreach ($backtrace as $trace) {
+            if (isset($trace['file'])) {
+                $filePath = str_replace('\\', '/', $trace['file']);
+                if (strpos($filePath, '/api/') !== false) {
+                    $isApiContext = true;
+                    break;
+                }
+            }
+        }
+        
+        // Método 4: Verificar si Content-Type JSON ya fue establecido
+        $headersList = headers_list();
+        foreach ($headersList as $header) {
+            if (stripos($header, 'Content-Type: application/json') !== false) {
+                $isApiContext = true;
+                break;
+            }
+        }
+        
+        if ($isApiContext) {
+            // Lanzar excepción para que los endpoints la capturen y devuelvan JSON
+            // Esto permite que los endpoints manejen el error correctamente
+            throw new PDOException("Error de conexión a la base de datos. Por favor, inténtelo más tarde.", 0, $e);
+        } else {
+            // Para páginas normales, usar die() como antes
+            die("Error de conexión a la base de datos. Por favor, inténtelo más tarde.");
+        }
     }
     
     return $conn;

@@ -144,7 +144,7 @@ async function loadCarousel() {
 
     try {
         // Usar el endpoint de featured que no requiere autenticación
-        const response = await fetch(`${APP_BASE_URL}/api/content/featured?limit=5`);
+        const response = await fetch(`${APP_BASE_URL}/api/content/featured.php?limit=5`);
         if (!response.ok) throw new Error('Error al cargar el contenido del carrusel');
 
         // Verificar que la respuesta sea JSON
@@ -203,7 +203,8 @@ function createCarouselSlide(item, index) {
     slide.querySelector('.play-btn').addEventListener('click', () => playContent(item.id, 'movie'));
     slide.querySelector('.btn-outline').addEventListener('click', () => {
         // Redirigir a la página de detalles del contenido
-        window.location.href = `/content.php?id=${item.id}`;
+        // Usar ruta relativa para compatibilidad con root y subcarpetas
+        window.location.href = `content.php?id=${item.id}`;
     });
 
     return slide;
@@ -236,7 +237,7 @@ async function loadPopularContent() {
     // Cargar películas populares
     if (elements.popularMovies) {
         try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/popular?type=movie&limit=8`);
+            const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=movie&limit=8`);
             if (!response.ok) throw new Error('Error al cargar películas');
 
             // Verificar que la respuesta sea JSON
@@ -268,7 +269,7 @@ async function loadPopularContent() {
     // Cargar series populares
     if (elements.popularSeries) {
         try {
-            const response = await fetch(`${APP_BASE_URL}/api/content/popular?type=series&limit=8`);
+            const response = await fetch(`${APP_BASE_URL}/api/content/popular.php?type=series&limit=8`);
             if (!response.ok) throw new Error('Error al cargar series');
 
             // Verificar que la respuesta sea JSON
@@ -346,7 +347,7 @@ function createContentCard(item, type) {
         if (event.target.closest('.action-btn')) {
             return;
         }
-        window.location.href = `/content.php?id=${item.id}`;
+        window.location.href = `content.php?id=${item.id}`;
     });
 
     return card;

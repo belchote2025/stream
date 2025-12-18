@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Determine which API endpoint to use based on sort/source
             if (sort === 'popular' || source === 'popular') {
                 // Use popular endpoint
-                endpoint = `${config.apiBaseUrl}/api/content/popular`;
+                endpoint = `${config.apiBaseUrl}/api/content/popular.php`;
                 params.append('limit', limit);
 
                 // Add type if specified
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             } else if (sort === 'recent' || source === 'recent' || source === 'local') {
                 // Use recent endpoint (incluye caso 'local')
-                endpoint = `${config.apiBaseUrl}/api/content/recent`;
+                endpoint = `${config.apiBaseUrl}/api/content/recent.php`;
                 params.append('limit', limit);
 
                 // Add type if specified
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             } else if (source === 'imdb') {
                 // Use popular with type filter for IMDB content
-                endpoint = `${config.apiBaseUrl}/api/content/popular`;
+                endpoint = `${config.apiBaseUrl}/api/content/popular.php`;
                 params.append('limit', limit);
 
                 if (type && type !== 'content') {
@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             } else {
                 // Fallback to recent
-                endpoint = `${config.apiBaseUrl}/api/content/recent`;
+                endpoint = `${config.apiBaseUrl}/api/content/recent.php`;
                 params.append('limit', limit);
 
                 if (type && type !== 'content') {
@@ -131,10 +131,27 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Error HTTP ${response.status} para ${endpoint}:`, errorText.substring(0, 200));
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
+            // Verificar que la respuesta sea JSON
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error(`Respuesta no es JSON para ${endpoint}:`, text.substring(0, 300));
+                throw new Error('El servidor devolvió HTML en lugar de JSON');
+            }
+
             const data = await response.json();
+            
+            // Verificar si hay error en la respuesta
+            if (!data.success && data.error) {
+                console.error(`Error en respuesta de ${endpoint}:`, data.error);
+                throw new Error(data.error || 'Error desconocido');
+            }
+            
             const items = data.success ? data.data : data;
 
             // Cache the response

@@ -1,6 +1,17 @@
 # Habilitar rewrite engine
 RewriteEngine On
 
+# Forzar HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Headers CORS para API
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, X-Requested-With, Authorization"
+</IfModule>
+
 # Definir SITE_URL solo para el dominio de producción
 SetEnvIf Host "^goldenrod-finch-839887\.hostingersite\.com$" SITE_URL=https://goldenrod-finch-839887.hostingersite.com
 

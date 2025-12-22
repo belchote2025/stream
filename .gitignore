@@ -71,3 +71,8 @@ composer.lock
 # Archivos de wget
 wget-log
 
+# Archivos ZIP grandes (no subir a GitHub)
+*.zip
+urrestv_web.zip
+run-tests.zip
+

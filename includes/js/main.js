@@ -1019,7 +1019,6 @@ async function selectTorrentForPlayback(magnetLink, contentId) {
     if (contentId) {
         try {
             const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
-            const updateUrl = `${baseUrl}/api/content/index.php?id=${contentId}`;
             
             // Obtener información del contenido actual para preservar otros campos
             const contentResponse = await fetch(`${baseUrl}/api/content/index.php?id=${contentId}`, {
@@ -1027,20 +1026,41 @@ async function selectTorrentForPlayback(magnetLink, contentId) {
             });
             
             let contentData = {};
+            let contentType = 'movie';
+            
             if (contentResponse.ok) {
                 const contentResult = await contentResponse.json();
                 if (contentResult.success && contentResult.data) {
                     contentData = contentResult.data;
+                    contentType = contentData.type || 'movie';
                 }
             }
             
-            // Actualizar solo el campo torrent_magnet
+            // Determinar la API correcta según el tipo de contenido
+            const apiEndpoint = contentType === 'series' 
+                ? `${baseUrl}/api/series/index.php` 
+                : `${baseUrl}/api/movies/index.php`;
+            
+            // Actualizar solo el campo torrent_magnet, preservando todos los demás campos
             const updateData = {
-                ...contentData,
-                torrent_magnet: magnetLink
+                id: contentId,
+                title: contentData.title || '',
+                description: contentData.description || '',
+                release_year: contentData.release_year || null,
+                duration: contentData.duration || null,
+                type: contentType,
+                poster_url: contentData.poster_url || null,
+                backdrop_url: contentData.backdrop_url || null,
+                video_url: contentData.video_url || null,
+                trailer_url: contentData.trailer_url || null,
+                torrent_magnet: magnetLink, // Actualizar el magnet link
+                age_rating: contentData.age_rating || null,
+                is_featured: contentData.is_featured ? 1 : 0,
+                is_trending: contentData.is_trending ? 1 : 0,
+                is_premium: contentData.is_premium ? 1 : 0
             };
             
-            const updateResponse = await fetch(updateUrl, {
+            const updateResponse = await fetch(`${apiEndpoint}?id=${contentId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1055,7 +1075,17 @@ async function selectTorrentForPlayback(magnetLink, contentId) {
                     if (typeof showNotification === 'function') {
                         showNotification('Contenido actualizado correctamente. Iniciando reproducción...', 'success');
                     }
+                    // Actualizar el cache local si existe
+                    if (appState.contentCache && appState.contentCache[`${contentType}s`]) {
+                        const index = appState.contentCache[`${contentType}s`].findIndex(item => item.id === contentId);
+                        if (index !== -1) {
+                            appState.contentCache[`${contentType}s`][index].torrent_magnet = magnetLink;
+                        }
+                    }
                 }
+            } else {
+                const errorText = await updateResponse.text();
+                console.warn('Error al actualizar contenido:', errorText);
             }
         } catch (error) {
             console.warn('Error al actualizar contenido:', error);
@@ -1070,18 +1100,17 @@ async function selectTorrentForPlayback(magnetLink, contentId) {
     
     // Reproducir el contenido
     const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
-    const url = `${baseUrl}/watch.php?id=${contentId || ''}&torrent=${encodeURIComponent(magnetLink)}`;
+    const contentType = appState.activeTorrentContent?.type || 'movie';
     
     // Intentar reproducir en la misma ventana si hay un reproductor disponible
     if (typeof playContent === 'function' && contentId) {
-        // Obtener el tipo de contenido
-        const contentType = appState.activeTorrentContent?.type || 'movie';
         // Reproducir usando la función playContent
         setTimeout(() => {
             playContent(contentId, contentType);
         }, 500);
     } else {
         // Fallback: abrir en nueva pestaña
+        const url = `${baseUrl}/watch.php?id=${contentId || ''}&torrent=${encodeURIComponent(magnetLink)}`;
         window.open(url, '_blank');
     }
 }

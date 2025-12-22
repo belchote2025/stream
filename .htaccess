@@ -1,8 +1,10 @@
 # Habilitar rewrite engine
 RewriteEngine On
 
-# Forzar HTTPS
+# Forzar HTTPS (excepto en localhost)
 RewriteCond %{HTTPS} off
+RewriteCond %{HTTP_HOST} !^localhost [NC]
+RewriteCond %{HTTP_HOST} !^127\.0\.0\.1
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # Headers CORS para API

@@ -319,6 +319,13 @@
     <script src="<?php echo $baseUrl; ?>/js/netflix-enhancements.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/animations.js"></script>
     <script src="<?php echo $baseUrl; ?>/js/notifications.js"></script>
+    
+    <!-- Nuevas funcionalidades avanzadas -->
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/accessibility.css">
+    <script src="<?php echo $baseUrl; ?>/js/i18n.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/accessibility.js"></script>
+    <script src="<?php echo $baseUrl; ?>/js/trailer-preview.js"></script>
+    
     <script src="<?php echo $baseUrl; ?>/js/main.js"></script>
     
     <!-- Script de diagnóstico de botones del reproductor (solo en index.php y solo en modo debug) -->

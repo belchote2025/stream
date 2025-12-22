@@ -154,6 +154,19 @@ if ($auth->isAuthenticated()) {
                     <i class="fas fa-user-plus"></i> Crear cuenta
                 </button>
                 
+                <div class="social-login">
+                    <p class="divider">o regístrate con</p>
+                    
+                    <div class="social-buttons">
+                        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/api/auth/social/google.php" class="btn btn-social btn-google" id="googleRegisterBtn">
+                            <i class="fab fa-google"></i> Google
+                        </a>
+                        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/api/auth/social/facebook.php" class="btn btn-social btn-facebook" id="facebookRegisterBtn">
+                            <i class="fab fa-facebook-f"></i> Facebook
+                        </a>
+                    </div>
+                </div>
+                
                 <div class="auth-footer">
                     <p>¿Ya tienes una cuenta? <a href="login.php">Inicia sesión</a></p>
                 </div>
@@ -184,5 +197,6 @@ if ($auth->isAuthenticated()) {
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="js/auth.js"></script>
+    <script src="<?php echo rtrim(SITE_URL, '/'); ?>/js/social-auth.js"></script>
 </body>
 </html>

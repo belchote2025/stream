@@ -248,8 +248,12 @@ class UnifiedVideoPlayer {
             });
         }
         
+        // Detectar si es dispositivo táctil
+        const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+        const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+        
         // Mostrar/ocultar controles (solo en desktop)
-        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        if (isDesktop) {
             let controlsTimeout;
             this.container.addEventListener('mousemove', () => {
                 this.showControls();
@@ -265,23 +269,87 @@ class UnifiedVideoPlayer {
                     this.hideControls();
                 }
             });
-        } else {
-            // En dispositivos táctiles, mantener controles visibles
-            this.showControls();
         }
         
         // Toggle controles al tocar en móviles
-        if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+        if (isTouchDevice) {
+            // En móviles, mostrar controles siempre pero con auto-hide
+            this.showControls();
+            
             let touchTimeout;
-            this.container.addEventListener('touchstart', () => {
+            let lastTouchTime = 0;
+            let isControlsVisible = true;
+            
+            const hideControlsDelayed = () => {
                 clearTimeout(touchTimeout);
-                this.showControls();
                 touchTimeout = setTimeout(() => {
-                    if (this.isPlaying) {
+                    if (this.isPlaying && isControlsVisible) {
                         this.hideControls();
+                        isControlsVisible = false;
                     }
                 }, 3000);
-            });
+            };
+            
+            // Toggle al tocar el contenedor
+            this.container.addEventListener('touchstart', (e) => {
+                // No hacer toggle si se toca un control
+                if (e.target.closest('.custom-controls, .control-btn, .progress-bar-container')) {
+                    return;
+                }
+                
+                const now = Date.now();
+                if (now - lastTouchTime < 300) {
+                    // Doble toque - toggle controles
+                    if (isControlsVisible) {
+                        this.hideControls();
+                        isControlsVisible = false;
+                    } else {
+                        this.showControls();
+                        isControlsVisible = true;
+                        hideControlsDelayed();
+                    }
+                } else {
+                    // Tocar una vez - mostrar controles
+                    this.showControls();
+                    isControlsVisible = true;
+                    hideControlsDelayed();
+                }
+                lastTouchTime = now;
+            }, { passive: true });
+            
+            // Mantener controles visibles cuando se interactúa con ellos
+            const controlsElement = document.getElementById('customControls');
+            if (controlsElement) {
+                controlsElement.addEventListener('touchstart', () => {
+                    clearTimeout(touchTimeout);
+                    this.showControls();
+                    isControlsVisible = true;
+                    hideControlsDelayed();
+                }, { passive: true });
+            }
+            
+            // Activar menú de velocidad con tap
+            if (speedBtn) {
+                speedBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isActive = speedControl.classList.contains('active');
+                    if (isActive) {
+                        speedControl.classList.remove('active');
+                        speedMenu.style.display = 'none';
+                    } else {
+                        speedControl.classList.add('active');
+                        speedMenu.style.display = 'block';
+                    }
+                });
+            }
+            
+            // Cerrar menú de velocidad al tocar fuera
+            document.addEventListener('touchstart', (e) => {
+                if (speedControl && !speedControl.contains(e.target)) {
+                    speedControl.classList.remove('active');
+                    speedMenu.style.display = 'none';
+                }
+            }, { passive: true });
         }
         
         // Atajos de teclado
@@ -369,17 +437,25 @@ class UnifiedVideoPlayer {
             else if (url.startsWith('/')) {
                 // Obtener el base URL del sitio
                 const baseUrl = window.__APP_BASE_URL || window.location.origin;
-                normalizedUrl = baseUrl + url;
+                // Asegurar que no haya doble slash
+                normalizedUrl = baseUrl.replace(/\/$/, '') + url;
             }
             // Si es una ruta relativa sin /, añadir el base path
             else {
                 const baseUrl = window.__APP_BASE_URL || window.location.origin;
                 const currentPath = window.location.pathname;
-                const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
-                normalizedUrl = baseUrl + basePath + '/' + url;
+                // Si estamos en watch.php, el base path es la raíz
+                const basePath = currentPath.includes('/watch.php') ? '' : currentPath.substring(0, currentPath.lastIndexOf('/'));
+                // Asegurar que no haya doble slash
+                normalizedUrl = baseUrl.replace(/\/$/, '') + (basePath ? basePath : '') + '/' + url.replace(/^\//, '');
             }
             
-            console.log('Cargando video:', { original: url, normalized: normalizedUrl });
+            console.log('Cargando video:', { 
+                original: url, 
+                normalized: normalizedUrl,
+                baseUrl: window.__APP_BASE_URL || window.location.origin,
+                currentPath: window.location.pathname
+            });
             
             // Configurar fuente
             this.videoElement.src = normalizedUrl;
@@ -397,6 +473,11 @@ class UnifiedVideoPlayer {
                 if (!resolved) {
                     resolved = true;
                     this.hideLoading();
+                    // Ocultar también el mensaje de carga original de watch.php
+                    const originalLoading = document.querySelector('.video-loading');
+                    if (originalLoading) {
+                        originalLoading.style.display = 'none';
+                    }
                     resolve();
                 }
             }, { once: true });
@@ -405,6 +486,11 @@ class UnifiedVideoPlayer {
                 if (!resolved) {
                     resolved = true;
                     this.hideLoading();
+                    // Ocultar también el mensaje de carga original de watch.php
+                    const originalLoading = document.querySelector('.video-loading');
+                    if (originalLoading) {
+                        originalLoading.style.display = 'none';
+                    }
                     resolve();
                 }
             }, { once: true });
@@ -421,20 +507,59 @@ class UnifiedVideoPlayer {
                                 errorMessage = 'La reproducción fue abortada';
                                 break;
                             case error.MEDIA_ERR_NETWORK:
-                                errorMessage = 'Error de red al cargar el video';
+                                errorMessage = 'Error de red al cargar el video. Verifica que el archivo exista y sea accesible.';
                                 break;
                             case error.MEDIA_ERR_DECODE:
-                                errorMessage = 'Error al decodificar el video';
+                                errorMessage = 'Error al decodificar el video. El formato puede no ser compatible.';
                                 break;
                             case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                                errorMessage = 'El formato de video no es compatible o la URL no es válida';
+                                errorMessage = 'El formato de video no es compatible o la URL no es válida. URL: ' + normalizedUrl;
                                 break;
                         }
                     }
                     
+                    // Log detallado del error
+                    console.error('Error al cargar video:', {
+                        errorCode: error ? error.code : 'unknown',
+                        errorMessage: errorMessage,
+                        originalUrl: url,
+                        normalizedUrl: normalizedUrl,
+                        videoElement: this.videoElement,
+                        networkState: this.videoElement.networkState,
+                        readyState: this.videoElement.readyState
+                    });
+                    
+                    this.hideLoading();
+                    // Ocultar también el mensaje de carga original de watch.php
+                    const originalLoading = document.querySelector('.video-loading');
+                    if (originalLoading) {
+                        originalLoading.style.display = 'none';
+                    }
                     reject(new Error(errorMessage + ' (URL: ' + normalizedUrl + ')'));
                 }
             }, { once: true });
+            
+            // Añadir más listeners para debugging
+            this.videoElement.addEventListener('loadstart', () => {
+                console.log('[Video] loadstart - Iniciando carga del video');
+            });
+            
+            this.videoElement.addEventListener('loadedmetadata', () => {
+                console.log('[Video] loadedmetadata - Metadatos cargados:', {
+                    duration: this.videoElement.duration,
+                    videoWidth: this.videoElement.videoWidth,
+                    videoHeight: this.videoElement.videoHeight,
+                    readyState: this.videoElement.readyState
+                });
+            });
+            
+            this.videoElement.addEventListener('stalled', () => {
+                console.warn('[Video] stalled - La descarga se ha detenido');
+            });
+            
+            this.videoElement.addEventListener('suspend', () => {
+                console.warn('[Video] suspend - La descarga se ha suspendido');
+            });
             
             // Intentar cargar el video
             try {

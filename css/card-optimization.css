@@ -1,0 +1,92 @@
+/* ============================================
+   OPTIMIZACIÓN DE TARJETAS - TAMAÑO UNIFORME
+   ============================================ */
+
+/* Asegurar que todas las tarjetas tengan el mismo tamaño */
+.content-card {
+    /* Mantener aspect-ratio 2:3 para todas las tarjetas */
+    aspect-ratio: 2/3 !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Contenedor de media con altura fija */
+.content-card-media {
+    /* Mantener aspect-ratio y altura completa */
+    aspect-ratio: 2/3 !important;
+    width: 100% !important;
+    height: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
+}
+
+/* Imágenes siempre del mismo tamaño */
+.content-card-media img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    aspect-ratio: 2/3 !important;
+    display: block !important;
+    flex-shrink: 0 !important;
+}
+
+/* Imágenes que fallan al cargar */
+.content-card-media img[src=""],
+.content-card-media img:not([src]),
+.content-card-media img[src*="default-poster"],
+.content-card-media img[src*="placeholder"] {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    aspect-ratio: 2/3 !important;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
+}
+
+/* Asegurar que las imágenes locales también se ajusten */
+.content-card-media img[src*="/uploads/"],
+.content-card-media img[src*="local"] {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    aspect-ratio: 2/3 !important;
+}
+
+/* Responsive - mantener aspect-ratio en todos los tamaños */
+@media (max-width: 768px) {
+    .content-card {
+        aspect-ratio: 2/3 !important;
+    }
+    
+    .content-card-media {
+        aspect-ratio: 2/3 !important;
+    }
+    
+    .content-card-media img {
+        aspect-ratio: 2/3 !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .content-card {
+        aspect-ratio: 2/3 !important;
+    }
+    
+    .content-card-media {
+        aspect-ratio: 2/3 !important;
+    }
+    
+    .content-card-media img {
+        aspect-ratio: 2/3 !important;
+    }
+}
+
+

@@ -557,6 +557,11 @@ $playerVersion = @filemtime(__DIR__ . '/js/player/main.js') ?: time();
 <script>
 // Configuración global
 const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+// Definir __APP_BASE_URL si no está definido
+if (typeof window !== 'undefined' && !window.__APP_BASE_URL) {
+    window.__APP_BASE_URL = '<?php echo rtrim(SITE_URL, '/'); ?>';
+}
+const APP_BASE_URL = window.__APP_BASE_URL || '<?php echo rtrim(SITE_URL, '/'); ?>';
 
 // WebTorrent se cargará de forma asíncrona, no verificar aquí
 // La verificación se hará cuando realmente se necesite usar WebTorrent
@@ -610,6 +615,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const startTime = <?php echo ($savedProgress && $savedProgress['progress'] > 10) ? $savedProgress['progress'] : 0; ?>;
 
     try {
+        // Ocultar el mensaje de carga inicial cuando se crea el reproductor
+        const loadingDiv = document.querySelector('.video-loading');
+        
         player = new UnifiedVideoPlayer('unifiedVideoContainer', {
             autoplay: false,
             controls: true,
@@ -628,9 +636,23 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             onError: (error) => {
                 console.error('Error en el reproductor:', error);
+                // Ocultar el mensaje de carga en caso de error
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
                 showVideoError(error);
             }
         });
+        
+        // Ocultar el mensaje de carga cuando el reproductor está listo
+        if (loadingDiv && player) {
+            // Esperar un momento para que el reproductor se inicialice
+            setTimeout(() => {
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
+            }, 100);
+        }
 
         const urlToLoad = torrentMagnet || videoUrl;
 
@@ -679,12 +701,27 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 player.loadVideo(urlToLoad).then(() => {
                     console.log('Video cargado correctamente');
+                    // Ocultar el mensaje de carga original
+                    const loadingDiv = document.querySelector('.video-loading');
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
                 }).catch(error => {
                     console.error('Error al cargar el video:', error);
+                    // Ocultar el mensaje de carga en caso de error también
+                    const loadingDiv = document.querySelector('.video-loading');
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
                     showVideoError('Error al cargar el video. Por favor, intenta más tarde.');
                 });
             } catch (error) {
                 console.error('Error al cargar el video:', error);
+                // Ocultar el mensaje de carga en caso de error también
+                const loadingDiv = document.querySelector('.video-loading');
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
                 showVideoError('Error al cargar el video. Por favor, intenta más tarde.');
                 return;
             }

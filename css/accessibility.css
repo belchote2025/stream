@@ -1,0 +1,418 @@
+/**
+ * Estilos de Accesibilidad
+ * Navegación por teclado, alto contraste, tamaño de fuente ajustable
+ */
+
+/* ============================================
+   NAVEGACIÓN POR TECLADO
+   ============================================ */
+
+/* Indicador de foco visible */
+*:focus {
+    outline: 2px solid #E50914;
+    outline-offset: 2px;
+}
+
+*:focus:not(:focus-visible) {
+    outline: none;
+}
+
+*:focus-visible {
+    outline: 3px solid #E50914;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(229, 9, 20, 0.3);
+}
+
+/* Mejorar visibilidad de elementos interactivos */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 3px solid #E50914;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(229, 9, 20, 0.3);
+    z-index: 1000;
+}
+
+/* Saltar al contenido principal (skip link) */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #E50914;
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+    z-index: 10000;
+    border-radius: 0 0 4px 0;
+    font-weight: 600;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* ============================================
+   MODO ALTO CONTRASTE
+   ============================================ */
+
+body.high-contrast {
+    background: #000000 !important;
+    color: #FFFFFF !important;
+}
+
+body.high-contrast * {
+    background-color: transparent !important;
+    border-color: #FFFFFF !important;
+}
+
+body.high-contrast .content-card,
+body.high-contrast .btn,
+body.high-contrast button {
+    border: 2px solid #FFFFFF !important;
+    background: #000000 !important;
+    color: #FFFFFF !important;
+}
+
+body.high-contrast .content-card:hover {
+    border-color: #E50914 !important;
+    box-shadow: 0 0 0 3px #E50914 !important;
+}
+
+body.high-contrast a {
+    color: #E50914 !important;
+    text-decoration: underline !important;
+}
+
+body.high-contrast a:visited {
+    color: #FF6B6B !important;
+}
+
+body.high-contrast input,
+body.high-contrast textarea,
+body.high-contrast select {
+    background: #000000 !important;
+    color: #FFFFFF !important;
+    border: 2px solid #FFFFFF !important;
+}
+
+body.high-contrast input:focus,
+body.high-contrast textarea:focus,
+body.high-contrast select:focus {
+    border-color: #E50914 !important;
+    box-shadow: 0 0 0 3px #E50914 !important;
+}
+
+/* ============================================
+   TAMAÑO DE FUENTE AJUSTABLE
+   ============================================ */
+
+html {
+    font-size: 16px; /* Tamaño base */
+}
+
+body.font-small {
+    font-size: 14px;
+}
+
+body.font-normal {
+    font-size: 16px;
+}
+
+body.font-large {
+    font-size: 18px;
+}
+
+body.font-xlarge {
+    font-size: 20px;
+}
+
+body.font-xxlarge {
+    font-size: 24px;
+}
+
+/* Ajustar elementos según tamaño de fuente */
+body.font-small .content-card h3,
+body.font-small .content-title {
+    font-size: 0.9rem;
+}
+
+body.font-large .content-card h3,
+body.font-large .content-title {
+    font-size: 1.2rem;
+}
+
+body.font-xlarge .content-card h3,
+body.font-xlarge .content-title {
+    font-size: 1.4rem;
+}
+
+body.font-xxlarge .content-card h3,
+body.font-xxlarge .content-title {
+    font-size: 1.6rem;
+}
+
+/* ============================================
+   CONTROLES DE ACCESIBILIDAD
+   ============================================ */
+
+.accessibility-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+}
+
+.accessibility-toggle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #E50914 0%, #B20710 100%);
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.accessibility-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(229, 9, 20, 0.6);
+}
+
+.accessibility-toggle.active {
+    background: linear-gradient(135deg, #B20710 0%, #E50914 100%);
+    transform: scale(0.95);
+}
+
+.accessibility-controls {
+    position: absolute;
+    bottom: 70px;
+    right: 0;
+    background: rgba(20, 20, 20, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    padding: 0;
+    min-width: 280px;
+    max-width: 320px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px) scale(0.95);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.accessibility-controls.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.accessibility-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(229, 9, 20, 0.1);
+}
+
+.accessibility-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: white;
+}
+
+.accessibility-close {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.accessibility-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.accessibility-group {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.accessibility-group:last-child {
+    border-bottom: none;
+}
+
+.accessibility-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.accessibility-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.accessibility-buttons button {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+.accessibility-buttons button:hover:not(.disabled) {
+    background: rgba(229, 9, 20, 0.3);
+    border-color: #E50914;
+    transform: scale(1.05);
+}
+
+.accessibility-buttons button.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.font-size-indicator {
+    flex: 1;
+    text-align: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.toggle-button {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.toggle-button:hover {
+    background: rgba(229, 9, 20, 0.2);
+    border-color: #E50914;
+}
+
+.toggle-button.active {
+    background: linear-gradient(135deg, rgba(229, 9, 20, 0.3) 0%, rgba(178, 7, 16, 0.3) 100%);
+    border-color: #E50914;
+    color: #E50914;
+}
+
+.toggle-button.active i {
+    color: #E50914;
+}
+
+/* ============================================
+   ATRIBUTOS ARIA Y SEMÁNTICA
+   ============================================ */
+
+/* Ocultar elementos decorativos de lectores de pantalla */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Mejorar anuncios de estado */
+[role="status"],
+[role="alert"] {
+    position: relative;
+}
+
+/* ============================================
+   REDUCCIÓN DE MOVIMIENTO
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ============================================
+   RESPONSIVE PARA ACCESIBILIDAD
+   ============================================ */
+
+@media (max-width: 768px) {
+    .accessibility-container {
+        bottom: 15px;
+        right: 15px;
+    }
+    
+    .accessibility-toggle {
+        width: 48px;
+        height: 48px;
+        font-size: 1.3rem;
+    }
+    
+    .accessibility-controls {
+        bottom: 65px;
+        min-width: 260px;
+        max-width: calc(100vw - 30px);
+        right: 0;
+    }
+    
+    .accessibility-group {
+        padding: 0.875rem 1rem;
+    }
+    
+    .accessibility-buttons button {
+        width: 36px;
+        height: 36px;
+        font-size: 0.85rem;
+    }
+}
+

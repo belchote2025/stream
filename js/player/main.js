@@ -42,9 +42,22 @@ class UnifiedVideoPlayer {
             this.setupCustomControls();
             this.initWebTorrent();
             
-            // Cargar API de YouTube si no está cargada
+            // Cargar API de YouTube si no está cargada (usar función global si existe)
             if (!window.YT) {
-                this.loadYouTubeAPI();
+                if (typeof loadYouTubeAPI === 'function') {
+                    // Usar función global si está disponible
+                    loadYouTubeAPI().catch(err => {
+                        console.warn('Error al cargar YouTube API (global):', err);
+                    });
+                } else if (typeof this.loadYouTubeAPI === 'function') {
+                    // Usar método de la clase si está disponible
+                    this.loadYouTubeAPI().catch(err => {
+                        console.warn('Error al cargar YouTube API (método):', err);
+                    });
+                } else {
+                    // Si no hay método disponible, solo loguear advertencia
+                    console.warn('YouTube API no está disponible y no se puede cargar automáticamente');
+                }
             }
             
             // Configurar atajos de teclado (solo si está definida la función)
@@ -664,6 +677,51 @@ class UnifiedVideoPlayer {
         if (this.options.onError && typeof this.options.onError === 'function') {
             this.options.onError(error);
         }
+    }
+    
+    // Cargar API de YouTube (método auxiliar)
+    loadYouTubeAPI() {
+        return new Promise((resolve, reject) => {
+            if (window.YT && window.YT.Player) {
+                resolve();
+                return;
+            }
+            
+            // Si ya se está cargando, esperar
+            if (window.onYouTubeIframeAPIReady) {
+                const checkReady = setInterval(() => {
+                    if (window.YT && window.YT.Player) {
+                        clearInterval(checkReady);
+                        resolve();
+                    }
+                }, 100);
+                
+                setTimeout(() => {
+                    clearInterval(checkReady);
+                    if (!window.YT || !window.YT.Player) {
+                        reject(new Error('Timeout al cargar YouTube API'));
+                    }
+                }, 10000);
+                return;
+            }
+            
+            // Cargar la API
+            window.onYouTubeIframeAPIReady = () => {
+                resolve();
+            };
+            
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            
+            // Timeout
+            setTimeout(() => {
+                if (!window.YT || !window.YT.Player) {
+                    reject(new Error('Timeout al cargar YouTube API'));
+                }
+            }, 10000);
+        });
     }
     
     // Limpieza

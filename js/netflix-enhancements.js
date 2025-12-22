@@ -36,21 +36,60 @@
     // ============================================
     // SEARCH FUNCTIONALITY MEJORADA
     // ============================================
+    function closeAutocomplete() {
+        const autocompleteResults = document.getElementById('autocompleteResults');
+        if (autocompleteResults) {
+            autocompleteResults.classList.remove('active');
+            autocompleteResults.innerHTML = '';
+        }
+    }
+
+    function closeSearch() {
+        const searchContainer = document.getElementById('searchContainer');
+        const searchInput = document.getElementById('searchInput');
+        const searchClear = document.getElementById('searchClear');
+
+        if (searchContainer) {
+            searchContainer.classList.remove('active');
+        }
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        if (searchClear) {
+            searchClear.style.display = 'none';
+        }
+        closeAutocomplete();
+        document.body.style.overflow = '';
+    }
+
     function initSearch() {
         const searchContainer = document.getElementById('searchContainer');
         const searchInput = document.getElementById('searchInput');
         const searchToggle = document.getElementById('searchToggle');
         const searchClear = document.getElementById('searchClear');
         const autocompleteResults = document.getElementById('autocompleteResults');
+        const navbarNav = document.getElementById('navbarNav');
 
         if (!searchContainer || !searchInput) return;
 
         // Toggle search on icon click
         if (searchToggle) {
-            searchToggle.addEventListener('click', () => {
+            searchToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Si el menú móvil está abierto, cerrarlo primero
+                if (navbarNav && navbarNav.classList.contains('active')) {
+                    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+                    if (mobileMenuToggle) mobileMenuToggle.click();
+                }
+
                 searchContainer.classList.toggle('active');
                 if (searchContainer.classList.contains('active')) {
                     searchInput.focus();
+                    if (window.innerWidth <= 992) {
+                        document.body.style.overflow = 'hidden';
+                    }
                 } else {
                     closeSearch();
                 }
@@ -63,6 +102,7 @@
                 searchInput.value = '';
                 searchInput.focus();
                 closeAutocomplete();
+                searchClear.style.display = 'none';
             });
         }
 
@@ -79,8 +119,10 @@
 
         // Close search on outside click
         document.addEventListener('click', (e) => {
-            if (!searchContainer.contains(e.target) && searchContainer.classList.contains('active')) {
-                closeSearch();
+            if (searchContainer.classList.contains('active')) {
+                if (!searchContainer.contains(e.target) && !searchToggle.contains(e.target)) {
+                    closeSearch();
+                }
             }
         });
 
@@ -208,31 +250,6 @@
             </div>
         `;
         autocompleteResults.classList.add('active');
-    }
-
-    function closeAutocomplete() {
-        const autocompleteResults = document.getElementById('autocompleteResults');
-        if (autocompleteResults) {
-            autocompleteResults.classList.remove('active');
-            autocompleteResults.innerHTML = '';
-        }
-    }
-
-    function closeSearch() {
-        const searchContainer = document.getElementById('searchContainer');
-        const searchInput = document.getElementById('searchInput');
-        const searchClear = document.getElementById('searchClear');
-
-        if (searchContainer) {
-            searchContainer.classList.remove('active');
-        }
-        if (searchInput) {
-            searchInput.value = '';
-        }
-        if (searchClear) {
-            searchClear.style.display = 'none';
-        }
-        closeAutocomplete();
     }
 
     function escapeHtml(text) {
@@ -461,9 +478,19 @@
     function setupMobileMenu() {
         const mobileMenuToggle = document.getElementById('mobileMenuToggle');
         const navbarNav = document.getElementById('navbarNav');
+        const searchContainer = document.getElementById('searchContainer');
 
         if (mobileMenuToggle && navbarNav) {
-            mobileMenuToggle.addEventListener('click', function () {
+            mobileMenuToggle.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Si el buscador está activo, cerrarlo primero
+                if (searchContainer && searchContainer.classList.contains('active')) {
+                    const searchToggle = document.getElementById('searchToggle');
+                    if (searchToggle) searchToggle.click();
+                }
+
                 navbarNav.classList.toggle('active');
                 this.classList.toggle('active');
                 const icon = this.querySelector('i');
@@ -471,10 +498,12 @@
                     icon.classList.remove('fa-bars');
                     icon.classList.add('fa-times');
                     document.body.style.overflow = 'hidden';
+                    document.documentElement.style.overflow = 'hidden';
                 } else {
                     icon.classList.remove('fa-times');
                     icon.classList.add('fa-bars');
                     document.body.style.overflow = '';
+                    document.documentElement.style.overflow = '';
                 }
             });
 
@@ -489,6 +518,7 @@
                         icon.classList.add('fa-bars');
                     }
                     document.body.style.overflow = '';
+                    document.documentElement.style.overflow = '';
                 });
             });
 
@@ -504,6 +534,7 @@
                             icon.classList.add('fa-bars');
                         }
                         document.body.style.overflow = '';
+                        document.documentElement.style.overflow = '';
                     }
                 }
             });
@@ -519,6 +550,7 @@
                         icon.classList.add('fa-bars');
                     }
                     document.body.style.overflow = '';
+                    document.documentElement.style.overflow = '';
                 }
             });
         }

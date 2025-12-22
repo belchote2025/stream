@@ -391,6 +391,7 @@
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/font-awesome-fallback.css">
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/fix-visibility.css">
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/pwa-styles.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/card-optimization.css">
     
     <script>
         // Marcar que los estilos están cargados - versión simplificada

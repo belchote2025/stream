@@ -1,5 +1,5 @@
 // Service Worker para PWA - Streaming Platform
-const CACHE_NAME = 'streaming-platform-v1.0.0';
+const CACHE_NAME = 'streaming-platform-v1.0.1';
 const RUNTIME_CACHE = 'streaming-runtime-v1';
 const IMAGE_CACHE = 'streaming-images-v1';
 
@@ -61,6 +61,31 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // EXCLUIR videos grandes - dejar pasar directamente sin interceptar
+    // Los videos grandes no deben ser cacheados por el Service Worker
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4v'];
+    const isVideoFile = videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)) ||
+                       url.pathname.includes('/uploads/videos/') ||
+                       url.pathname.includes('/uploads/') && videoExtensions.some(ext => url.pathname.toLowerCase().includes(ext)) ||
+                       url.pathname.includes('/videos/') ||
+                       request.destination === 'video' ||
+                       (request.headers && request.headers.get('accept') && request.headers.get('accept').includes('video/'));
+    
+    if (isVideoFile) {
+        // Dejar pasar directamente sin interceptar - no usar event.respondWith
+        // Esto permite que el navegador maneje la petición directamente
+        return;
+    }
+
+    // EXCLUIR archivos grandes en general (más de 50MB)
+    // Verificar Content-Length si está disponible
+    if (request.headers && request.headers.get('content-length')) {
+        const contentLength = parseInt(request.headers.get('content-length'), 10);
+        if (contentLength > 50 * 1024 * 1024) { // 50MB
+            return; // Dejar pasar sin interceptar
+        }
+    }
+
     // Estrategia para imágenes: Cache First
     if (request.destination === 'image') {
         event.respondWith(cacheFirstStrategy(request, IMAGE_CACHE));
@@ -117,9 +142,28 @@ async function cacheFirstStrategy(request, cacheName) {
 
     try {
         const networkResponse = await fetch(request);
-        if (networkResponse.ok && request.method === 'GET') {
-            // Solo cachear peticiones GET
-            cache.put(request, networkResponse.clone());
+        // Solo cachear respuestas completas (200 OK), no parciales (206)
+        if (networkResponse.ok && 
+            networkResponse.status === 200 && 
+            request.method === 'GET') {
+            // Verificar que no sea un video antes de cachear
+            const contentType = networkResponse.headers.get('content-type') || '';
+            const url = new URL(request.url);
+            const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4v'];
+            const isVideoFile = videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)) ||
+                               url.pathname.includes('/uploads/videos/') ||
+                               url.pathname.includes('/videos/') ||
+                               contentType.includes('video/');
+            
+            if (!isVideoFile) {
+                // Solo cachear si no es un video y es una respuesta completa
+                try {
+                    cache.put(request, networkResponse.clone());
+                } catch (cacheError) {
+                    // Si falla el cacheo (por ejemplo, respuesta parcial), ignorar silenciosamente
+                    console.warn('[SW] Could not cache response:', cacheError.message);
+                }
+            }
         }
         return networkResponse;
     } catch (error) {
@@ -150,9 +194,28 @@ async function networkFirstStrategy(request, cacheName) {
 
     try {
         const networkResponse = await fetch(request);
-        if (networkResponse.ok && request.method === 'GET') {
-            // Solo cachear peticiones GET
-            cache.put(request, networkResponse.clone());
+        // Solo cachear respuestas completas (200 OK), no parciales (206)
+        if (networkResponse.ok && 
+            networkResponse.status === 200 && 
+            request.method === 'GET') {
+            // Verificar que no sea un video antes de cachear
+            const contentType = networkResponse.headers.get('content-type') || '';
+            const url = new URL(request.url);
+            const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4v'];
+            const isVideoFile = videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)) ||
+                               url.pathname.includes('/uploads/videos/') ||
+                               url.pathname.includes('/videos/') ||
+                               contentType.includes('video/');
+            
+            if (!isVideoFile) {
+                // Solo cachear si no es un video y es una respuesta completa
+                try {
+                    cache.put(request, networkResponse.clone());
+                } catch (cacheError) {
+                    // Si falla el cacheo (por ejemplo, respuesta parcial), ignorar silenciosamente
+                    console.warn('[SW] Could not cache response:', cacheError.message);
+                }
+            }
         }
         return networkResponse;
     } catch (error) {
@@ -186,11 +249,46 @@ async function fetchAndCache(request, cacheName) {
         return;
     }
     
+    // No cachear videos
+    const url = new URL(request.url);
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4v'];
+    const isVideoFile = videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)) ||
+                       url.pathname.includes('/uploads/videos/') ||
+                       url.pathname.includes('/videos/') ||
+                       request.destination === 'video';
+    
+    if (isVideoFile) {
+        return; // No cachear videos
+    }
+    
     try {
         const networkResponse = await fetch(request);
-        if (networkResponse.ok) {
-            const cache = await caches.open(cacheName);
-            cache.put(request, networkResponse.clone());
+        // Solo cachear respuestas completas (200 OK), no parciales (206)
+        if (networkResponse.ok && networkResponse.status === 200) {
+            // Verificar Content-Type para excluir videos
+            const contentType = networkResponse.headers.get('content-type') || '';
+            if (contentType.includes('video/')) {
+                return; // No cachear videos
+            }
+            
+            // Verificar tamaño antes de cachear
+            const contentLength = networkResponse.headers.get('content-length');
+            if (contentLength && parseInt(contentLength, 10) > 10 * 1024 * 1024) {
+                return; // No cachear archivos mayores a 10MB
+            }
+            
+            // Verificar que no sea una respuesta parcial (206)
+            if (networkResponse.status === 206) {
+                return; // No cachear respuestas parciales
+            }
+            
+            try {
+                const cache = await caches.open(cacheName);
+                cache.put(request, networkResponse.clone());
+            } catch (cacheError) {
+                // Si falla el cacheo, ignorar silenciosamente
+                console.warn('[SW] Could not cache response in background:', cacheError.message);
+            }
         }
     } catch (error) {
         // Silently fail

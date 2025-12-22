@@ -107,3 +107,5 @@ chmod 600 .env
 
 Una vez configurado correctamente, los endpoints deberían devolver datos JSON válidos en lugar del error de conexión.
 
+
+

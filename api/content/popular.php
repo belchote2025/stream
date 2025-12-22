@@ -18,8 +18,25 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Methods: GET');
 header('X-Content-Type-Options: nosniff');
 
-require_once __DIR__ . '/../../includes/config.php';
-require_once __DIR__ . '/../../includes/image-helper.php';
+// Incluir dependencias con manejo de errores
+try {
+    require_once __DIR__ . '/../../includes/config.php';
+    require_once __DIR__ . '/../../includes/image-helper.php';
+} catch (Throwable $e) {
+    // Si hay error en los includes, devolver JSON de error
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    error_log('Error loading includes in popular.php: ' . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error al cargar dependencias',
+        'message' => 'Error interno del servidor'
+    ]);
+    exit;
+}
 
 // Limpiar cualquier output accidental antes de continuar
 ob_clean();

@@ -602,28 +602,55 @@
     .control-btn {
         min-width: 44px;
         min-height: 44px;
+        width: 44px;
+        height: 44px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Mostrar slider de volumen siempre en móviles */
+    .volume-slider-container {
+        width: 80px !important;
+        display: flex !important;
     }
     
     .left-controls:hover .volume-slider-container,
     .left-controls:active .volume-slider-container {
-        width: 100px;
+        width: 80px !important;
     }
     
-    .speed-control:hover .speed-menu,
+    /* Menú de velocidad con toggle en táctiles */
     .speed-control.active .speed-menu {
         display: block;
     }
     
     /* Mostrar controles siempre en dispositivos táctiles */
     .custom-controls {
-        opacity: 1;
-        pointer-events: all;
+        opacity: 1 !important;
+        pointer-events: all !important;
+        display: block !important;
     }
     
     /* Aumentar área táctil de la barra de progreso */
     .progress-bar-container {
         min-height: 44px;
         padding: 20px 0;
+        touch-action: manipulation;
+    }
+    
+    /* Mejorar visibilidad de controles en móviles */
+    .controls-overlay {
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.85) 50%, transparent 100%);
+    }
+    
+    /* Ocultar hover effects en táctiles */
+    .control-btn:hover {
+        transform: none;
+    }
+    
+    .control-btn:active {
+        transform: scale(0.9);
+        background: rgba(255, 255, 255, 0.3);
     }
 }
 

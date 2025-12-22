@@ -1,29 +1,35 @@
 <?php
 /**
  * CLI: Ingresa/actualiza novedades (películas y series) con prioridad torrents.
- * Usa múltiples fuentes: Trakt.tv y TVMaze (ambas gratuitas).
+ * Usa múltiples fuentes: Trakt.tv, TMDB, TVMaze (todas gratuitas).
  *
  * Uso:
  *   php scripts/fetch-new-content.php --type=movie --limit=30 --since-days=7 --min-seeds=10
  *   php scripts/fetch-new-content.php --type=tv --limit=30 --since-days=7 --min-seeds=10
  *
- * Fuentes:
- *   - Trakt.tv (gratuita, requiere TRAKT_CLIENT_ID) - fuente principal
- *   - TVMaze (gratuita, sin API key) - fuente secundaria
- *   - OMDB_API_KEY (opcional) para completar metadatos
- *   - TORRENTIO_BASE_URL (opcional)
+ * Fuentes (en orden de prioridad):
+ *   1. Trakt.tv (gratuita, requiere TRAKT_CLIENT_ID) - excelente para trending/popular
+ *   2. TVMaze (gratuita, sin API key) - buena para series, limitada para películas
+ *   3. TMDB (gratuita, requiere TMDB_API_KEY) - EXCELENTE para películas y series
+ *   4. OMDb (opcional, requiere OMDB_API_KEY) - para completar metadatos e IMDb ID
  *
- * Para obtener TRAKT_CLIENT_ID:
- *   1. Ve a https://trakt.tv/oauth/applications
- *   2. Crea una nueva aplicación (gratis)
- *   3. Copia el Client ID
- *   4. Configúralo como variable de entorno o en includes/config.php
+ * Para obtener API Keys (todas gratuitas):
+ *   - TRAKT_CLIENT_ID: https://trakt.tv/oauth/applications
+ *   - TMDB_API_KEY: https://www.themoviedb.org/settings/api (recomendado para películas)
+ *   - OMDB_API_KEY: http://www.omdbapi.com/apikey.aspx
+ *
+ * Configuración:
+ *   Agrega las API keys como variables de entorno o en includes/config.php:
+ *   - TRAKT_CLIENT_ID=tu_client_id
+ *   - TMDB_API_KEY=tu_api_key
+ *   - OMDB_API_KEY=tu_api_key
  *
  * Efectos:
  *   - Inserta/actualiza filas en content (movie/series)
  *   - Inserta/actualiza episodios para series (episodes)
  *   - Asocia géneros (content_genres)
- *   - Guarda magnet en content.torrent_magnet o episodes.video_url
+ *   - Busca enlaces de streaming (vidsrc/filemoon/streamtape) usando IMDb ID
+ *   - Guarda magnet en content.torrent_magnet o episodes.video_url como fallback
  */
 
 declare(strict_types=1);
@@ -91,6 +97,7 @@ if ($isCli) {
 $omdbKey = getenv('OMDB_API_KEY') ?: (defined('OMDB_API_KEY') ? OMDB_API_KEY : '');
 $torrentioBase = getenv('TORRENTIO_BASE_URL') ?: 'https://torrentio.strem.fun';
 $traktClientId = getenv('TRAKT_CLIENT_ID') ?: (defined('TRAKT_CLIENT_ID') ? TRAKT_CLIENT_ID : '');
+$tmdbApiKey = getenv('TMDB_API_KEY') ?: (defined('TMDB_API_KEY') ? TMDB_API_KEY : '');
 
 $db = getDbConnection();
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -226,6 +233,207 @@ function tvmazeGetUpdates(): array
     $url = "https://api.tvmaze.com/updates/shows";
     $data = httpJson($url, 12);
     return is_array($data) ? $data : [];
+}
+
+// -------------------- TMDB (The Movie Database) - API gratuita --------------------
+function tmdbHttpJson(string $url, string $apiKey, int $timeout = 8): ?array
+{
+    if (empty($apiKey)) {
+        return null;
+    }
+    
+    $fullUrl = strpos($url, '?') !== false ? $url . '&api_key=' . $apiKey : $url . '?api_key=' . $apiKey;
+    
+    if (function_exists('curl_init')) {
+        $ch = curl_init($fullUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($code === 200 && $resp) {
+            $data = json_decode($resp, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+                return $data;
+            }
+        }
+    } else {
+        $resp = @file_get_contents($fullUrl, false, stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: Mozilla/5.0\r\n",
+                'timeout' => $timeout,
+                'ignore_errors' => true
+            ]
+        ]));
+        if ($resp) {
+            $data = json_decode($resp, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
+                return $data;
+            }
+        }
+    }
+    return null;
+}
+
+function tmdbGetTrending(string $type, string $apiKey, int $limit = 30): array
+{
+    if (empty($apiKey)) {
+        return [];
+    }
+    
+    $results = [];
+    $mediaType = $type === 'tv' ? 'tv' : 'movie';
+    $url = "https://api.themoviedb.org/3/trending/{$mediaType}/day";
+    
+    scriptOutput("Buscando trending en TMDB ({$type})...\n");
+    $data = tmdbHttpJson($url, $apiKey, 8); // Timeout reducido
+    
+    if (!empty($data['results']) && is_array($data['results'])) {
+        scriptOutput("TMDB devolvió " . count($data['results']) . " resultados\n");
+        $count = 0;
+        foreach ($data['results'] as $item) {
+            if ($count >= $limit) break;
+            
+            $releaseDate = $item['release_date'] ?? $item['first_air_date'] ?? '';
+            $releaseYear = $releaseDate ? (int)substr($releaseDate, 0, 4) : null;
+            
+            $posterPath = $item['poster_path'] ?? '';
+            $backdropPath = $item['backdrop_path'] ?? '';
+            $posterUrl = $posterPath ? 'https://image.tmdb.org/t/p/w500' . $posterPath : '';
+            $backdropUrl = $backdropPath ? 'https://image.tmdb.org/t/p/w1280' . $backdropPath : '';
+            
+            $results[] = [
+                'id' => $item['id'] ?? null,
+                'name' => $item['title'] ?? $item['name'] ?? '',
+                'premiered' => $releaseDate,
+                'type' => $type === 'tv' ? 'Scripted' : 'Movie',
+                'summary' => $item['overview'] ?? '',
+                'rating' => ['average' => $item['vote_average'] ?? 0],
+                'genres' => [], // TMDB usa IDs, los convertiremos después
+                'image' => [
+                    'medium' => $posterUrl,
+                    'original' => $posterUrl
+                ],
+                'backdrop' => $backdropUrl,
+                'tmdb_id' => $item['id'] ?? null,
+                'tmdb_data' => $item // Guardar datos completos de TMDB
+            ];
+            $count++;
+        }
+    }
+    
+    return $results;
+}
+
+function tmdbGetPopular(string $type, string $apiKey, int $limit = 30): array
+{
+    if (empty($apiKey)) {
+        return [];
+    }
+    
+    $results = [];
+    $mediaType = $type === 'tv' ? 'tv' : 'movie';
+    $url = "https://api.themoviedb.org/3/{$mediaType}/popular";
+    
+    scriptOutput("Buscando populares en TMDB ({$type})...\n");
+    $data = tmdbHttpJson($url, $apiKey, 8); // Timeout reducido
+    
+    if (!empty($data['results']) && is_array($data['results'])) {
+        scriptOutput("TMDB devolvió " . count($data['results']) . " resultados populares\n");
+        $count = 0;
+        foreach ($data['results'] as $item) {
+            if ($count >= $limit) break;
+            
+            $releaseDate = $item['release_date'] ?? $item['first_air_date'] ?? '';
+            $releaseYear = $releaseDate ? (int)substr($releaseDate, 0, 4) : null;
+            
+            $posterPath = $item['poster_path'] ?? '';
+            $backdropPath = $item['backdrop_path'] ?? '';
+            $posterUrl = $posterPath ? 'https://image.tmdb.org/t/p/w500' . $posterPath : '';
+            $backdropUrl = $backdropPath ? 'https://image.tmdb.org/t/p/w1280' . $backdropPath : '';
+            
+            $results[] = [
+                'id' => $item['id'] ?? null,
+                'name' => $item['title'] ?? $item['name'] ?? '',
+                'premiered' => $releaseDate,
+                'type' => $type === 'tv' ? 'Scripted' : 'Movie',
+                'summary' => $item['overview'] ?? '',
+                'rating' => ['average' => $item['vote_average'] ?? 0],
+                'genres' => [],
+                'image' => [
+                    'medium' => $posterUrl,
+                    'original' => $posterUrl
+                ],
+                'backdrop' => $backdropUrl,
+                'tmdb_id' => $item['id'] ?? null,
+                'tmdb_data' => $item
+            ];
+            $count++;
+        }
+    }
+    
+    return $results;
+}
+
+function tmdbGetNowPlaying(string $type, string $apiKey, int $limit = 30): array
+{
+    if (empty($apiKey)) {
+        return [];
+    }
+    
+    $results = [];
+    if ($type === 'movie') {
+        $url = "https://api.themoviedb.org/3/movie/now_playing";
+    } else {
+        $url = "https://api.themoviedb.org/3/tv/on_the_air";
+    }
+    
+    scriptOutput("Buscando estrenos recientes en TMDB ({$type})...\n");
+    $data = tmdbHttpJson($url, $apiKey, 8); // Timeout reducido
+    
+    if (!empty($data['results']) && is_array($data['results'])) {
+        scriptOutput("TMDB devolvió " . count($data['results']) . " resultados de estrenos\n");
+        $count = 0;
+        foreach ($data['results'] as $item) {
+            if ($count >= $limit) break;
+            
+            $releaseDate = $item['release_date'] ?? $item['first_air_date'] ?? '';
+            
+            $posterPath = $item['poster_path'] ?? '';
+            $backdropPath = $item['backdrop_path'] ?? '';
+            $posterUrl = $posterPath ? 'https://image.tmdb.org/t/p/w500' . $posterPath : '';
+            $backdropUrl = $backdropPath ? 'https://image.tmdb.org/t/p/w1280' . $backdropPath : '';
+            
+            $results[] = [
+                'id' => $item['id'] ?? null,
+                'name' => $item['title'] ?? $item['name'] ?? '',
+                'premiered' => $releaseDate,
+                'type' => $type === 'tv' ? 'Scripted' : 'Movie',
+                'summary' => $item['overview'] ?? '',
+                'rating' => ['average' => $item['vote_average'] ?? 0],
+                'genres' => [],
+                'image' => [
+                    'medium' => $posterUrl,
+                    'original' => $posterUrl
+                ],
+                'backdrop' => $backdropUrl,
+                'tmdb_id' => $item['id'] ?? null,
+                'tmdb_data' => $item
+            ];
+            $count++;
+        }
+    }
+    
+    return $results;
 }
 
 // -------------------- Trakt.tv (gratuita, requiere client_id) --------------------
@@ -459,6 +667,9 @@ function tvmazeGetRecentShows(int $limit, int $sinceDays, string $type): array
     }
     
     // Estrategia 4: Obtener shows populares directamente (paginación)
+    // Si no hay resultados con filtro de fecha, ignorar el filtro completamente
+    $ignoreDateFilter = (count($results) === 0 && $sinceDays > 0);
+    
     if (count($results) < $limit) {
         $page = 0;
         while (count($results) < $limit && $page < 5) {
@@ -474,27 +685,31 @@ function tvmazeGetRecentShows(int $limit, int $sinceDays, string $type): array
                 $id = $show['id'] ?? 0;
                 if ($id && !isset($seenIds[$id])) {
                     $showType = $show['type'] ?? '';
-                    if ($type === 'tv' && ($showType === 'Scripted' || $showType === 'Reality' || $showType === 'Documentary')) {
-                        $seenIds[$id] = true;
-                        $premiered = $show['premiered'] ?? '';
-                        if ($premiered) {
-                            $premieredTs = strtotime($premiered);
-                            if ($premieredTs >= $cutoff || $sinceDays === 0) {
-                                $results[] = $show;
-                            }
-                        } else {
-                            $results[] = $show;
-                        }
+                    $shouldAdd = false;
+                    
+                    if ($type === 'tv' && ($showType === 'Scripted' || $showType === 'Reality' || $showType === 'Documentary' || $showType === '')) {
+                        $shouldAdd = true;
                     } elseif ($type === 'movie' && $showType === 'Movie') {
+                        $shouldAdd = true;
+                    }
+                    
+                    if ($shouldAdd) {
                         $seenIds[$id] = true;
-                        $premiered = $show['premiered'] ?? '';
-                        if ($premiered) {
-                            $premieredTs = strtotime($premiered);
-                            if ($premieredTs >= $cutoff || $sinceDays === 0) {
+                        // Si ignoramos el filtro de fecha o no hay filtro, añadir directamente
+                        if ($ignoreDateFilter || $sinceDays === 0) {
+                            $results[] = $show;
+                        } else {
+                            // Aplicar filtro de fecha solo si no estamos ignorándolo
+                            $premiered = $show['premiered'] ?? '';
+                            if ($premiered) {
+                                $premieredTs = strtotime($premiered);
+                                if ($premieredTs >= $cutoff) {
+                                    $results[] = $show;
+                                }
+                            } else {
+                                // Si no tiene fecha, añadir de todas formas
                                 $results[] = $show;
                             }
-                        } else {
-                            $results[] = $show;
                         }
                     }
                 }
@@ -527,15 +742,107 @@ function omdbFetch(string $title, ?string $year, string $type, string $apiKey): 
 
 // -------------------- Búsqueda de Video URL Directo --------------------
 /**
- * Busca enlaces de video directos (streaming) para el contenido.
- * Prioridad: OMDB (si tiene enlace), luego intenta buscar en APIs públicas.
+ * Obtiene imdbId usando OMDB (si es posible) o los datos ya obtenidos.
  */
-function searchVideoUrl(string $title, string $type, ?int $year, ?array $omdb): ?string
+function resolveImdbId(string $title, ?int $year, string $type, ?array $omdb): string
 {
-    // OMDB no suele tener enlaces directos, pero podemos intentar otras fuentes
-    // Por ahora, retornamos null para que se use torrent o trailer
-    // En el futuro se podría integrar con APIs de streaming o enlaces directos
-    return null;
+    if (!empty($omdb['imdbID'])) {
+        return $omdb['imdbID'];
+    }
+
+    $omdbKey = getenv('OMDB_API_KEY') ?: (defined('OMDB_API_KEY') ? OMDB_API_KEY : '');
+    if (empty($omdbKey) || $omdbKey === 'demo') {
+        // Fallback: intentar scraping directo a IMDb (sin API)
+        return scrapeImdbIdFromWeb($title, $year, $type);
+    }
+
+    $fetched = omdbFetch($title, $year ? (string)$year : null, $type, $omdbKey);
+    if (!empty($fetched['imdbID'])) {
+        return $fetched['imdbID'];
+    }
+
+    // Fallback: scraping si OMDB no devolvió ID
+    return scrapeImdbIdFromWeb($title, $year, $type);
+}
+
+/**
+ * Construye lista de URLs de embed (prioriza mirrors tipo filemoon/streamtape via proveedores).
+ */
+function buildEmbedProviders(string $imdbId, string $type, ?int $season = null, ?int $episode = null): array
+{
+    // vidsrc soporta ruta /tv/{imdb}/{season}-{episode} para episodios concretos
+    if ($type === 'tv' && $season !== null && $episode !== null) {
+        return [
+            "https://vidsrc.to/embed/tv/{$imdbId}/{$season}-{$episode}",
+            "https://vidsrc.cc/v2/embed/tv/{$imdbId}/{$season}-{$episode}",
+            "https://embed.smashystream.com/play/{$imdbId}/{$season}-{$episode}",
+        ];
+    }
+
+    // Genérico por serie/película (el proveedor resuelve capítulos internamente)
+    if ($type === 'tv') {
+        return [
+            "https://vidsrc.to/embed/tv/{$imdbId}",
+            "https://vidsrc.cc/v2/embed/tv/{$imdbId}",
+            "https://embed.smashystream.com/play/{$imdbId}",
+        ];
+    }
+
+    return [
+        "https://vidsrc.to/embed/movie/{$imdbId}",
+        "https://vidsrc.cc/v2/embed/movie/{$imdbId}",
+        "https://embed.smashystream.com/play/{$imdbId}",
+    ];
+}
+
+/**
+ * Scraping sencillo a IMDb para obtener un imdbId sin API.
+ * Usa búsqueda web y toma el primer tt\d+ encontrado.
+ */
+function scrapeImdbIdFromWeb(string $title, ?int $year, string $type): string
+{
+    $query = urlencode(trim($title) . ' ' . ($year ?: ''));
+    // imdb tt search; ttype ft(movie)/tv
+    $ttype = ($type === 'tv') ? 'tv' : 'ft';
+    $url = "https://www.imdb.com/find?q={$query}&s=tt&ttype={$ttype}";
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n",
+            'timeout' => 4,
+            'ignore_errors' => true,
+        ]
+    ]);
+
+    try {
+        $html = @file_get_contents($url, false, $context);
+        if (!$html) {
+            return '';
+        }
+        if (preg_match('/\/title\/(tt\d+)/', $html, $m)) {
+            return $m[1];
+        }
+    } catch (Exception $e) {
+        // Silenciar errores; retornará vacío
+    }
+    return '';
+}
+
+/**
+ * Busca enlace de video directo (streaming) para el contenido.
+ * Devuelve el primer embed disponible a partir de imdbId.
+ */
+function searchVideoUrl(string $title, string $type, ?int $year, ?array $omdb, ?string $imdbId = null): ?string
+{
+    // Resolver imdbId si no viene
+    $imdbId = $imdbId ?: resolveImdbId($title, $year, $type, $omdb);
+    if (empty($imdbId)) {
+        return null;
+    }
+
+    $providers = buildEmbedProviders($imdbId, $type);
+    return $providers[0] ?? null;
 }
 
 // -------------------- Búsqueda de Trailer en YouTube --------------------
@@ -1062,71 +1369,143 @@ try {
     }
     
     if (empty($items)) {
-        scriptOutput("No se encontraron resultados desde TVMaze. Intentando con búsqueda alternativa...\n");
+        scriptOutput("No se encontraron resultados desde TVMaze con filtro de fecha. Buscando contenido popular sin filtro...\n");
         
-        // Estrategia alternativa: obtener shows directamente sin filtros de fecha
-        scriptOutput("Obteniendo shows directamente (sin filtro de fecha)...\n");
-        $url = "https://api.tvmaze.com/shows?page=0";
-        $shows = httpJson($url, 15);
+        // Estrategia alternativa: obtener shows populares sin filtros de fecha
+        // Reducir páginas para evitar timeouts (priorizar TMDB si está disponible)
+        $maxPages = $type === 'movie' ? 3 : 2; // Reducido para evitar timeouts
+        $count = 0;
+        $checkedShows = 0;
+        $maxTime = 30; // Máximo 30 segundos para esta búsqueda
+        $startTime = time();
         
-        if (!empty($shows) && is_array($shows)) {
-            scriptOutput("Se obtuvieron " . count($shows) . " shows de la página 0\n");
-            $count = 0;
-            foreach ($shows as $show) {
-                if ($count >= $limit) {
-                    break;
-                }
-                $showType = $show['type'] ?? '';
-                $premiered = $show['premiered'] ?? '';
-                
-                // Para películas
-                if ($type === 'movie' && $showType === 'Movie') {
-                    // Si hay filtro de días, verificar fecha
-                    if ($sinceDays > 0 && $premiered) {
-                        $premieredTs = strtotime($premiered);
-                        $cutoff = strtotime("-{$sinceDays} days");
-                        if ($premieredTs >= $cutoff) {
-                            $items[] = $show;
-                            $count++;
-                        }
-                    } else {
-                        $items[] = $show;
-                        $count++;
-                    }
-                }
-                // Para series
-                elseif ($type === 'tv' && ($showType === 'Scripted' || $showType === 'Reality' || $showType === 'Documentary' || $showType === '')) {
-                    // Si hay filtro de días, verificar fecha
-                    if ($sinceDays > 0 && $premiered) {
-                        $premieredTs = strtotime($premiered);
-                        $cutoff = strtotime("-{$sinceDays} days");
-                        if ($premieredTs >= $cutoff) {
-                            $items[] = $show;
-                            $count++;
-                        }
-                    } else {
-                        $items[] = $show;
-                        $count++;
-                    }
-                }
+        scriptOutput("Buscando en hasta {$maxPages} páginas de TVMaze (máx. {$maxTime}s)...\n");
+        
+        for ($page = 0; $page < $maxPages && count($items) < $limit; $page++) {
+            // Verificar tiempo límite
+            if ((time() - $startTime) > $maxTime) {
+                scriptOutput("Tiempo límite alcanzado ({$maxTime}s). Continuando con otras fuentes...\n");
+                break;
             }
-            scriptOutput("Se añadieron {$count} items después del filtrado\n");
-        } else {
-            scriptOutput("No se pudieron obtener shows de TVMaze\n");
+            
+            scriptOutput("Obteniendo shows de la página {$page}...\n");
+            $url = "https://api.tvmaze.com/shows?page={$page}";
+            $shows = httpJson($url, 8); // Reducir timeout
+            
+            if (!empty($shows) && is_array($shows)) {
+                scriptOutput("Se obtuvieron " . count($shows) . " shows de la página {$page}\n");
+                $checkedShows += count($shows);
+                
+                foreach ($shows as $show) {
+                    if (count($items) >= $limit) {
+                        break 2; // Salir de ambos loops
+                    }
+                    
+                    $showType = $show['type'] ?? '';
+                    $itemId = $show['id'] ?? null;
+                    
+                    // Evitar duplicados
+                    if ($itemId && isset($seenIds['tvmaze_' . $itemId])) {
+                        continue;
+                    }
+                    
+                    // Para películas: buscar solo tipo Movie
+                    if ($type === 'movie' && $showType === 'Movie') {
+                        $seenIds['tvmaze_' . $itemId] = true;
+                        $items[] = $show;
+                        $count++;
+                        scriptOutput("  ✓ Encontrada película: " . ($show['name'] ?? 'Sin título') . " (ID: {$itemId})\n");
+                    }
+                    // Para series: buscar Scripted, Reality, Documentary o vacío
+                    elseif ($type === 'tv' && ($showType === 'Scripted' || $showType === 'Reality' || $showType === 'Documentary' || $showType === '')) {
+                        $seenIds['tvmaze_' . $itemId] = true;
+                        $items[] = $show;
+                        $count++;
+                        scriptOutput("  ✓ Encontrada serie: " . ($show['name'] ?? 'Sin título') . " (ID: {$itemId})\n");
+                    }
+                }
+            } else {
+                scriptOutput("No se pudieron obtener shows de la página {$page}\n");
+                break;
+            }
+            
+            // Pausa más corta entre páginas
+            if ($page < $maxPages - 1) {
+                usleep(100000); // 0.1 segundos (reducido)
+            }
         }
+        
+        scriptOutput("Revisados {$checkedShows} shows, se añadieron {$count} items de contenido popular\n");
+        
+        // NO hacer búsqueda por términos si ya pasó mucho tiempo (evitar timeout)
+        // TMDB será más rápido y eficiente
     }
 } catch (Exception $e) {
     scriptOutput("Error al buscar en TVMaze: " . $e->getMessage() . "\n", true);
     scriptOutput("Trace: " . $e->getTraceAsString() . "\n", true);
-    $items = [];
+}
+
+// Fuente 3: TMDB (The Movie Database) - API gratuita (MÁS RÁPIDA)
+// Priorizar TMDB sobre búsquedas extensas en TVMaze para evitar timeouts
+if (empty($items) || count($items) < $limit) {
+    scriptOutput("\n=== Buscando en TMDB (The Movie Database) ===\n");
+    if (!empty($tmdbApiKey)) {
+        scriptOutput("API Key configurada: " . substr($tmdbApiKey, 0, 20) . "...\n");
+        try {
+            // TMDB es más rápido, intentar primero trending (más rápido que now_playing)
+            $tmdbTrending = tmdbGetTrending($type, $tmdbApiKey, $limit);
+            foreach ($tmdbTrending as $item) {
+                $itemId = $item['tmdb_id'] ?? $item['id'] ?? null;
+                if ($itemId && !isset($seenIds['tmdb_' . $itemId])) {
+                    $seenIds['tmdb_' . $itemId] = true;
+                    $items[] = $item;
+                    if (count($items) >= $limit) {
+                        break;
+                    }
+                }
+            }
+            scriptOutput("TMDB trending: " . count($tmdbTrending) . " resultados\n");
+            
+            // Solo si aún necesitamos más y no hemos alcanzado el límite de tiempo
+            if (count($items) < $limit && count($items) < $limit) {
+                $tmdbPopular = tmdbGetPopular($type, $tmdbApiKey, $limit);
+                foreach ($tmdbPopular as $item) {
+                    $itemId = $item['tmdb_id'] ?? $item['id'] ?? null;
+                    if ($itemId && !isset($seenIds['tmdb_' . $itemId])) {
+                        $seenIds['tmdb_' . $itemId] = true;
+                        $items[] = $item;
+                        if (count($items) >= $limit) {
+                            break;
+                        }
+                    }
+                }
+                scriptOutput("TMDB popular: " . count($tmdbPopular) . " resultados\n");
+            }
+        } catch (Exception $e) {
+            scriptOutput("Error en TMDB: " . $e->getMessage() . "\n", true);
+        }
+    } else {
+        scriptOutput("TMDB no configurado (TMDB_API_KEY). Obtén una API key gratis en https://www.themoviedb.org/settings/api\n");
+        scriptOutput("TMDB es excelente para películas y series, especialmente películas que TVMaze no tiene.\n");
+        scriptOutput("⚠️ Sin TMDB, la búsqueda puede ser más lenta y encontrar menos películas.\n");
+    }
+}
+
+// Fuente 4: OMDb como último recurso (solo si tenemos API key y aún no hay resultados)
+if ((empty($items) || count($items) < $limit) && !empty($omdbKey) && $omdbKey !== 'demo') {
+    scriptOutput("\n=== Buscando en OMDb (último recurso) ===\n");
+    scriptOutput("OMDb tiene limitaciones pero puede ayudar a encontrar contenido adicional...\n");
+    // OMDb no tiene endpoints de búsqueda masiva, así que solo lo usamos para completar datos
+    // No agregamos búsqueda aquí ya que requiere título específico
 }
 
 if (empty($items)) {
-    scriptOutput("No se encontraron resultados. El script se ejecutó correctamente pero no hay contenido nuevo disponible.\n");
+    scriptOutput("\n⚠️ No se encontraron resultados de ninguna fuente.\n");
     scriptOutput("Sugerencias:\n");
+    scriptOutput("  - Configura TMDB_API_KEY (gratis en https://www.themoviedb.org/settings/api)\n");
+    scriptOutput("  - Configura TRAKT_CLIENT_ID (gratis en https://trakt.tv/oauth/applications)\n");
     scriptOutput("  - Aumenta el valor de 'Últimos días' (ej: 30 o 365)\n");
     scriptOutput("  - Verifica tu conexión a internet\n");
-    scriptOutput("  - TVMaze puede estar temporalmente no disponible\n");
     scriptOutput("Listo. Creados: 0, actualizados: 0, episodios nuevos: 0\n");
     if ($isCli) {
         exit(0);
@@ -1141,8 +1520,9 @@ $updated = 0;
 $newEpisodes = 0;
 
 foreach ($items as $show) {
-    // Detectar si viene de Trakt.tv o TVMaze
+    // Detectar si viene de Trakt.tv, TMDB o TVMaze
     $isTrakt = isset($show['trakt_data']);
+    $isTMDB = isset($show['tmdb_data']);
     
     if ($isTrakt) {
         // Datos de Trakt.tv
@@ -1163,6 +1543,42 @@ foreach ($items as $show) {
         $rating = isset($show['rating']['average']) ? round((float)$show['rating']['average'], 1) : null;
         $genres = $show['genres'] ?? [];
         $description = $show['summary'] ?? $traktData['overview'] ?? '';
+        $tvmazeId = null; // No hay ID de TVMaze
+    } elseif ($isTMDB) {
+        // Datos de TMDB
+        $tmdbData = $show['tmdb_data'];
+        $title = $show['name'] ?? $tmdbData['title'] ?? $tmdbData['name'] ?? 'Sin título';
+        $premiered = $show['premiered'] ?? '';
+        $releaseYear = $premiered ? (int)substr($premiered, 0, 4) : null;
+        $runtime = isset($tmdbData['runtime']) ? (int)$tmdbData['runtime'] : (isset($tmdbData['episode_run_time'][0]) ? (int)$tmdbData['episode_run_time'][0] : ($type === 'tv' ? 45 : 100));
+        $poster = !empty($show['image']['original']) 
+            ? $show['image']['original'] 
+            : (!empty($show['image']['medium']) ? $show['image']['medium'] : '');
+        if (empty($poster)) {
+            $poster = getPosterImage($title, $type === 'tv' ? 'series' : 'movie', $releaseYear);
+        }
+        $backdrop = !empty($show['backdrop']) 
+            ? $show['backdrop'] 
+            : getBackdropImage($title, $type === 'tv' ? 'series' : 'movie', $releaseYear);
+        $rating = isset($show['rating']['average']) ? round((float)$show['rating']['average'], 1) : null;
+        // TMDB devuelve IDs de géneros, necesitamos convertirlos a nombres
+        $genres = [];
+        if (!empty($tmdbData['genre_ids']) && is_array($tmdbData['genre_ids'])) {
+            // Mapeo básico de IDs de TMDB a nombres (se puede mejorar obteniendo la lista completa)
+            $genreMap = [
+                28 => 'Action', 12 => 'Adventure', 16 => 'Animation', 35 => 'Comedy',
+                80 => 'Crime', 99 => 'Documentary', 18 => 'Drama', 10751 => 'Family',
+                14 => 'Fantasy', 36 => 'History', 27 => 'Horror', 10402 => 'Music',
+                9648 => 'Mystery', 10749 => 'Romance', 878 => 'Science Fiction',
+                10770 => 'TV Movie', 53 => 'Thriller', 10752 => 'War', 37 => 'Western'
+            ];
+            foreach ($tmdbData['genre_ids'] as $genreId) {
+                if (isset($genreMap[$genreId])) {
+                    $genres[] = $genreMap[$genreId];
+                }
+            }
+        }
+        $description = $show['summary'] ?? $tmdbData['overview'] ?? '';
         $tvmazeId = null; // No hay ID de TVMaze
     } else {
         // Datos de TVMaze
@@ -1206,6 +1622,8 @@ foreach ($items as $show) {
             $description = $omdb['Plot'] ?? '';
         }
     }
+    // Resolver imdbId (para embeds/episodios)
+    $imdbId = resolveImdbId($title, $releaseYear, $type, $omdb);
     // Limpiar HTML de la descripción
     $description = strip_tags($description);
     $description = html_entity_decode($description, ENT_QUOTES, 'UTF-8');
@@ -1228,8 +1646,13 @@ foreach ($items as $show) {
     
     scriptOutput("  Buscando enlaces de video para: {$title}...\n");
     
-    // 2. Buscar video URL directo (streaming)
-    $videoUrl = searchVideoUrl($title, $type, $releaseYear, $omdb);
+    // 2. Buscar video URL directo (streaming) - Filemoon, Streamtape, Upstream, etc.
+    if (!empty($imdbId)) {
+        scriptOutput("  → IMDb ID encontrado: {$imdbId}, buscando enlaces de streaming (vidsrc/filemoon/streamtape)...\n");
+    } else {
+        scriptOutput("  → Intentando obtener IMDb ID para buscar enlaces de streaming...\n");
+    }
+    $videoUrl = searchVideoUrl($title, $type, $releaseYear, $omdb, $imdbId);
     
     // 3. Buscar torrents (solo si no hay video URL)
     $torrents = [];
@@ -1329,6 +1752,7 @@ foreach ($items as $show) {
                         ? $ep['image']['original'] 
                         : (!empty($ep['image']['medium']) ? $ep['image']['medium'] : $poster);
                     $epMagnet = null;
+                    $epEmbed = null;
 
                     // Intentar mapear torrents por SxxEyy
                     foreach ($torrents as $tor) {
@@ -1344,6 +1768,12 @@ foreach ($items as $show) {
                         }
                     }
 
+                    // Embed directo por episodio (si tenemos imdbId)
+                    if (!empty($imdbId)) {
+                        $episodeEmbeds = buildEmbedProviders($imdbId, 'tv', $seasonNum, $episodeNum);
+                        $epEmbed = $episodeEmbeds[0] ?? null;
+                    }
+
                     $epDesc = $ep['summary'] ?? '';
                     $epDesc = strip_tags($epDesc);
                     $epDesc = html_entity_decode($epDesc, ENT_QUOTES, 'UTF-8');
@@ -1352,7 +1782,7 @@ foreach ($items as $show) {
                         'title' => $ep['name'] ?? "{$title} S{$seasonNum}E{$episodeNum}",
                         'description' => $epDesc,
                         'duration' => $epDuration,
-                        'video_url' => $epMagnet,
+                        'video_url' => $epEmbed ?: $epMagnet,
                         'thumbnail_url' => $epThumb,
                         'release_date' => $ep['airdate'] ?? null
                     ];

@@ -88,3 +88,5 @@ Si no estás seguro de las credenciales, puedes:
 
 Una vez configurado el `.env`, los endpoints deberían funcionar correctamente y devolver datos JSON válidos.
 
+
+

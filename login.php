@@ -165,10 +165,10 @@ if ($auth->isAuthenticated()) {
                     <p class="divider">o inicia sesión con</p>
                     
                     <div class="social-buttons">
-                        <a href="#" class="btn btn-social btn-google">
+                        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/api/auth/social/google.php" class="btn btn-social btn-google" id="googleLoginBtn">
                             <i class="fab fa-google"></i> Google
                         </a>
-                        <a href="#" class="btn btn-social btn-facebook">
+                        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/api/auth/social/facebook.php" class="btn btn-social btn-facebook" id="facebookLoginBtn">
                             <i class="fab fa-facebook-f"></i> Facebook
                         </a>
                     </div>
@@ -204,5 +204,6 @@ if ($auth->isAuthenticated()) {
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="js/auth.js"></script>
+    <script src="<?php echo rtrim(SITE_URL, '/'); ?>/js/social-auth.js"></script>
 </body>
 </html>

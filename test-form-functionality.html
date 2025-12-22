@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Funcionalidad Formulario Netflix</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-header {
+            background: linear-gradient(135deg, #e50914 0%, #b20710 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .test-header h1 {
+            margin: 0;
+            font-size: 2rem;
+        }
+        .test-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .test-card {
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+        .test-card h3 {
+            margin-top: 0;
+            color: #e50914;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .test-item {
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .test-item.pass {
+            border-left: 4px solid #28a745;
+        }
+        .test-item.fail {
+            border-left: 4px solid #dc3545;
+        }
+        .test-item.warning {
+            border-left: 4px solid #ffc107;
+        }
+        .test-icon {
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+        .test-icon.pass { color: #28a745; }
+        .test-icon.fail { color: #dc3545; }
+        .test-icon.warning { color: #ffc107; }
+        .test-details {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+        .test-summary {
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .summary-stats {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            min-width: 120px;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .stat-number.pass { color: #28a745; }
+        .stat-number.fail { color: #dc3545; }
+        .stat-number.warning { color: #ffc107; }
+        .responsive-test {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        .responsive-btn {
+            padding: 0.75rem 1.5rem;
+            background: rgba(229, 9, 20, 0.2);
+            border: 2px solid #e50914;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .responsive-btn:hover {
+            background: rgba(229, 9, 20, 0.4);
+        }
+        .responsive-btn.active {
+            background: #e50914;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+        }
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: #141414;
+            border-radius: 12px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .test-form-preview {
+            margin-top: 2rem;
+            padding: 2rem;
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+        .test-form-preview h3 {
+            margin-top: 0;
+            color: #e50914;
+        }
+        .btn-test {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #e50914 0%, #b20710 100%);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 0.5rem;
+            transition: all 0.3s;
+        }
+        .btn-test:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1><i class="fas fa-vial"></i> Test de Funcionalidad - Formulario Netflix</h1>
+            <p>Verificación completa del formulario de contenido</p>
+        </div>
+
+        <div class="test-summary">
+            <h2>Resumen de Pruebas</h2>
+            <div class="summary-stats">
+                <div class="stat-box">
+                    <div class="stat-number pass" id="total-pass">0</div>
+                    <div>Exitosas</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number fail" id="total-fail">0</div>
+                    <div>Fallidas</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number warning" id="total-warning">0</div>
+                    <div>Advertencias</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="total-tests">0</div>
+                    <div>Total</div>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; text-align: center;">
+                <button class="btn-test" onclick="runAllTests()">
+                    <i class="fas fa-play"></i> Ejecutar Todas las Pruebas
+                </button>
+                <button class="btn-test" onclick="testResponsive()">
+                    <i class="fas fa-mobile-alt"></i> Probar Responsive
+                </button>
+                <button class="btn-test" onclick="openFormPreview()">
+                    <i class="fas fa-eye"></i> Ver Formulario
+                </button>
+            </div>
+        </div>
+
+        <div class="test-results" id="test-results">
+            <!-- Los resultados se insertarán aquí -->
+        </div>
+
+        <div class="test-form-preview">
+            <h3>Vista Previa del Formulario</h3>
+            <div class="responsive-test">
+                <button class="responsive-btn" onclick="setViewport(1920)">Desktop (1920px)</button>
+                <button class="responsive-btn" onclick="setViewport(1024)">Tablet (1024px)</button>
+                <button class="responsive-btn" onclick="setViewport(768)">Tablet Pequeña (768px)</button>
+                <button class="responsive-btn active" onclick="setViewport(375)">Móvil (375px)</button>
+            </div>
+            <div id="viewport-info" style="margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 6px;">
+                Ancho actual: <strong id="current-width">100%</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para vista previa del formulario -->
+    <div class="modal" id="formPreviewModal">
+        <div class="modal-content" style="width: 90%; max-width: 900px;">
+            <div style="padding: 1.5rem; border-bottom: 2px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; color: #e50914;">Vista Previa del Formulario</h2>
+                <button onclick="closeFormPreview()" style="background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div id="form-preview-content" style="padding: 2rem;">
+                <!-- El formulario se insertará aquí -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let testResults = {
+            pass: 0,
+            fail: 0,
+            warning: 0,
+            total: 0
+        };
+
+        // Cargar el formulario desde admin/index.php
+        async function loadFormHTML() {
+            try {
+                const response = await fetch('admin/index.php');
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const form = doc.querySelector('#contentForm');
+                return form ? form.outerHTML : null;
+            } catch (error) {
+                console.error('Error al cargar formulario:', error);
+                return null;
+            }
+        }
+
+        function addTestResult(category, name, status, message) {
+            testResults.total++;
+            if (status === 'pass') testResults.pass++;
+            else if (status === 'fail') testResults.fail++;
+            else if (status === 'warning') testResults.warning++;
+
+            const resultsContainer = document.getElementById('test-results');
+            let categoryDiv = document.getElementById(`category-${category}`);
+            
+            if (!categoryDiv) {
+                categoryDiv = document.createElement('div');
+                categoryDiv.className = 'test-card';
+                categoryDiv.id = `category-${category}`;
+                categoryDiv.innerHTML = `<h3><i class="fas fa-${getCategoryIcon(category)}"></i> ${getCategoryName(category)}</h3>`;
+                resultsContainer.appendChild(categoryDiv);
+            }
+
+            const testItem = document.createElement('div');
+            testItem.className = `test-item ${status}`;
+            testItem.innerHTML = `
+                <i class="fas fa-${status === 'pass' ? 'check-circle' : status === 'fail' ? 'times-circle' : 'exclamation-triangle'} test-icon ${status}"></i>
+                <div class="test-details">
+                    <strong>${name}</strong>
+                    ${message ? `<br><small>${message}</small>` : ''}
+                </div>
+            `;
+            categoryDiv.appendChild(testItem);
+
+            updateSummary();
+        }
+
+        function getCategoryIcon(category) {
+            const icons = {
+                'elements': 'cube',
+                'functionality': 'cogs',
+                'validation': 'shield-alt',
+                'styles': 'palette',
+                'responsive': 'mobile-alt'
+            };
+            return icons[category] || 'question';
+        }
+
+        function getCategoryName(category) {
+            const names = {
+                'elements': 'Elementos HTML',
+                'functionality': 'Funcionalidad',
+                'validation': 'Validación',
+                'styles': 'Estilos CSS',
+                'responsive': 'Responsive'
+            };
+            return names[category] || category;
+        }
+
+        function updateSummary() {
+            document.getElementById('total-pass').textContent = testResults.pass;
+            document.getElementById('total-fail').textContent = testResults.fail;
+            document.getElementById('total-warning').textContent = testResults.warning;
+            document.getElementById('total-tests').textContent = testResults.total;
+        }
+
+        // Tests de elementos HTML
+        function testHTMLElements() {
+            const form = document.getElementById('contentForm');
+            
+            if (!form) {
+                addTestResult('elements', 'Formulario existe', 'fail', 'No se encontró el formulario #contentForm');
+                return;
+            }
+
+            addTestResult('elements', 'Formulario existe', 'pass', 'Formulario encontrado correctamente');
+
+            // Campos requeridos
+            const requiredFields = [
+                { id: 'title', name: 'Título' },
+                { id: 'release_year', name: 'Año' },
+                { id: 'duration', name: 'Duración' },
+                { id: 'description', name: 'Descripción' },
+                { id: 'poster_file', name: 'Póster' },
+                { id: 'backdrop_file', name: 'Backdrop' },
+                { id: 'video_file', name: 'Video' }
+            ];
+
+            requiredFields.forEach(field => {
+                const element = document.getElementById(field.id);
+                if (element) {
+                    addTestResult('elements', `Campo ${field.name}`, 'pass', `Elemento #${field.id} encontrado`);
+                } else {
+                    addTestResult('elements', `Campo ${field.name}`, 'fail', `Elemento #${field.id} NO encontrado`);
+                }
+            });
+
+            // Campos opcionales
+            const optionalFields = [
+                { id: 'trailer_file', name: 'Tráiler' },
+                { id: 'torrent_magnet', name: 'Torrent' },
+                { id: 'age_rating', name: 'Clasificación' }
+            ];
+
+            optionalFields.forEach(field => {
+                const element = document.getElementById(field.id);
+                if (element) {
+                    addTestResult('elements', `Campo ${field.name} (opcional)`, 'pass', `Elemento #${field.id} encontrado`);
+                } else {
+                    addTestResult('elements', `Campo ${field.name} (opcional)`, 'warning', `Elemento #${field.id} NO encontrado`);
+                }
+            });
+
+            // Checkboxes
+            const checkboxes = ['is_featured', 'is_trending', 'is_premium'];
+            checkboxes.forEach(cb => {
+                const element = document.getElementById(cb);
+                if (element) {
+                    addTestResult('elements', `Checkbox ${cb}`, 'pass', `Checkbox encontrado`);
+                } else {
+                    addTestResult('elements', `Checkbox ${cb}`, 'fail', `Checkbox NO encontrado`);
+                }
+            });
+        }
+
+        // Tests de funcionalidad
+        function testFunctionality() {
+            // Test de eventos de archivos
+            const fileInputs = ['poster_file', 'backdrop_file', 'video_file', 'trailer_file'];
+            
+            fileInputs.forEach(inputId => {
+                const input = document.getElementById(inputId);
+                if (input) {
+                    const hasListener = input.hasAttribute('data-listener-test');
+                    if (hasListener) {
+                        addTestResult('functionality', `Evento ${inputId}`, 'pass', 'Listener configurado');
+                    } else {
+                        // Simular evento
+                        input.addEventListener('change', function() {
+                            addTestResult('functionality', `Evento ${inputId}`, 'pass', 'Evento change funciona');
+                        });
+                        addTestResult('functionality', `Evento ${inputId}`, 'warning', 'Listener agregado dinámicamente');
+                    }
+                }
+            });
+
+            // Test de botones
+            const buttons = [
+                { id: 'searchTorrentBtn', name: 'Buscar Torrent' },
+                { id: 'retryTorrentBtn', name: 'Reintentar Torrent' }
+            ];
+
+            buttons.forEach(btn => {
+                const element = document.getElementById(btn.id);
+                if (element) {
+                    addTestResult('functionality', `Botón ${btn.name}`, 'pass', `Botón #${btn.id} encontrado`);
+                } else {
+                    addTestResult('functionality', `Botón ${btn.name}`, 'warning', `Botón #${btn.id} NO encontrado`);
+                }
+            });
+
+            // Test de funciones globales
+            const globalFunctions = ['clearImageFile', 'clearVideoFile', 'clearTrailerFile'];
+            globalFunctions.forEach(func => {
+                if (typeof window[func] === 'function') {
+                    addTestResult('functionality', `Función ${func}`, 'pass', 'Función disponible globalmente');
+                } else {
+                    addTestResult('functionality', `Función ${func}`, 'fail', 'Función NO disponible');
+                }
+            });
+        }
+
+        // Tests de validación
+        function testValidation() {
+            const form = document.getElementById('contentForm');
+            if (!form) return;
+
+            // Test de validación HTML5
+            const requiredInputs = form.querySelectorAll('[required]');
+            addTestResult('validation', 'Atributos required', 'pass', `${requiredInputs.length} campos con atributo required`);
+
+            // Test de tipos de archivo
+            const posterInput = document.getElementById('poster_file');
+            if (posterInput && posterInput.accept === 'image/*') {
+                addTestResult('validation', 'Validación póster', 'pass', 'Acepta solo imágenes');
+            } else {
+                addTestResult('validation', 'Validación póster', 'fail', 'Tipo de archivo no configurado');
+            }
+
+            const videoInput = document.getElementById('video_file');
+            if (videoInput && videoInput.accept === 'video/*') {
+                addTestResult('validation', 'Validación video', 'pass', 'Acepta solo videos');
+            } else {
+                addTestResult('validation', 'Validación video', 'fail', 'Tipo de archivo no configurado');
+            }
+
+            // Test de límites de tamaño
+            if (posterInput && posterInput.dataset.maxSize) {
+                const maxSize = parseInt(posterInput.dataset.maxSize);
+                const maxSizeMB = (maxSize / 1024 / 1024).toFixed(0);
+                addTestResult('validation', 'Límite tamaño póster', 'pass', `Máximo ${maxSizeMB}MB`);
+            }
+        }
+
+        // Tests de estilos CSS
+        function testStyles() {
+            const form = document.getElementById('contentForm');
+            if (!form) return;
+
+            // Verificar clases Netflix
+            const netflixClasses = [
+                'netflix-form',
+                'netflix-form-section',
+                'netflix-file-upload',
+                'netflix-input',
+                'netflix-btn'
+            ];
+
+            netflixClasses.forEach(className => {
+                const elements = document.querySelectorAll(`.${className}`);
+                if (elements.length > 0) {
+                    addTestResult('styles', `Clase .${className}`, 'pass', `${elements.length} elementos encontrados`);
+                } else {
+                    addTestResult('styles', `Clase .${className}`, 'warning', 'No se encontraron elementos con esta clase');
+                }
+            });
+
+            // Verificar estilos aplicados
+            const firstSection = document.querySelector('.netflix-form-section');
+            if (firstSection) {
+                const styles = window.getComputedStyle(firstSection);
+                if (styles.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+                    addTestResult('styles', 'Estilos de sección', 'pass', 'Estilos aplicados correctamente');
+                } else {
+                    addTestResult('styles', 'Estilos de sección', 'warning', 'Verificar estilos CSS');
+                }
+            }
+        }
+
+        // Tests de responsive
+        function testResponsive() {
+            const widths = [1920, 1024, 768, 375];
+            const currentWidth = window.innerWidth;
+
+            widths.forEach(width => {
+                setViewport(width);
+                setTimeout(() => {
+                    const form = document.getElementById('contentForm');
+                    if (form) {
+                        const formWidth = form.offsetWidth;
+                        const isResponsive = formWidth <= width + 50; // Margen de error
+                        
+                        if (isResponsive) {
+                            addTestResult('responsive', `Ancho ${width}px`, 'pass', `Formulario se adapta correctamente`);
+                        } else {
+                            addTestResult('responsive', `Ancho ${width}px`, 'warning', `Ancho actual: ${formWidth}px`);
+                        }
+                    }
+                }, 100);
+            });
+
+            // Restaurar ancho original
+            setTimeout(() => {
+                setViewport(currentWidth);
+            }, 1000);
+        }
+
+        function setViewport(width) {
+            document.body.style.width = width + 'px';
+            document.body.style.margin = '0 auto';
+            document.getElementById('current-width').textContent = width + 'px';
+            
+            // Actualizar botones activos
+            document.querySelectorAll('.responsive-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes(width)) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        async function openFormPreview() {
+            const modal = document.getElementById('formPreviewModal');
+            const content = document.getElementById('form-preview-content');
+            
+            // Cargar formulario si no está en la página
+            if (!document.getElementById('contentForm')) {
+                const formHTML = await loadFormHTML();
+                if (formHTML) {
+                    content.innerHTML = formHTML;
+                } else {
+                    content.innerHTML = '<p>No se pudo cargar el formulario. Asegúrate de estar en el contexto correcto.</p>';
+                }
+            } else {
+                content.innerHTML = document.getElementById('contentForm').outerHTML;
+            }
+            
+            modal.classList.add('active');
+        }
+
+        function closeFormPreview() {
+            document.getElementById('formPreviewModal').classList.remove('active');
+        }
+
+        function runAllTests() {
+            // Resetear resultados
+            testResults = { pass: 0, fail: 0, warning: 0, total: 0 };
+            document.getElementById('test-results').innerHTML = '';
+
+            // Ejecutar todos los tests
+            testHTMLElements();
+            setTimeout(() => testFunctionality(), 100);
+            setTimeout(() => testValidation(), 200);
+            setTimeout(() => testStyles(), 300);
+        }
+
+        // Ejecutar tests al cargar
+        window.addEventListener('DOMContentLoaded', () => {
+            // Esperar a que el formulario esté disponible
+            setTimeout(() => {
+                if (document.getElementById('contentForm')) {
+                    runAllTests();
+                } else {
+                    addTestResult('elements', 'Formulario en página', 'warning', 'El formulario no está en esta página. Usa "Ver Formulario" para cargarlo.');
+                }
+            }, 500);
+        });
+
+        // Detectar cambios de tamaño de ventana
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                const width = window.innerWidth;
+                document.getElementById('current-width').textContent = width + 'px';
+            }, 250);
+        });
+    </script>
+</body>
+</html>
+

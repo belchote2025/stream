@@ -89,7 +89,9 @@ define('DB_NAME', getenv('DB_NAME') ?: $currentDbDefaults['name']);
 if (!defined('SITE_URL')) {
     $envSiteUrl = getenv('SITE_URL');
     
-    if ($envSiteUrl) {
+    // Si estamos en localhost, ignoramos el SITE_URL del .env para evitar 
+    // que apunte a producción mientras desarrollamos localmente.
+    if ($envSiteUrl && !$isLocalHost) {
         define('SITE_URL', rtrim($envSiteUrl, '/'));
     } else {
         $host = $_SERVER['HTTP_HOST'] ?? null;

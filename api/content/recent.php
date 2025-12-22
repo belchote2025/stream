@@ -14,9 +14,25 @@ header('Access-Control-Allow-Methods: GET');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 
-// Incluir dependencias
-require_once __DIR__ . '/../../includes/config.php';
-require_once __DIR__ . '/../../includes/image-helper.php';
+// Incluir dependencias con manejo de errores
+try {
+    require_once __DIR__ . '/../../includes/config.php';
+    require_once __DIR__ . '/../../includes/image-helper.php';
+} catch (Throwable $e) {
+    // Si hay error en los includes, devolver JSON de error
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    error_log('Error loading includes in recent.php: ' . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error al cargar dependencias',
+        'message' => 'Error interno del servidor'
+    ]);
+    exit;
+}
 
 // Limpiar cualquier output accidental antes de continuar
 ob_clean();
@@ -62,12 +78,21 @@ function sendJsonResponse($data = null, $statusCode = 200, $error = null) {
 
 // Manejo de errores global
 set_exception_handler(function($e) {
+    // Asegurar que los headers JSON estén establecidos
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+    }
     if (ob_get_level() > 0) {
         ob_clean();
     }
     error_log('Uncaught Exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-    header('Content-Type: application/json; charset=utf-8');
-    sendJsonResponse(null, 500, new Exception('Error interno del servidor'));
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error interno del servidor',
+        'message' => defined('APP_ENV') && APP_ENV === 'local' ? $e->getMessage() : 'Error interno del servidor'
+    ]);
+    exit;
 });
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
@@ -197,10 +222,52 @@ try {
     sendJsonResponse($formatted, 200, null);
     
 } catch (PDOException $e) {
+    // Asegurar headers JSON antes de enviar error
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    http_response_code(500);
     error_log('Database Error in recent.php: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-    sendJsonResponse(null, 500, new Exception('Error al obtener contenido de la base de datos'));
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error al obtener contenido de la base de datos',
+        'message' => 'Error de base de datos'
+    ]);
+    exit;
 } catch (Exception $e) {
+    // Asegurar headers JSON antes de enviar error
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    http_response_code(500);
     error_log('Error in recent.php: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-    sendJsonResponse(null, 500, $e);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error al obtener contenido',
+        'message' => $e->getMessage()
+    ]);
+    exit;
+} catch (Throwable $e) {
+    // Capturar cualquier otro tipo de error
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    http_response_code(500);
+    error_log('Fatal Error in recent.php: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error interno del servidor',
+        'message' => 'Error inesperado'
+    ]);
+    exit;
 }
 

@@ -76,3 +76,5 @@ Pero el `.env` tenía:
 
 **Asegúrate de usar el nombre exacto que aparece en el panel.**
 
+
+

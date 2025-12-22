@@ -436,25 +436,50 @@ function createContentCard(item, type) {
         </div>
     `;
     
-    // Redirigir a detalles cuando se hace clic fuera de los botones
+    // Abrir búsqueda automática de torrents al hacer clic en cualquier parte de la ficha
     card.addEventListener('click', (event) => {
+        // No hacer nada si se hace clic en botones de acción o en el contenedor del trailer
         if (event.target.closest('.action-btn') || event.target.closest('.content-trailer-container')) {
             return;
         }
-        const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
-        window.location.href = `${baseUrl}/content.php?id=${item.id}`;
+        
+        // Abrir modal de búsqueda de torrents automáticamente
+        event.preventDefault();
+        event.stopPropagation();
+        
+        if (typeof showTorrentModal === 'function') {
+            showTorrentModal(item.id, item.title || '', item.release_year || null, contentType);
+        } else if (typeof openTorrentModal === 'function') {
+            openTorrentModal({
+                id: item.id,
+                title: item.title || '',
+                year: item.release_year || null,
+                type: contentType
+            });
+        } else {
+            // Fallback: redirigir a detalles si no hay modal disponible
+            const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+            window.location.href = `${baseUrl}/content.php?id=${item.id}`;
+        }
     });
     
-    // Añadir handler al poster para buscar torrents
+    // Añadir handler al poster para buscar torrents (mantener compatibilidad)
     const poster = card.querySelector('.content-poster-clickable');
     if (poster) {
         poster.addEventListener('click', (e) => {
             e.stopPropagation();
             if (typeof showTorrentModal === 'function') {
                 showTorrentModal(item.id, item.title || '', item.release_year || null, contentType);
+            } else if (typeof openTorrentModal === 'function') {
+                openTorrentModal({
+                    id: item.id,
+                    title: item.title || '',
+                    year: item.release_year || null,
+                    type: contentType
+                });
             } else {
                 const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
-        window.location.href = `${baseUrl}/content.php?id=${item.id}`;
+                window.location.href = `${baseUrl}/content.php?id=${item.id}`;
             }
         });
     }
@@ -982,13 +1007,83 @@ function handleTorrentResultClick(event) {
     selectTorrentForPlayback(magnet, contentId);
 }
 
-function selectTorrentForPlayback(magnetLink, contentId) {
+async function selectTorrentForPlayback(magnetLink, contentId) {
     if (!magnetLink) return;
+    
+    // Mostrar notificación de actualización
+    if (typeof showNotification === 'function') {
+        showNotification('Actualizando contenido y preparando reproducción...', 'info');
+    }
+    
+    // Si tenemos un contentId, actualizar el contenido en la base de datos
+    if (contentId) {
+        try {
+            const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
+            const updateUrl = `${baseUrl}/api/content/index.php?id=${contentId}`;
+            
+            // Obtener información del contenido actual para preservar otros campos
+            const contentResponse = await fetch(`${baseUrl}/api/content/index.php?id=${contentId}`, {
+                credentials: 'same-origin'
+            });
+            
+            let contentData = {};
+            if (contentResponse.ok) {
+                const contentResult = await contentResponse.json();
+                if (contentResult.success && contentResult.data) {
+                    contentData = contentResult.data;
+                }
+            }
+            
+            // Actualizar solo el campo torrent_magnet
+            const updateData = {
+                ...contentData,
+                torrent_magnet: magnetLink
+            };
+            
+            const updateResponse = await fetch(updateUrl, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(updateData)
+            });
+            
+            if (updateResponse.ok) {
+                const updateResult = await updateResponse.json();
+                if (updateResult.success) {
+                    if (typeof showNotification === 'function') {
+                        showNotification('Contenido actualizado correctamente. Iniciando reproducción...', 'success');
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Error al actualizar contenido:', error);
+            // Continuar con la reproducción aunque falle la actualización
+            if (typeof showNotification === 'function') {
+                showNotification('Reproduciendo torrent (actualización falló, pero continuando...)', 'warning');
+            }
+        }
+    }
+    
     closeTorrentModal();
     
+    // Reproducir el contenido
     const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
     const url = `${baseUrl}/watch.php?id=${contentId || ''}&torrent=${encodeURIComponent(magnetLink)}`;
-    window.open(url, '_blank');
+    
+    // Intentar reproducir en la misma ventana si hay un reproductor disponible
+    if (typeof playContent === 'function' && contentId) {
+        // Obtener el tipo de contenido
+        const contentType = appState.activeTorrentContent?.type || 'movie';
+        // Reproducir usando la función playContent
+        setTimeout(() => {
+            playContent(contentId, contentType);
+        }, 500);
+    } else {
+        // Fallback: abrir en nueva pestaña
+        window.open(url, '_blank');
+    }
 }
 
 function closeTorrentModal() {

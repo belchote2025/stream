@@ -271,67 +271,6 @@ function setupEventListeners() {
     if (contentForm) {
         contentForm.addEventListener('submit', handleContentSubmit);
 
-        // Opciones mutuamente excluyentes para póster y backdrop
-        setupMutuallyExclusiveOptions('poster_source', {
-            'url': { input: 'poster_url', otherInput: 'poster_file', otherOption: 'poster_source_file' },
-            'file': { input: 'poster_file', otherInput: 'poster_url', otherOption: 'poster_source_url' }
-        });
-
-        setupMutuallyExclusiveOptions('backdrop_source', {
-            'url': { input: 'backdrop_url', otherInput: 'backdrop_file', otherOption: 'backdrop_source_file' },
-            'file': { input: 'backdrop_file', otherInput: 'backdrop_url', otherOption: 'backdrop_source_url' }
-        });
-
-        // Manejo de opciones mutuamente excluyentes para video
-        setupMutuallyExclusiveOptions('video_source', {
-            'url': {
-                container: 'videoUrlContainer',
-                input: 'video_url',
-                previewBtn: 'previewVideoBtn',
-                otherOption: 'videoFileOption',
-                otherInput: 'video_file'
-            },
-            'file': {
-                container: 'videoFileContainer',
-                input: 'video_file',
-                otherOption: 'videoUrlOption',
-                otherInput: 'video_url',
-                previewBtn: 'previewVideoBtn'
-            }
-        });
-
-        // Manejo de opciones mutuamente excluyentes para tráiler
-        setupMutuallyExclusiveOptions('trailer_source', {
-            'url': {
-                container: 'trailerUrlContainer',
-                input: 'trailer_url',
-                otherOption: 'trailerFileOption',
-                otherInput: 'trailer_file'
-            },
-            'file': {
-                container: 'trailerFileContainer',
-                input: 'trailer_file',
-                otherOption: 'trailerUrlOption',
-                otherInput: 'trailer_url'
-            },
-            'none': {
-                otherOption: 'trailerUrlOption',
-                otherInput: 'trailer_url',
-                otherOption2: 'trailerFileOption',
-                otherInput2: 'trailer_file'
-            }
-        });
-
-        // Validación de archivos de video
-        const videoFileInput = document.getElementById('video_file');
-        if (videoFileInput) {
-            videoFileInput.addEventListener('change', function (e) {
-                if (e.target.files && e.target.files[0]) {
-                    validateFileInput(e.target, 'video_file_info', 2147483648); // 2GB
-                }
-            });
-        }
-
         // Validación de archivos de póster
         const posterFileInput = document.getElementById('poster_file');
         if (posterFileInput) {
@@ -348,6 +287,16 @@ function setupEventListeners() {
             backdropFileInput.addEventListener('change', function (e) {
                 if (e.target.files && e.target.files[0]) {
                     validateImageInput(e.target, 'backdrop_file_info', 6291456); // 6MB
+                }
+            });
+        }
+
+        // Validación de archivos de video
+        const videoFileInput = document.getElementById('video_file');
+        if (videoFileInput) {
+            videoFileInput.addEventListener('change', function (e) {
+                if (e.target.files && e.target.files[0]) {
+                    validateFileInput(e.target, 'video_file_info', 2147483648); // 2GB
                 }
             });
         }
@@ -370,17 +319,6 @@ function setupEventListeners() {
         const retryTorrentBtn = document.getElementById('retryTorrentBtn');
         if (retryTorrentBtn) {
             retryTorrentBtn.addEventListener('click', handleInvalidTorrent);
-        }
-
-        // Previsualización de video
-        const previewVideoBtn = document.getElementById('previewVideoBtn');
-        if (previewVideoBtn) {
-            previewVideoBtn.addEventListener('click', handlePreviewVideo);
-        }
-
-        const closePreviewBtn = document.getElementById('closePreviewBtn');
-        if (closePreviewBtn) {
-            closePreviewBtn.addEventListener('click', closeVideoPreview);
         }
     }
 
@@ -868,58 +806,181 @@ function renderDashboard(stats = null, recentUsers = [], recentContent = []) {
             </div>
         </div>
         
-        <!-- Actualización de novedades -->
-        <div class="quick-actions" style="margin: 2rem 0; padding: 2.5rem; background: #141414; border-radius: 12px; border: 1px solid #2a2a2a; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
-            <div class="section-header" style="margin-bottom: 1.5rem;">
-                <h2 style="color: #ffffff; font-size: 1.75rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; margin: 0; letter-spacing: -0.5px;">
-                    <i class="fas fa-sync-alt" style="color: #e50914;"></i>
-                    Actualización Automática de Contenido
-                </h2>
-            </div>
-            <p style="color: #b3b3b3; margin-bottom: 2rem; line-height: 1.7; font-size: 0.95rem;">
-                Busca y actualiza automáticamente novedades de películas y series desde <strong style="color: #ffffff;">Trakt.tv</strong> y <strong style="color: #ffffff;">TVMaze</strong> (ambas gratuitas), incluyendo portadas, trailers y enlaces torrent. El sistema prioriza torrents con más seeds para mejor calidad.
-                <br><br>
-                <small style="color: #808080;">💡 Para mejores resultados, configura TRAKT_CLIENT_ID (gratis en <a href="https://trakt.tv/oauth/applications" target="_blank" style="color: #e50914;">trakt.tv/oauth/applications</a>)</small>
-                <br>
-                <small style="color: #808080;">🔗 Addon Torrentio oficial para Stremio: <code style="color: #e50914;">https://torrentio.strem.fun/lite/manifest.json</code></small>
-                <br>
-                <small style="color: #808080;">(Opcional) Proxy interno de respaldo: <code style="color: #e50914;">/api/torrentio/manifest.json</code></small>
-            </p>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
-                <div>
-                    <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #ffffff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Tipo de contenido:</label>
-                    <select id="refresh-type" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #ffffff; font-size: 0.95rem; transition: all 0.2s ease; outline: none;">
-                        <option value="movie" style="background: #1a1a1a;">Películas</option>
-                        <option value="tv" style="background: #1a1a1a;">Series</option>
-                    </select>
+        <!-- Actualización Automática de Contenido - Estilo Netflix Mejorado -->
+        <div class="netflix-refresh-section">
+            <div class="netflix-refresh-header">
+                <div class="netflix-refresh-icon-wrapper">
+                    <i class="fas fa-sync-alt"></i>
                 </div>
-                <div>
-                    <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #ffffff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Límite:</label>
-                    <input type="number" id="refresh-limit" value="30" min="1" max="100" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #ffffff; font-size: 0.95rem; transition: all 0.2s ease; outline: none;">
-                </div>
-                <div>
-                    <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #ffffff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Últimos días:</label>
-                    <input type="number" id="refresh-days" value="7" min="0" max="365" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #ffffff; font-size: 0.95rem; transition: all 0.2s ease; outline: none;">
-                </div>
-                <div>
-                    <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #ffffff; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">Mín. seeds:</label>
-                    <input type="number" id="refresh-seeds" value="10" min="0" style="width: 100%; padding: 0.875rem 1rem; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #ffffff; font-size: 0.95rem; transition: all 0.2s ease; outline: none;">
+                <div class="netflix-refresh-title-group">
+                    <h2 class="netflix-refresh-title">Actualización Automática de Contenido</h2>
+                    <p class="netflix-refresh-subtitle">Sincroniza novedades desde múltiples fuentes</p>
                 </div>
             </div>
-            
-            <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
-                <button id="btn-refresh-content" class="btn btn-primary" style="padding: 0.875rem 2.5rem; font-size: 1rem; background: #e50914; border: none; border-radius: 6px; color: #ffffff; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 10px rgba(229, 9, 20, 0.4); text-transform: uppercase; letter-spacing: 0.5px;">
-                    <i class="fas fa-sync-alt"></i> Actualizar Novedades
-                </button>
-                <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; color: #b3b3b3; font-size: 0.9rem;">
-                    <input type="checkbox" id="refresh-dry-run" style="width: 20px; height: 20px; cursor: pointer; accent-color: #e50914;">
-                    <span>Modo prueba (no guarda cambios)</span>
-                </label>
-                <div id="refresh-status" style="margin-left: auto; font-weight: 600; color: #e50914; font-size: 0.95rem;"></div>
+
+            <div class="netflix-refresh-info">
+                <div class="netflix-info-card">
+                    <i class="fas fa-info-circle"></i>
+                    <div>
+                        <strong>Fuentes disponibles:</strong> Trakt.tv y TVMaze (ambas gratuitas)
+                        <br>
+                        <small>Incluye portadas, trailers y enlaces torrent con prioridad por seeds</small>
+                    </div>
+                </div>
+                <div class="netflix-info-links">
+                    <a href="https://trakt.tv/oauth/applications" target="_blank" class="netflix-link">
+                        <i class="fas fa-external-link-alt"></i> Configurar Trakt (Opcional)
+                    </a>
+                    <span class="netflix-link-separator">•</span>
+                    <span class="netflix-code-link" onclick="copyToClipboard('https://torrentio.strem.fun/lite/manifest.json')" title="Clic para copiar">
+                        <i class="fas fa-copy"></i> Torrentio Stremio
+                    </span>
+                </div>
             </div>
-            
-            <div id="refresh-output" style="margin-top: 2rem; padding: 1.5rem; background: #0a0a0a; border-radius: 8px; display: none; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.85rem; white-space: pre-wrap; color: #b3b3b3; border: 1px solid #2a2a2a; line-height: 1.6;"></div>
+
+            <!-- Presets rápidos -->
+            <div class="netflix-presets">
+                <label class="netflix-presets-label">Presets rápidos:</label>
+                <div class="netflix-presets-buttons">
+                    <button type="button" class="netflix-preset-btn" data-preset="quick" onclick="applyPreset('quick')">
+                        <i class="fas fa-bolt"></i> Rápido (10 items, 3 días)
+                    </button>
+                    <button type="button" class="netflix-preset-btn active" data-preset="standard" onclick="applyPreset('standard')">
+                        <i class="fas fa-star"></i> Estándar (30 items, 7 días)
+                    </button>
+                    <button type="button" class="netflix-preset-btn" data-preset="extensive" onclick="applyPreset('extensive')">
+                        <i class="fas fa-fire"></i> Extensivo (50 items, 14 días)
+                    </button>
+                    <button type="button" class="netflix-preset-btn" data-preset="full" onclick="applyPreset('full')">
+                        <i class="fas fa-infinity"></i> Completo (100 items, 30 días)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Controles principales -->
+            <div class="netflix-refresh-controls">
+                <div class="netflix-control-grid">
+                    <div class="netflix-control-field">
+                        <label class="netflix-control-label" for="refresh-type">
+                            <i class="fas fa-film"></i> Tipo de Contenido
+                        </label>
+                        <div class="netflix-select-wrapper">
+                            <select id="refresh-type" class="netflix-select-control">
+                                <option value="movie">🎬 Películas</option>
+                                <option value="tv">📺 Series</option>
+                            </select>
+                            <i class="fas fa-chevron-down netflix-select-arrow"></i>
+                        </div>
+                    </div>
+
+                    <div class="netflix-control-field">
+                        <label class="netflix-control-label" for="refresh-limit">
+                            <i class="fas fa-list-ol"></i> Límite de Items
+                        </label>
+                        <div class="netflix-input-wrapper">
+                            <input type="number" id="refresh-limit" class="netflix-input-control" value="30" min="1" max="100">
+                            <span class="netflix-input-hint">1-100</span>
+                        </div>
+                    </div>
+
+                    <div class="netflix-control-field">
+                        <label class="netflix-control-label" for="refresh-days">
+                            <i class="fas fa-calendar-alt"></i> Últimos Días
+                        </label>
+                        <div class="netflix-input-wrapper">
+                            <input type="number" id="refresh-days" class="netflix-input-control" value="7" min="0" max="365">
+                            <span class="netflix-input-hint">0-365</span>
+                        </div>
+                    </div>
+
+                    <div class="netflix-control-field">
+                        <label class="netflix-control-label" for="refresh-seeds">
+                            <i class="fas fa-seedling"></i> Mín. Seeds
+                        </label>
+                        <div class="netflix-input-wrapper">
+                            <input type="number" id="refresh-seeds" class="netflix-input-control" value="10" min="0">
+                            <span class="netflix-input-hint">Calidad</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="netflix-refresh-actions">
+                <div class="netflix-actions-left">
+                    <button id="btn-refresh-content" class="netflix-btn-refresh">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Actualizar Novedades</span>
+                    </button>
+                    <label class="netflix-checkbox-label">
+                        <input type="checkbox" id="refresh-dry-run" class="netflix-checkbox-input">
+                        <span class="netflix-checkbox-custom"></span>
+                        <span class="netflix-checkbox-text">Modo prueba (no guarda cambios)</span>
+                    </label>
+                </div>
+                <div id="refresh-status" class="netflix-refresh-status"></div>
+            </div>
+
+            <!-- Estadísticas en tiempo real -->
+            <div id="refresh-stats" class="netflix-refresh-stats" style="display: none;">
+                <div class="netflix-stat-item">
+                    <div class="netflix-stat-icon created">
+                        <i class="fas fa-plus-circle"></i>
+                    </div>
+                    <div class="netflix-stat-content">
+                        <div class="netflix-stat-value" id="stat-created">0</div>
+                        <div class="netflix-stat-label">Creados</div>
+                    </div>
+                </div>
+                <div class="netflix-stat-item">
+                    <div class="netflix-stat-icon updated">
+                        <i class="fas fa-edit"></i>
+                    </div>
+                    <div class="netflix-stat-content">
+                        <div class="netflix-stat-value" id="stat-updated">0</div>
+                        <div class="netflix-stat-label">Actualizados</div>
+                    </div>
+                </div>
+                <div class="netflix-stat-item">
+                    <div class="netflix-stat-icon episodes">
+                        <i class="fas fa-tv"></i>
+                    </div>
+                    <div class="netflix-stat-content">
+                        <div class="netflix-stat-value" id="stat-episodes">0</div>
+                        <div class="netflix-stat-label">Episodios</div>
+                    </div>
+                </div>
+                <div class="netflix-stat-item">
+                    <div class="netflix-stat-icon time">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="netflix-stat-content">
+                        <div class="netflix-stat-value" id="stat-time">0s</div>
+                        <div class="netflix-stat-label">Tiempo</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output mejorado -->
+            <div id="refresh-output" class="netflix-refresh-output" style="display: none;">
+                <div class="netflix-output-header">
+                    <span class="netflix-output-title">
+                        <i class="fas fa-terminal"></i> Salida del Proceso
+                    </span>
+                    <button type="button" class="netflix-output-clear" onclick="clearRefreshOutput()" title="Limpiar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="netflix-output-content" id="refresh-output-content"></div>
+            </div>
+
+            <!-- Barra de progreso -->
+            <div id="refresh-progress" class="netflix-refresh-progress" style="display: none;">
+                <div class="netflix-progress-bar">
+                    <div class="netflix-progress-fill" id="refresh-progress-fill"></div>
+                </div>
+                <div class="netflix-progress-text" id="refresh-progress-text">Iniciando...</div>
+            </div>
         </div>
         
         <!-- Gráficos -->
@@ -3004,7 +3065,7 @@ function showContentModal(itemData = null) {
 
     if (itemData) {
         // Rellenar el formulario con los datos existentes
-        const fields = ['id', 'title', 'release_year', 'duration', 'description', 'poster_url', 'backdrop_url', 'age_rating', 'type'];
+        const fields = ['id', 'title', 'release_year', 'duration', 'description', 'torrent_magnet', 'age_rating', 'type'];
         fields.forEach(key => {
             const input = form.elements[key];
             if (input && itemData[key] !== undefined && itemData[key] !== null) {
@@ -3016,51 +3077,6 @@ function showContentModal(itemData = null) {
             }
         });
 
-        // Configurar fuente de video (URL por defecto si existe video_url)
-        const videoUrlRadio = document.getElementById('video_source_url');
-        const videoFileRadio = document.getElementById('video_source_file');
-        const videoUrlInput = document.getElementById('video_url');
-
-        if (itemData.video_url && itemData.video_url.trim() !== '') {
-            // Si hay URL de video, usar opción URL
-            if (videoUrlRadio) {
-                videoUrlRadio.checked = true;
-                videoUrlRadio.dispatchEvent(new Event('change'));
-            }
-            if (videoUrlInput) {
-                videoUrlInput.value = itemData.video_url;
-            }
-        } else {
-            // Si no hay URL, dejar URL seleccionada pero vacía (para que el usuario elija)
-            if (videoUrlRadio) {
-                videoUrlRadio.checked = true;
-                videoUrlRadio.dispatchEvent(new Event('change'));
-            }
-        }
-
-        // Configurar fuente de tráiler
-        const trailerUrlRadio = document.getElementById('trailer_source_url');
-        const trailerFileRadio = document.getElementById('trailer_source_file');
-        const trailerNoneRadio = document.getElementById('trailer_source_none');
-        const trailerUrlInput = document.getElementById('trailer_url');
-
-        if (itemData.trailer_url && itemData.trailer_url.trim() !== '') {
-            // Si hay URL de tráiler, usar opción URL
-            if (trailerUrlRadio) {
-                trailerUrlRadio.checked = true;
-                trailerUrlRadio.dispatchEvent(new Event('change'));
-            }
-            if (trailerUrlInput) {
-                trailerUrlInput.value = itemData.trailer_url;
-            }
-        } else {
-            // Si no hay tráiler, usar opción "none"
-            if (trailerNoneRadio) {
-                trailerNoneRadio.checked = true;
-                trailerNoneRadio.dispatchEvent(new Event('change'));
-            }
-        }
-
         // Checkboxes especiales
         if (form.elements.is_featured) form.elements.is_featured.checked = !!itemData.is_featured;
         if (form.elements.is_trending) form.elements.is_trending.checked = !!itemData.is_trending;
@@ -3070,19 +3086,26 @@ function showContentModal(itemData = null) {
         if (form.elements.type) {
             form.elements.type.value = itemData.type || 'movie';
         }
+        
+        // Guardar URLs existentes en data attributes para usarlas si no se suben nuevos archivos
+        if (itemData.poster_url) {
+            form.setAttribute('data-existing-poster', itemData.poster_url);
+        }
+        if (itemData.backdrop_url) {
+            form.setAttribute('data-existing-backdrop', itemData.backdrop_url);
+        }
+        if (itemData.video_url) {
+            form.setAttribute('data-existing-video', itemData.video_url);
+        }
+        if (itemData.trailer_url) {
+            form.setAttribute('data-existing-trailer', itemData.trailer_url);
+        }
     } else {
-        // Modo creación: establecer valores por defecto
-        const videoUrlRadio = document.getElementById('video_source_url');
-        const trailerNoneRadio = document.getElementById('trailer_source_none');
-
-        if (videoUrlRadio) {
-            videoUrlRadio.checked = true;
-            videoUrlRadio.dispatchEvent(new Event('change'));
-        }
-        if (trailerNoneRadio) {
-            trailerNoneRadio.checked = true;
-            trailerNoneRadio.dispatchEvent(new Event('change'));
-        }
+        // Limpiar data attributes al agregar nuevo contenido
+        form.removeAttribute('data-existing-poster');
+        form.removeAttribute('data-existing-backdrop');
+        form.removeAttribute('data-existing-video');
+        form.removeAttribute('data-existing-trailer');
     }
 
     const modal = document.getElementById('contentModal');
@@ -3337,10 +3360,10 @@ async function handleContentSubmit(e) {
     }
 
     try {
-        // Validar que se haya seleccionado una fuente de video
-        const videoSource = formData.get('video_source');
-        if (!videoSource) {
-            showNotification('Por favor, selecciona una fuente de video (URL o archivo local)', 'error');
+        // Validar archivos requeridos
+        const posterFileInput = document.getElementById('poster_file');
+        if (!posterFileInput || !posterFileInput.files || !posterFileInput.files[0]) {
+            showNotification('Por favor, selecciona un archivo de póster', 'error');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
@@ -3348,74 +3371,39 @@ async function handleContentSubmit(e) {
             return;
         }
 
-        // Validar archivos antes de subir (solo si se seleccionó archivo)
-        if (videoSource === 'file') {
-            const videoFileInput = document.getElementById('video_file');
-            if (!videoFileInput || !videoFileInput.files || !videoFileInput.files[0]) {
-                showNotification('Por favor, selecciona un archivo de video', 'error');
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalText;
-                }
-                return;
+        const backdropFileInput = document.getElementById('backdrop_file');
+        if (!backdropFileInput || !backdropFileInput.files || !backdropFileInput.files[0]) {
+            showNotification('Por favor, selecciona un archivo de backdrop', 'error');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
-            if (!validateFileInput(videoFileInput, 'video_file_info', 2147483648)) {
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalText;
-                }
-                return;
-            }
-        } else if (videoSource === 'url') {
-            const videoUrlInput = document.getElementById('video_url');
-            if (!videoUrlInput || !videoUrlInput.value || videoUrlInput.value.trim() === '') {
-                showNotification('Por favor, ingresa una URL de video', 'error');
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalText;
-                }
-                return;
-            }
+            return;
         }
 
-        // Validar tráiler si se seleccionó archivo
-        const trailerSource = formData.get('trailer_source') || 'none';
-        if (trailerSource === 'file') {
-            const trailerFileInput = document.getElementById('trailer_file');
-            if (!trailerFileInput || !trailerFileInput.files || !trailerFileInput.files[0]) {
-                showNotification('Por favor, selecciona un archivo de tráiler', 'error');
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalText;
-                }
-                return;
-            }
-            if (!validateFileInput(trailerFileInput, 'trailer_file_info', 524288000)) {
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalText;
-                }
-                return;
-            }
-        }
+        const videoFileInput = document.getElementById('video_file');
 
-        // Procesar póster
-        const posterSource = formData.get('poster_source') || 'url';
+        // Validar archivos antes de subir (solo si existen)
         let posterUrl = '';
-        if (posterSource === 'file') {
-            const posterFileInput = document.getElementById('poster_file');
-            if (!posterFileInput || !posterFileInput.files || !posterFileInput.files[0]) {
-                throw new Error('Selecciona un archivo de póster');
-            }
+        let backdropUrl = '';
+        let videoUrl = '';
+        let trailerUrl = '';
+
+        // Procesar póster (opcional)
+        if (posterFileInput && posterFileInput.files && posterFileInput.files[0]) {
             if (!validateImageInput(posterFileInput, 'poster_file_info', 5242880)) {
-                throw new Error('El póster no es válido');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
             }
             showNotification('Subiendo póster...', 'info');
-            const uploadData = new FormData();
-            uploadData.append('file', posterFileInput.files[0]);
+            const posterUploadData = new FormData();
+            posterUploadData.append('file', posterFileInput.files[0]);
             const posterResp = await fetch(`${baseUrl}/api/upload/image.php`, {
                 method: 'POST',
-                body: uploadData,
+                body: posterUploadData,
                 credentials: 'same-origin'
             });
             const posterJson = await posterResp.json();
@@ -3423,27 +3411,23 @@ async function handleContentSubmit(e) {
                 throw new Error(posterJson.error || 'Error al subir el póster');
             }
             posterUrl = posterJson.data.url;
-        } else {
-            posterUrl = (formData.get('poster_url') || '').trim();
         }
 
-        // Procesar backdrop
-        const backdropSource = formData.get('backdrop_source') || 'url';
-        let backdropUrl = '';
-        if (backdropSource === 'file') {
-            const backdropFileInput = document.getElementById('backdrop_file');
-            if (!backdropFileInput || !backdropFileInput.files || !backdropFileInput.files[0]) {
-                throw new Error('Selecciona un archivo de backdrop');
-            }
+        // Procesar backdrop (opcional)
+        if (backdropFileInput && backdropFileInput.files && backdropFileInput.files[0]) {
             if (!validateImageInput(backdropFileInput, 'backdrop_file_info', 6291456)) {
-                throw new Error('El backdrop no es válido');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
             }
             showNotification('Subiendo backdrop...', 'info');
-            const uploadData = new FormData();
-            uploadData.append('file', backdropFileInput.files[0]);
+            const backdropUploadData = new FormData();
+            backdropUploadData.append('file', backdropFileInput.files[0]);
             const bdResp = await fetch(`${baseUrl}/api/upload/image.php`, {
                 method: 'POST',
-                body: uploadData,
+                body: backdropUploadData,
                 credentials: 'same-origin'
             });
             const bdJson = await bdResp.json();
@@ -3451,88 +3435,58 @@ async function handleContentSubmit(e) {
                 throw new Error(bdJson.error || 'Error al subir el backdrop');
             }
             backdropUrl = bdJson.data.url;
-        } else {
-            backdropUrl = (formData.get('backdrop_url') || '').trim();
         }
 
-        // Determinar qué fuente de video usar (URL o archivo)
-        let videoUrl = '';
-
-        if (videoSource === 'file') {
-            // Subir archivo de video
-            const videoFile = formData.get('video_file');
-            if (!videoFile || videoFile.size === 0) {
-                throw new Error('Por favor, selecciona un archivo de video');
+        // Subir archivo de video (opcional)
+        if (videoFileInput && videoFileInput.files && videoFileInput.files[0]) {
+            if (!validateFileInput(videoFileInput, 'video_file_info', 2147483648)) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
             }
-
             showNotification('Subiendo video...', 'info');
             const videoUploadData = new FormData();
-            videoUploadData.append('file', videoFile);
-
-            const uploadEndpoint = `${baseUrl}/api/upload/video.php`;
-            const videoUploadResponse = await fetch(uploadEndpoint, {
+            videoUploadData.append('file', videoFileInput.files[0]);
+            const videoUploadResponse = await fetch(`${baseUrl}/api/upload/video.php`, {
                 method: 'POST',
                 body: videoUploadData,
                 credentials: 'same-origin'
             });
-
             const videoUploadResult = await videoUploadResponse.json();
-
-            if (videoUploadResult.success && videoUploadResult.data) {
-                videoUrl = videoUploadResult.data.url;
-                showNotification('Video subido correctamente', 'success');
-            } else {
+            if (!videoUploadResult.success || !videoUploadResult.data?.url) {
                 throw new Error(videoUploadResult.error || 'Error al subir el video');
             }
-        } else if (videoSource === 'url') {
-            // Usar URL de video
-            videoUrl = formData.get('video_url') || '';
-            if (!videoUrl || videoUrl.trim() === '') {
-                throw new Error('Por favor, ingresa una URL de video');
-            }
-            videoUrl = videoUrl.trim();
-        } else {
-            throw new Error('Por favor, selecciona una fuente de video (URL o archivo)');
+            videoUrl = videoUploadResult.data.url;
+            showNotification('Video subido correctamente', 'success');
         }
 
-        // Determinar qué fuente de tráiler usar (URL, archivo o ninguno)
-        let trailerUrl = '';
-
-        if (trailerSource === 'file') {
-            // Subir archivo de tráiler
-            const trailerFile = formData.get('trailer_file');
-            if (!trailerFile || trailerFile.size === 0) {
-                throw new Error('Por favor, selecciona un archivo de tráiler');
+        // Subir tráiler si existe (opcional)
+        const trailerFileInput = document.getElementById('trailer_file');
+        if (trailerFileInput && trailerFileInput.files && trailerFileInput.files[0]) {
+            if (!validateFileInput(trailerFileInput, 'trailer_file_info', 524288000)) {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+                return;
             }
-
             showNotification('Subiendo tráiler...', 'info');
             const trailerUploadData = new FormData();
-            trailerUploadData.append('file', trailerFile);
+            trailerUploadData.append('file', trailerFileInput.files[0]);
             trailerUploadData.append('is_trailer', '1');
-
-            const uploadEndpoint = `${baseUrl}/api/upload/video.php`;
-            const trailerUploadResponse = await fetch(uploadEndpoint, {
+            const trailerUploadResponse = await fetch(`${baseUrl}/api/upload/video.php`, {
                 method: 'POST',
                 body: trailerUploadData,
                 credentials: 'same-origin'
             });
-
             const trailerUploadResult = await trailerUploadResponse.json();
-
-            if (trailerUploadResult.success && trailerUploadResult.data) {
+            if (trailerUploadResult.success && trailerUploadResult.data?.url) {
                 trailerUrl = trailerUploadResult.data.url;
                 showNotification('Tráiler subido correctamente', 'success');
-            } else {
-                throw new Error(trailerUploadResult.error || 'Error al subir el tráiler');
-            }
-        } else if (trailerSource === 'url') {
-            // Usar URL de tráiler
-            trailerUrl = formData.get('trailer_url') || '';
-            if (trailerUrl) {
-                trailerUrl = trailerUrl.trim();
             }
         }
-        // Si trailerSource === 'none', trailerUrl permanece vacío
 
         // Preparar datos del formulario
         const data = Object.fromEntries(formData.entries());
@@ -3546,17 +3500,31 @@ async function handleContentSubmit(e) {
         const type = appState.currentSubsection || 'peliculas'; // 'peliculas', 'series', etc.
         const contentType = type === 'peliculas' ? 'movie' : 'series';
 
+        // Si estamos editando, obtener valores existentes si no se subieron nuevos archivos
+        if (appState.editingItemId) {
+            // Intentar obtener datos existentes del formulario (si están en data attributes)
+            const existingPoster = form.getAttribute('data-existing-poster');
+            const existingBackdrop = form.getAttribute('data-existing-backdrop');
+            const existingVideo = form.getAttribute('data-existing-video');
+            const existingTrailer = form.getAttribute('data-existing-trailer');
+            
+            if (!posterUrl && existingPoster) posterUrl = existingPoster;
+            if (!backdropUrl && existingBackdrop) backdropUrl = existingBackdrop;
+            if (!videoUrl && existingVideo) videoUrl = existingVideo;
+            if (!trailerUrl && existingTrailer) trailerUrl = existingTrailer;
+        }
+
         // Preparar datos para la API
         const apiData = {
             title: data.title,
             description: data.description,
-            release_year: parseInt(data.release_year),
-            duration: parseInt(data.duration),
+            release_year: data.release_year ? parseInt(data.release_year) : null,
+            duration: data.duration ? parseInt(data.duration) : null,
             type: contentType,
-            poster_url: posterUrl,
-            backdrop_url: backdropUrl,
-            video_url: videoUrl,
-            trailer_url: trailerUrl,
+            poster_url: posterUrl || null,
+            backdrop_url: backdropUrl || null,
+            video_url: videoUrl || null,
+            trailer_url: trailerUrl || null,
             torrent_magnet: data.torrent_magnet || null,
             age_rating: data.age_rating || null,
             is_featured: data.is_featured === '1' || data.is_featured === true ? 1 : 0,
@@ -4054,13 +4022,6 @@ function clearVideoFile() {
     if (videoFileInfo) {
         videoFileInfo.style.display = 'none';
     }
-
-    // Cambiar a opción de URL
-    const urlRadio = document.getElementById('video_source_url');
-    if (urlRadio) {
-        urlRadio.checked = true;
-        urlRadio.dispatchEvent(new Event('change'));
-    }
 }
 
 // Limpiar archivo de tráiler
@@ -4073,13 +4034,6 @@ function clearTrailerFile() {
     }
     if (trailerFileInfo) {
         trailerFileInfo.style.display = 'none';
-    }
-
-    // Cambiar a opción "none"
-    const noneRadio = document.getElementById('trailer_source_none');
-    if (noneRadio) {
-        noneRadio.checked = true;
-        noneRadio.dispatchEvent(new Event('change'));
     }
 }
 
@@ -5403,13 +5357,24 @@ window.selectTorrent = selectTorrent;
 // ============================================
 // ACTUALIZACIÓN AUTOMÁTICA DE CONTENIDO
 // ============================================
+let contentRefreshAttempts = 0;
+const MAX_REFRESH_ATTEMPTS = 3;
+
 function initContentRefresh() {
     const btnRefresh = document.getElementById('btn-refresh-content');
     if (!btnRefresh) {
-        console.log('Botón btn-refresh-content no encontrado, reintentando en 500ms...');
-        setTimeout(initContentRefresh, 500);
+        // Solo reintentar un número limitado de veces
+        if (contentRefreshAttempts < MAX_REFRESH_ATTEMPTS) {
+            contentRefreshAttempts++;
+            setTimeout(initContentRefresh, 500);
+        }
+        // Si el botón no existe después de los intentos, simplemente no hacer nada
+        // (esto es normal cuando no estamos en la vista del dashboard)
         return;
     }
+
+    // Resetear contador si encontramos el botón
+    contentRefreshAttempts = 0;
 
     // Si ya tiene el listener, no hacer nada
     if (btnRefresh.hasAttribute('data-listener-attached')) {
@@ -5417,7 +5382,6 @@ function initContentRefresh() {
     }
 
     btnRefresh.setAttribute('data-listener-attached', 'true');
-    console.log('Inicializando botón de actualización de contenido');
 
     btnRefresh.addEventListener('click', async function (e) {
         e.preventDefault();
@@ -5431,6 +5395,11 @@ function initContentRefresh() {
         const dryRun = document.getElementById('refresh-dry-run')?.checked || false;
         const statusDiv = document.getElementById('refresh-status');
         const outputDiv = document.getElementById('refresh-output');
+        const outputContent = document.getElementById('refresh-output-content');
+        const statsDiv = document.getElementById('refresh-stats');
+        const progressDiv = document.getElementById('refresh-progress');
+        const progressFill = document.getElementById('refresh-progress-fill');
+        const progressText = document.getElementById('refresh-progress-text');
         const btn = this;
 
         // Validar parámetros
@@ -5445,11 +5414,25 @@ function initContentRefresh() {
 
         // Deshabilitar botón y mostrar estado
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
-        statusDiv.textContent = 'Procesando...';
-        statusDiv.style.color = '#e50914';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Actualizando...</span>';
+        statusDiv.className = 'netflix-refresh-status processing';
+        statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+        
+        // Mostrar elementos
         outputDiv.style.display = 'none';
-        outputDiv.textContent = '';
+        if (outputContent) outputContent.textContent = '';
+        if (statsDiv) {
+            statsDiv.style.display = 'grid';
+            document.getElementById('stat-created').textContent = '0';
+            document.getElementById('stat-updated').textContent = '0';
+            document.getElementById('stat-episodes').textContent = '0';
+            document.getElementById('stat-time').textContent = '0s';
+        }
+        if (progressDiv) {
+            progressDiv.style.display = 'block';
+            if (progressFill) progressFill.style.width = '0%';
+            if (progressText) progressText.textContent = 'Iniciando actualización...';
+        }
 
         try {
             const apiUrl = (baseUrl || '') + '/api/content/refresh-latest.php';
@@ -5496,23 +5479,42 @@ function initContentRefresh() {
                 throw new Error('Error al parsear respuesta del servidor: ' + parseError.message);
             }
 
+            // Actualizar progreso
+            if (progressFill) progressFill.style.width = '100%';
+            if (progressText) progressText.textContent = 'Completado';
+
             if (data.success) {
-                statusDiv.textContent = '✅ Completado';
-                statusDiv.style.color = '#46d369';
+                statusDiv.className = 'netflix-refresh-status success';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Completado exitosamente';
 
-                const result = data.data;
-                const summary = `Creados: ${result.created || 0} | Actualizados: ${result.updated || 0} | Episodios nuevos: ${result.new_episodes || 0} | Tiempo: ${result.execution_time || 'N/A'}`;
+                const result = data.data || {};
+                const created = result.created || 0;
+                const updated = result.updated || 0;
+                const episodes = result.new_episodes || 0;
+                const execTime = result.execution_time || '0s';
 
-                outputDiv.textContent = summary + '\n\n' + (result.output || '');
+                // Actualizar estadísticas
+                if (statsDiv) {
+                    animateValue('stat-created', 0, created, 1000);
+                    animateValue('stat-updated', 0, updated, 1000);
+                    animateValue('stat-episodes', 0, episodes, 1000);
+                    document.getElementById('stat-time').textContent = execTime;
+                }
+
+                // Mostrar output
+                if (outputContent) {
+                    const outputText = result.output || '';
+                    outputContent.textContent = outputText || `✅ Proceso completado exitosamente\n\nCreados: ${created}\nActualizados: ${updated}\nEpisodios nuevos: ${episodes}\nTiempo de ejecución: ${execTime}`;
+                }
                 outputDiv.style.display = 'block';
 
                 showNotification(
-                    `Actualización completada: ${result.created || 0} creados, ${result.updated || 0} actualizados, ${result.new_episodes || 0} episodios nuevos`,
+                    `Actualización completada: ${created} creados, ${updated} actualizados, ${episodes} episodios nuevos`,
                     'success'
                 );
 
                 // Recargar página después de 3 segundos si no es dry-run
-                if (!dryRun && (result.created > 0 || result.updated > 0)) {
+                if (!dryRun && (created > 0 || updated > 0)) {
                     setTimeout(() => {
                         if (confirm('¿Recargar la página para ver los cambios?')) {
                             window.location.reload();
@@ -5520,33 +5522,49 @@ function initContentRefresh() {
                     }, 3000);
                 }
             } else {
-                statusDiv.textContent = '⚠️ Completado con advertencias';
-                statusDiv.style.color = '#ffa500';
+                statusDiv.className = 'netflix-refresh-status warning';
+                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Completado con advertencias';
 
                 const result = data.data || {};
-                const summary = `Creados: ${result.created || 0} | Actualizados: ${result.updated || 0} | Episodios nuevos: ${result.new_episodes || 0} | Tiempo: ${result.execution_time || 'N/A'}`;
+                const created = result.created || 0;
+                const updated = result.updated || 0;
+                const episodes = result.new_episodes || 0;
+                const execTime = result.execution_time || '0s';
 
-                let errorMsg = data.error || data.message || 'Error desconocido';
-                if (result.output) {
-                    errorMsg += '\n\n' + result.output;
+                // Actualizar estadísticas
+                if (statsDiv) {
+                    animateValue('stat-created', 0, created, 1000);
+                    animateValue('stat-updated', 0, updated, 1000);
+                    animateValue('stat-episodes', 0, episodes, 1000);
+                    document.getElementById('stat-time').textContent = execTime;
                 }
 
-                outputDiv.textContent = summary + '\n\n' + errorMsg;
+                // Mostrar output con error
+                let errorMsg = data.error || data.message || 'Error desconocido';
+                if (outputContent) {
+                    outputContent.textContent = `⚠️ ${errorMsg}\n\n${result.output || ''}`;
+                }
                 outputDiv.style.display = 'block';
-                outputDiv.style.color = '#ffa500';
 
                 showNotification('Actualización completada con advertencias. Revisa la salida para más detalles.', 'warning');
             }
         } catch (error) {
             console.error('Error en actualización:', error);
-            statusDiv.textContent = '❌ Error';
-            statusDiv.style.color = '#e50914';
-            outputDiv.textContent = 'Error de conexión: ' + error.message;
+            statusDiv.className = 'netflix-refresh-status error';
+            statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> Error en la conexión';
+            
+            if (outputContent) {
+                outputContent.textContent = `❌ Error de conexión: ${error.message}\n\nPor favor, verifica tu conexión a internet e intenta nuevamente.`;
+            }
             outputDiv.style.display = 'block';
+            
+            if (progressFill) progressFill.style.width = '0%';
+            if (progressText) progressText.textContent = 'Error en la conexión';
+            
             showNotification('Error de conexión al actualizar contenido', 'error');
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-sync-alt"></i> Actualizar Novedades';
+            btn.innerHTML = '<i class="fas fa-sync-alt"></i> <span>Actualizar Novedades</span>';
         }
     });
 }
@@ -5557,3 +5575,123 @@ if (document.readyState === 'loading') {
 } else {
     initContentRefresh();
 }
+
+// ============================================
+// FUNCIONES AUXILIARES PARA ACTUALIZACIÓN
+// ============================================
+
+// Aplicar presets rápidos
+function applyPreset(presetName) {
+    const presets = {
+        quick: { limit: 10, days: 3, seeds: 5 },
+        standard: { limit: 30, days: 7, seeds: 10 },
+        extensive: { limit: 50, days: 14, seeds: 15 },
+        full: { limit: 100, days: 30, seeds: 20 }
+    };
+
+    const preset = presets[presetName];
+    if (!preset) return;
+
+    // Actualizar valores
+    const limitInput = document.getElementById('refresh-limit');
+    const daysInput = document.getElementById('refresh-days');
+    const seedsInput = document.getElementById('refresh-seeds');
+
+    if (limitInput) limitInput.value = preset.limit;
+    if (daysInput) daysInput.value = preset.days;
+    if (seedsInput) seedsInput.value = preset.seeds;
+
+    // Actualizar botones activos
+    document.querySelectorAll('.netflix-preset-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.preset === presetName) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Efecto visual
+    if (limitInput) {
+        limitInput.style.transform = 'scale(1.05)';
+        setTimeout(() => { limitInput.style.transform = ''; }, 200);
+    }
+}
+
+// Animar valores numéricos
+function animateValue(elementId, start, end, duration) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    const startTime = performance.now();
+    const isTime = elementId.includes('time');
+
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        if (isTime) {
+            element.textContent = end;
+        } else {
+            const current = Math.floor(start + (end - start) * progress);
+            element.textContent = current.toLocaleString();
+        }
+
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        } else {
+            element.textContent = isTime ? end : end.toLocaleString();
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+// Copiar al portapapeles
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('Enlace copiado al portapapeles', 'success');
+        }).catch(err => {
+            console.error('Error al copiar:', err);
+            fallbackCopyToClipboard(text);
+        });
+    } else {
+        fallbackCopyToClipboard(text);
+    }
+}
+
+function fallbackCopyToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+        showNotification('Enlace copiado al portapapeles', 'success');
+    } catch (err) {
+        console.error('Error al copiar:', err);
+        showNotification('No se pudo copiar al portapapeles', 'error');
+    }
+    
+    document.body.removeChild(textArea);
+}
+
+// Limpiar output
+function clearRefreshOutput() {
+    const outputContent = document.getElementById('refresh-output-content');
+    const outputDiv = document.getElementById('refresh-output');
+    
+    if (outputContent) {
+        outputContent.textContent = '';
+    }
+    if (outputDiv) {
+        outputDiv.style.display = 'none';
+    }
+}
+
+// Hacer funciones globales
+window.applyPreset = applyPreset;
+window.copyToClipboard = copyToClipboard;
+window.clearRefreshOutput = clearRefreshOutput;

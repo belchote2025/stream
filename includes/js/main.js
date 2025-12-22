@@ -886,14 +886,24 @@ function openTorrentModal(content) {
                 elements.torrentResultsContainer.style.display = 'block';
             }
             renderTorrentResults(results, content);
+            
+            // Añadir event listeners a los botones después de renderizar
+            setTimeout(() => {
+                const playButtons = document.querySelectorAll('.play-torrent-btn');
+                playButtons.forEach(btn => {
+                    btn.addEventListener('click', handleTorrentResultClick);
+                });
+            }, 100);
         })
-        .catch(() => {
+        .catch((error) => {
+            console.error('Error al buscar torrents:', error);
             if (elements.torrentSearchStatus) {
                 elements.torrentSearchStatus.style.display = 'block';
                 elements.torrentSearchStatus.innerHTML = `
                     <div class="torrent-loading error">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <p>Error al buscar torrents. Intenta nuevamente.</p>
+                        <p>Error al buscar torrents: ${error.message || 'Error desconocido'}</p>
+                        <p style="font-size: 0.85rem; margin-top: 0.5rem; color: #999;">Intenta nuevamente o cierra el modal.</p>
                     </div>
                 `;
             }
@@ -956,39 +966,64 @@ function renderTorrentResults(results, content) {
             <div class="torrent-empty">
                 <i class="fas fa-search"></i>
                 <p>No se encontraron torrents para esta búsqueda.</p>
+                <p style="font-size: 0.9rem; color: #999; margin-top: 0.5rem;">Puedes intentar con otro título o buscar manualmente.</p>
             </div>
         `;
         return;
     }
     
-    const html = results.map(result => {
+    // Ordenar resultados por calidad y seeds (mejores primero)
+    const sortedResults = [...results].sort((a, b) => {
+        // Priorizar por seeds
+        const seedsA = a.seeds || 0;
+        const seedsB = b.seeds || 0;
+        if (seedsB !== seedsA) return seedsB - seedsA;
+        
+        // Luego por calidad (1080p > 720p > 480p)
+        const qualityOrder = { '1080p': 3, '720p': 2, '480p': 1, '360p': 0 };
+        const qualityA = qualityOrder[a.quality] || 0;
+        const qualityB = qualityOrder[b.quality] || 0;
+        return qualityB - qualityA;
+    });
+    
+    const html = sortedResults.map((result, index) => {
         const safeMagnet = encodeURIComponent(result.magnet || '');
         const quality = result.quality && result.quality !== 'Unknown' ? result.quality : 'Desconocida';
         const seeds = result.seeds || 0;
         const size = result.size || 'N/A';
         const source = result.source || 'Fuente desconocida';
+        const isRecommended = index === 0 && seeds > 5; // Marcar el mejor como recomendado
         
         return `
-            <div class="torrent-result">
-                <div class="torrent-info">
-                    <div class="torrent-title">${result.title || 'Torrent sin título'}</div>
-                    <div class="torrent-meta">
-                        <span class="torrent-quality">${quality}</span>
-                        <span><i class="fas fa-arrow-up"></i> Seeds: ${seeds}</span>
-                        <span><i class="fas fa-hdd"></i> ${size}</span>
-                        <span><i class="fas fa-database"></i> ${source}</span>
+            <div class="torrent-result ${isRecommended ? 'torrent-recommended' : ''}" style="padding: 1rem; margin-bottom: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s ease; ${isRecommended ? 'border-color: #e50914; box-shadow: 0 0 10px rgba(229,9,20,0.3);' : ''}">
+                ${isRecommended ? '<div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: #e50914; font-size: 0.85rem; font-weight: 600;"><i class="fas fa-star"></i> Recomendado</div>' : ''}
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem; color: #fff; font-size: 1rem;">${result.title || 'Torrent sin título'}</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.85rem; color: #ccc;">
+                            ${quality !== 'Desconocida' ? `<span style="background: #e50914; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 600;">${quality}</span>` : ''}
+                            ${seeds > 0 ? `<span style="color: #28a745;"><i class="fas fa-arrow-up"></i> ${seeds} seeds</span>` : '<span style="color: #999;"><i class="fas fa-arrow-up"></i> Sin seeds</span>'}
+                            ${size !== 'N/A' ? `<span><i class="fas fa-hdd"></i> ${size}</span>` : ''}
+                            <span style="color: #999;"><i class="fas fa-database"></i> ${source}</span>
+                        </div>
                     </div>
-                </div>
-                <div class="torrent-actions">
-                    <button class="play-torrent-btn" data-magnet="${safeMagnet}" data-content-id="${content.id}" data-title="${encodeURIComponent(content.title)}">
-                        <i class="fas fa-play"></i> Reproducir
-                    </button>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="play-torrent-btn" data-magnet="${safeMagnet}" data-content-id="${content.id}" data-title="${encodeURIComponent(content.title)}" style="background: #e50914; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;" onmouseover="this.style.background='#f40612'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#e50914'; this.style.transform='scale(1)'">
+                            <i class="fas fa-check"></i> Usar
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
     }).join('');
     
-    elements.torrentResultsList.innerHTML = html;
+    elements.torrentResultsList.innerHTML = `
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(229,9,20,0.1); border-left: 3px solid #e50914; border-radius: 4px;">
+            <div style="font-weight: 600; color: #fff; margin-bottom: 0.25rem;">Encontrados ${results.length} resultado${results.length !== 1 ? 's' : ''}</div>
+            <div style="font-size: 0.85rem; color: #ccc;">Selecciona un torrent para actualizar el contenido y reproducirlo</div>
+        </div>
+        ${html}
+    `;
 }
 
 function handleTorrentResultClick(event) {
@@ -1008,11 +1043,43 @@ function handleTorrentResultClick(event) {
 }
 
 async function selectTorrentForPlayback(magnetLink, contentId) {
-    if (!magnetLink) return;
+    if (!magnetLink) {
+        if (typeof showNotification === 'function') {
+            showNotification('Enlace magnet no válido', 'error');
+        }
+        return;
+    }
+    
+    // Validar que el magnet link tenga el formato correcto
+    if (!magnetLink.startsWith('magnet:?')) {
+        if (typeof showNotification === 'function') {
+            showNotification('El enlace magnet no tiene un formato válido', 'error');
+        }
+        return;
+    }
+    
+    // Deshabilitar todos los botones de "Usar" mientras se procesa
+    const allButtons = document.querySelectorAll('.play-torrent-btn');
+    allButtons.forEach(btn => {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'not-allowed';
+    });
     
     // Mostrar notificación de actualización
     if (typeof showNotification === 'function') {
         showNotification('Actualizando contenido y preparando reproducción...', 'info');
+    }
+    
+    // Mostrar indicador de carga en el modal
+    if (elements.torrentSearchStatus) {
+        elements.torrentSearchStatus.style.display = 'block';
+        elements.torrentSearchStatus.innerHTML = `
+            <div class="torrent-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Actualizando contenido y preparando reproducción...</p>
+            </div>
+        `;
     }
     
     // Si tenemos un contentId, actualizar el contenido en la base de datos
@@ -1073,7 +1140,7 @@ async function selectTorrentForPlayback(magnetLink, contentId) {
                 const updateResult = await updateResponse.json();
                 if (updateResult.success) {
                     if (typeof showNotification === 'function') {
-                        showNotification('Contenido actualizado correctamente. Iniciando reproducción...', 'success');
+                        showNotification('✓ Contenido actualizado correctamente. Iniciando reproducción...', 'success');
                     }
                     // Actualizar el cache local si existe
                     if (appState.contentCache && appState.contentCache[`${contentType}s`]) {
@@ -1082,20 +1149,35 @@ async function selectTorrentForPlayback(magnetLink, contentId) {
                             appState.contentCache[`${contentType}s`][index].torrent_magnet = magnetLink;
                         }
                     }
+                } else {
+                    throw new Error(updateResult.error || 'Error al actualizar contenido');
                 }
             } else {
                 const errorText = await updateResponse.text();
-                console.warn('Error al actualizar contenido:', errorText);
+                let errorMessage = 'Error al actualizar contenido';
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    errorMessage = errorJson.error || errorMessage;
+                } catch (e) {
+                    errorMessage = errorText.substring(0, 100) || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
         } catch (error) {
             console.warn('Error al actualizar contenido:', error);
             // Continuar con la reproducción aunque falle la actualización
             if (typeof showNotification === 'function') {
-                showNotification('Reproduciendo torrent (actualización falló, pero continuando...)', 'warning');
+                showNotification(`⚠ ${error.message || 'Error al actualizar'}. Reproduciendo torrent directamente...`, 'warning');
+            }
+        } finally {
+            // Ocultar indicador de carga
+            if (elements.torrentSearchStatus) {
+                elements.torrentSearchStatus.style.display = 'none';
             }
         }
     }
     
+    // Cerrar el modal antes de reproducir
     closeTorrentModal();
     
     // Reproducir el contenido
@@ -1104,15 +1186,24 @@ async function selectTorrentForPlayback(magnetLink, contentId) {
     
     // Intentar reproducir en la misma ventana si hay un reproductor disponible
     if (typeof playContent === 'function' && contentId) {
-        // Reproducir usando la función playContent
+        // Pequeño delay para asegurar que el modal se cierre
         setTimeout(() => {
             playContent(contentId, contentType);
-        }, 500);
+        }, 300);
     } else {
         // Fallback: abrir en nueva pestaña
         const url = `${baseUrl}/watch.php?id=${contentId || ''}&torrent=${encodeURIComponent(magnetLink)}`;
         window.open(url, '_blank');
     }
+    
+    // Rehabilitar botones después de un delay
+    setTimeout(() => {
+        allButtons.forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+        });
+    }, 1000);
 }
 
 function closeTorrentModal() {

@@ -110,6 +110,25 @@ if ($auth->isAuthenticated()) {
                 </div>
             <?php endif; ?>
             
+            <?php if (isset($_SESSION['error'])): ?>
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($_SESSION['error']); ?>
+                </div>
+                <?php unset($_SESSION['error']); ?>
+            <?php endif; ?>
+            
+            <?php if (isset($_GET['error'])): ?>
+                <?php if ($_GET['error'] === 'google_not_configured'): ?>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle"></i> La autenticación con Google no está configurada. Por favor, usa el formulario de inicio de sesión o contacta al administrador.
+                    </div>
+                <?php elseif ($_GET['error'] === 'facebook_not_configured'): ?>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle"></i> La autenticación con Facebook no está configurada. Por favor, usa el formulario de inicio de sesión o contacta al administrador.
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+            
             <?php if (isset($_GET['registered']) && $_GET['registered'] === '1'): ?>
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle"></i> ¡Registro exitoso! Por favor inicia sesión con tus credenciales.

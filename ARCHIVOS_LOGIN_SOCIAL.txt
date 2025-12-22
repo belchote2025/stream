@@ -1,0 +1,78 @@
+ARCHIVOS PARA SUBIR - CORRECCIÓN BOTONES LOGIN SOCIAL
+======================================================
+
+Archivos modificados para corregir los botones de login social (Google y Facebook):
+
+1. js/social-auth.js
+   - Mejoras en el manejo de eventos de los botones
+   - Indicadores de carga visuales
+   - Redirección mejorada a endpoints OAuth
+   - Mejor manejo de errores
+
+2. login.php
+   - Añadidos mensajes de error para cuando OAuth no está configurado
+   - Mejor manejo de mensajes de sesión
+
+3. api/auth/social/google.php
+   - Mejor manejo cuando no hay configuración OAuth
+   - Redirección a login con mensaje de error en lugar de JSON
+
+4. api/auth/social/facebook.php
+   - Mejor manejo cuando no hay configuración OAuth
+   - Redirección a login con mensaje de error en lugar de JSON
+
+======================================================
+INSTRUCCIONES:
+======================================================
+
+1. Sube estos 4 archivos a tu servidor de producción:
+   - js/social-auth.js
+   - login.php
+   - api/auth/social/google.php
+   - api/auth/social/facebook.php
+
+2. Asegúrate de que los archivos se suban a las rutas correctas:
+   - /js/social-auth.js
+   - /login.php
+   - /api/auth/social/google.php
+   - /api/auth/social/facebook.php
+
+3. Limpia la caché del navegador después de subir los archivos
+   (Ctrl+F5 o Cmd+Shift+R)
+
+4. Prueba los botones de Google y Facebook:
+   - Si OAuth está configurado: deberían redirigir a Google/Facebook
+   - Si OAuth NO está configurado: mostrarán un mensaje informativo
+
+======================================================
+MEJORAS IMPLEMENTADAS:
+======================================================
+
+✓ Los botones ahora funcionan correctamente
+✓ Indicadores de carga visuales al hacer clic
+✓ Mejor manejo de errores cuando OAuth no está configurado
+✓ Mensajes informativos para el usuario
+✓ Redirección mejorada a endpoints OAuth
+✓ Prevención de múltiples clics durante la carga
+
+======================================================
+NOTA IMPORTANTE:
+======================================================
+
+Para que los botones funcionen completamente, necesitas configurar:
+
+1. Google OAuth:
+   - Obtener GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET
+   - Configurar en Google Cloud Console
+   - Añadir a variables de entorno
+
+2. Facebook OAuth:
+   - Obtener FACEBOOK_APP_ID y FACEBOOK_APP_SECRET
+   - Configurar en Facebook Developers
+   - Añadir a variables de entorno
+
+Sin esta configuración, los botones mostrarán un mensaje informativo
+pero no podrán autenticar usuarios.
+
+======================================================
+

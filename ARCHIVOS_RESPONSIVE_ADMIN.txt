@@ -1,0 +1,58 @@
+ARCHIVOS PARA SUBIR - MEJORAS RESPONSIVE PANEL ADMINISTRACIÓN
+================================================================
+
+Archivos modificados para mejorar el responsive del panel de administración:
+
+1. css/admin.css
+   - Mejoras en sidebar móvil (mejor posicionamiento y transiciones)
+   - Correcciones en top-bar para móviles y tablets
+   - Mejoras en tablas responsive con scroll horizontal
+   - Modales full-screen en móviles
+   - Mejoras en formularios Netflix responsive
+   - Mejoras en sección de actualización automática responsive
+   - Ajustes para pantallas muy pequeñas (480px y menos)
+
+2. js/admin.js
+   - Mejoras en el manejo del sidebar móvil
+   - Prevención de scroll cuando el sidebar está abierto
+   - Cierre automático del sidebar al redimensionar ventana
+   - Mejor manejo de eventos táctiles
+
+================================================================
+INSTRUCCIONES:
+================================================================
+
+1. Sube estos 2 archivos a tu servidor de producción:
+   - css/admin.css
+   - js/admin.js
+
+2. Asegúrate de que los archivos se suban a las rutas correctas:
+   - /css/admin.css
+   - /js/admin.js
+
+3. Limpia la caché del navegador después de subir los archivos
+   (Ctrl+F5 o Cmd+Shift+R)
+
+4. Prueba en diferentes dispositivos:
+   - Móviles (320px - 480px)
+   - Tablets (481px - 768px)
+   - Tablets grandes (769px - 992px)
+   - Desktop (993px+)
+
+================================================================
+MEJORAS IMPLEMENTADAS:
+================================================================
+
+✓ Sidebar móvil mejorado con mejor posicionamiento
+✓ Botón hamburguesa fijo y visible
+✓ Tablas con scroll horizontal en móviles
+✓ Modales full-screen en dispositivos móviles
+✓ Formularios Netflix completamente responsive
+✓ Sección de actualización automática responsive
+✓ Top-bar reorganizado para móviles
+✓ Prevención de scroll cuando el menú está abierto
+✓ Mejoras en estadísticas y cards en móviles
+✓ Ajustes para pantallas muy pequeñas
+
+================================================================
+

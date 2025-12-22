@@ -16,6 +16,7 @@
         if (googleBtn) {
             googleBtn.addEventListener('click', function(e) {
                 e.preventDefault();
+                e.stopPropagation();
                 handleGoogleAuth();
             });
         }
@@ -25,6 +26,7 @@
         if (facebookBtn) {
             facebookBtn.addEventListener('click', function(e) {
                 e.preventDefault();
+                e.stopPropagation();
                 handleFacebookAuth();
             });
         }
@@ -34,13 +36,33 @@
      * Manejar autenticación con Google
      */
     function handleGoogleAuth() {
-        // Opción 1: Usar Google Sign-In API (recomendado)
-        if (window.gapi && window.gapi.auth2) {
-            handleGoogleSignIn();
-        } else {
-            // Opción 2: Redirigir a endpoint OAuth
-            window.location.href = baseUrl + '/api/auth/social/google.php';
+        // Mostrar indicador de carga
+        const btn = document.querySelector('.btn-google');
+        if (btn) {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.7';
         }
+        
+        // Opción 1: Usar Google Sign-In API (si está disponible y configurado)
+        if (window.gapi && window.gapi.auth2 && window.__ENV && window.__ENV.GOOGLE_CLIENT_ID) {
+            try {
+                handleGoogleSignIn();
+                return;
+            } catch (error) {
+                console.warn('Error con Google SDK, usando redirección OAuth:', error);
+            }
+        }
+        
+        // Opción 2: Redirigir a endpoint OAuth (método por defecto y más confiable)
+        const googleUrl = baseUrl + '/api/auth/social/google.php';
+        console.log('Redirigiendo a Google OAuth:', googleUrl);
+        
+        // Pequeño delay para mostrar el indicador de carga
+        setTimeout(() => {
+            window.location.href = googleUrl;
+        }, 100);
     }
     
     /**
@@ -89,13 +111,33 @@
      * Manejar autenticación con Facebook
      */
     function handleFacebookAuth() {
-        // Opción 1: Usar Facebook SDK (recomendado)
-        if (window.FB) {
-            handleFacebookSDK();
-        } else {
-            // Opción 2: Redirigir a endpoint OAuth
-            window.location.href = baseUrl + '/api/auth/social/facebook.php';
+        // Mostrar indicador de carga
+        const btn = document.querySelector('.btn-facebook');
+        if (btn) {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.7';
         }
+        
+        // Opción 1: Usar Facebook SDK (si está disponible y configurado)
+        if (window.FB && window.__ENV && window.__ENV.FACEBOOK_APP_ID) {
+            try {
+                handleFacebookSDK();
+                return;
+            } catch (error) {
+                console.warn('Error con Facebook SDK, usando redirección OAuth:', error);
+            }
+        }
+        
+        // Opción 2: Redirigir a endpoint OAuth (método por defecto y más confiable)
+        const facebookUrl = baseUrl + '/api/auth/social/facebook.php';
+        console.log('Redirigiendo a Facebook OAuth:', facebookUrl);
+        
+        // Pequeño delay para mostrar el indicador de carga
+        setTimeout(() => {
+            window.location.href = facebookUrl;
+        }, 100);
     }
     
     /**
@@ -220,17 +262,27 @@
     }
     
     // Inicializar cuando el DOM esté listo
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            initSocialAuth();
-            // Cargar APIs de forma asíncrona (no bloqueante)
-            loadGoogleAPI().catch(() => console.warn('Google API no disponible'));
-            loadFacebookSDK().catch(() => console.warn('Facebook SDK no disponible'));
-        });
-    } else {
+    function initialize() {
+        // Inicializar los event listeners inmediatamente
         initSocialAuth();
-        loadGoogleAPI().catch(() => console.warn('Google API no disponible'));
-        loadFacebookSDK().catch(() => console.warn('Facebook SDK no disponible'));
+        
+        // Cargar APIs de forma asíncrona (no bloqueante, opcional)
+        // Solo si están configuradas las credenciales
+        if (window.__ENV && window.__ENV.GOOGLE_CLIENT_ID) {
+            loadGoogleAPI().catch(() => console.warn('Google API no disponible'));
+        }
+        
+        if (window.__ENV && window.__ENV.FACEBOOK_APP_ID) {
+            loadFacebookSDK().catch(() => console.warn('Facebook SDK no disponible'));
+        }
+    }
+    
+    // Inicializar cuando el DOM esté listo
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        // DOM ya está listo
+        initialize();
     }
     
     // Exportar funciones para uso global
@@ -241,5 +293,6 @@
     };
     
 })();
+
 
 

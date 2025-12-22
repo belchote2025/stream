@@ -48,12 +48,9 @@ try {
         $scope = 'email,public_profile';
         
         if (empty($appId)) {
-            echo json_encode([
-                'success' => false,
-                'error' => 'Autenticación con Facebook no configurada',
-                'message' => 'Por favor, contacta al administrador para configurar la autenticación con Facebook.',
-                'setup_required' => true
-            ]);
+            // Si no hay configuración, redirigir de vuelta al login con mensaje
+            $_SESSION['error'] = 'Autenticación con Facebook no está configurada. Por favor, contacta al administrador.';
+            header('Location: ' . $baseUrl . '/login.php?error=facebook_not_configured');
             exit;
         }
         

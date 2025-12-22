@@ -59,13 +59,9 @@ try {
         $scope = 'openid email profile';
         
         if (empty($clientId)) {
-            // Si no hay configuración, mostrar mensaje informativo
-            echo json_encode([
-                'success' => false,
-                'error' => 'Autenticación con Google no configurada',
-                'message' => 'Por favor, contacta al administrador para configurar la autenticación con Google.',
-                'setup_required' => true
-            ]);
+            // Si no hay configuración, redirigir de vuelta al login con mensaje
+            $_SESSION['error'] = 'Autenticación con Google no está configurada. Por favor, contacta al administrador.';
+            header('Location: ' . $baseUrl . '/login.php?error=google_not_configured');
             exit;
         }
         

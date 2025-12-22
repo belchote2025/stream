@@ -127,3 +127,4 @@ Para una implementación completa, considera:
 ⏳ **OAuth pendiente** - Requiere credenciales del desarrollador
 
 
+

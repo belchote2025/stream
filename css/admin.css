@@ -847,16 +847,26 @@ button {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(2px);
     z-index: 999;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .sidebar-overlay.active {
     opacity: 1;
     visibility: visible;
+}
+
+/* Prevenir scroll cuando el sidebar está abierto */
+body.sidebar-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
 }
 
 /* Responsive */
@@ -915,59 +925,123 @@ button {
         display: flex !important;
         align-items: center;
         justify-content: center;
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
+        z-index: 1002;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     
     .sidebar {
-        width: 250px;
+        width: 280px;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
         left: 0;
+        z-index: 1001;
     }
     
     .sidebar.active {
         transform: translateX(0);
-        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+        box-shadow: 2px 0 20px rgba(0, 0, 0, 0.5);
     }
     
     .sidebar-overlay {
         display: block !important;
     }
     
+    .sidebar-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+    
     .main-content {
         margin-left: 0;
+        width: 100%;
+    }
+    
+    /* Asegurar que el sidebar tenga scroll si es necesario */
+    .sidebar {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Mejorar visibilidad del logo en móviles */
+    .sidebar .logo {
+        padding: 1.25rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    
+    .sidebar .logo h2 {
+        font-size: 1.3rem;
     }
     
     .top-bar {
         padding: 1rem;
+        padding-left: 4rem; /* Espacio para el botón hamburguesa */
     }
     
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
     }
     
     .content-options {
         grid-template-columns: repeat(2, 1fr);
+    }
+    
+    /* Ajustes para user-menu en tablets */
+    .user-menu {
+        gap: 1rem;
+    }
+    
+    .search-bar {
+        flex: 1;
+        max-width: 400px;
     }
 }
 
 @media (max-width: 768px) {
     .top-bar {
         flex-direction: row;
-        gap: 1rem;
+        gap: 0.75rem;
         padding: 0.75rem 1rem;
+        padding-left: 4rem; /* Espacio para el botón hamburguesa */
         flex-wrap: wrap;
+        position: relative;
+    }
+    
+    .menu-toggle {
+        top: 0.75rem;
+        left: 0.75rem;
+    }
+    
+    .top-bar .user-menu {
+        order: 2;
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 0.5rem;
     }
     
     .top-bar .user-info {
-        order: 3;
-        width: 100%;
-        justify-content: center;
+        order: 2;
+        width: auto;
+        flex: 1;
+        justify-content: flex-end;
+    }
+    
+    .top-bar .notifications {
+        order: 1;
     }
     
     .search-bar {
         width: 100%;
         max-width: none;
-        order: 2;
+        order: 1;
+        margin-bottom: 0.5rem;
+    }
+    
+    .search-bar input {
+        font-size: 16px; /* Evita zoom en iOS */
     }
     
     .dashboard {
@@ -1004,65 +1078,145 @@ button {
     .table-responsive {
         margin: 0 -1rem;
         padding: 0 1rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        position: relative;
+    }
+    
+    .table-responsive::before {
+        content: '← Desliza para ver más →';
+        position: sticky;
+        left: 0;
+        top: 0;
+        background: rgba(229, 9, 20, 0.1);
+        color: #e50914;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        text-align: center;
+        width: 100%;
+        display: block;
+        z-index: 10;
     }
     
     .data-table {
         font-size: 0.875rem;
+        min-width: 600px; /* Ancho mínimo para scroll horizontal */
     }
     
     .data-table th,
     .data-table td {
         padding: 0.75rem 0.5rem;
+        white-space: nowrap;
+    }
+    
+    .data-table th:first-child,
+    .data-table td:first-child {
+        position: sticky;
+        left: 0;
+        background: inherit;
+        z-index: 5;
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
     }
     
     .data-table .thumbnail {
         width: 40px;
         height: 60px;
+        object-fit: cover;
     }
     
     .data-table .actions {
-        flex-direction: column;
+        flex-direction: row;
         gap: 0.25rem;
+        flex-wrap: wrap;
     }
     
     .data-table .actions button {
-        width: 100%;
-        padding: 0.5rem;
-        font-size: 0.8rem;
+        min-width: auto;
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+    }
+    
+    /* Ocultar columnas menos importantes en móviles */
+    .data-table .hidden-mobile {
+        display: none;
     }
     
     /* Modales responsive */
     .modal {
-        padding: 1rem;
-        margin: 0.5rem;
-        max-width: calc(100% - 1rem);
-        max-height: calc(100vh - 1rem);
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+        max-height: 100vh;
+        height: 100vh;
+        width: 100%;
+        border-radius: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .modal-content {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        border-radius: 0;
     }
     
     .modal-header {
         padding: 1rem;
         flex-wrap: wrap;
+        position: sticky;
+        top: 0;
+        background: inherit;
+        z-index: 10;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
     
     .modal-title {
         font-size: 1.25rem;
-        width: 100%;
+        width: calc(100% - 3rem);
         margin-bottom: 0.5rem;
+        word-wrap: break-word;
+    }
+    
+    .close-modal {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        z-index: 11;
     }
     
     .modal-body {
         padding: 1rem;
+        flex: 1;
+        overflow-y: auto;
     }
     
     .modal-footer {
         padding: 1rem;
         flex-direction: column;
         gap: 0.5rem;
+        position: sticky;
+        bottom: 0;
+        background: inherit;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 10;
     }
     
     .modal-footer button {
         width: 100%;
+        margin: 0;
     }
     
     /* Cards responsive */
@@ -1094,10 +1248,24 @@ button {
 @media (max-width: 576px) {
     .top-bar {
         padding: 0.5rem;
+        padding-left: 3.5rem; /* Espacio para el botón hamburguesa */
+    }
+    
+    .menu-toggle {
+        top: 0.5rem;
+        left: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        min-width: 40px;
+        min-height: 40px;
     }
     
     .dashboard {
-        padding: 0.5rem;
+        padding: 0.75rem;
+    }
+    
+    .dashboard h1 {
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
     }
     
     .stats-grid {
@@ -1106,14 +1274,27 @@ button {
     
     .stat-card {
         padding: 1rem;
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .stat-card .stat-icon {
+        margin-bottom: 0.75rem;
+        margin-right: 0;
     }
     
     .stat-card h3 {
-        font-size: 1.5rem;
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-card .stat-number {
+        font-size: 1.75rem;
     }
     
     .data-table {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
+        min-width: 500px;
     }
     
     .data-table th,
@@ -1125,18 +1306,40 @@ button {
     .form-group textarea,
     .form-group select {
         font-size: 16px; /* Evita zoom en iOS */
+        padding: 0.75rem;
     }
     
     .modal {
-        margin: 0.25rem;
-        padding: 0.75rem;
-        max-width: calc(100% - 0.5rem);
+        margin: 0;
+        padding: 0;
+        max-width: 100%;
     }
     
     .modal-header,
     .modal-body,
     .modal-footer {
         padding: 0.75rem;
+    }
+    
+    /* Ajustes para user-info en móviles muy pequeños */
+    .user-info span {
+        display: none; /* Ocultar nombre de usuario en móviles muy pequeños */
+    }
+    
+    .user-info .avatar {
+        width: 32px;
+        height: 32px;
+    }
+    
+    /* Ajustes para notifications */
+    .notifications {
+        font-size: 1.1rem;
+    }
+    
+    .badge {
+        width: 16px;
+        height: 16px;
+        font-size: 0.65rem;
     }
 }
 
@@ -1562,6 +1765,8 @@ button {
     color: #fff;
     margin: 0 0 0.5rem 0;
     text-shadow: 0 2px 10px rgba(229, 9, 20, 0.2);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .content-header p {
@@ -1570,6 +1775,38 @@ button {
     font-size: 1.1rem;
     font-weight: 400;
     letter-spacing: 0.3px;
+    word-wrap: break-word;
+}
+
+/* Responsive para content-header */
+@media (max-width: 768px) {
+    .content-header {
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .content-header h1 {
+        font-size: 1.75rem;
+    }
+    
+    .content-header p {
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .content-header {
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
+    .content-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .content-header p {
+        font-size: 0.85rem;
+    }
 }
 
 /* ============================================
@@ -4286,12 +4523,14 @@ button {
 @media (max-width: 768px) {
     .netflix-refresh-section {
         padding: 1.5rem;
+        margin: 1rem 0;
     }
     
     .netflix-refresh-header {
         flex-direction: column;
         text-align: center;
         gap: 1rem;
+        align-items: center;
     }
     
     .netflix-refresh-icon-wrapper {
@@ -4304,12 +4543,48 @@ button {
         font-size: 1.5rem;
     }
     
+    .netflix-refresh-subtitle {
+        font-size: 0.9rem;
+    }
+    
+    .netflix-refresh-info {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .netflix-info-card {
+        padding: 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .netflix-info-links {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+    }
+    
+    .netflix-link-separator {
+        display: none;
+    }
+    
+    .netflix-presets {
+        margin: 1rem 0;
+    }
+    
+    .netflix-presets-label {
+        margin-bottom: 0.75rem;
+        display: block;
+    }
+    
     .netflix-presets-buttons {
         flex-direction: column;
+        gap: 0.5rem;
     }
     
     .netflix-preset-btn {
         width: 100%;
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
     }
     
     .netflix-control-grid {
@@ -4320,48 +4595,105 @@ button {
     .netflix-refresh-actions {
         flex-direction: column;
         align-items: stretch;
+        gap: 1rem;
     }
     
     .netflix-actions-left {
         flex-direction: column;
         width: 100%;
+        gap: 0.75rem;
     }
     
     .netflix-btn-refresh {
         width: 100%;
         justify-content: center;
+        padding: 1rem;
+        font-size: 1rem;
     }
     
     .netflix-refresh-stats {
         grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+    
+    .netflix-refresh-output {
+        font-size: 0.85rem;
+        padding: 1rem;
+        max-height: 300px;
     }
 }
 
 @media (max-width: 480px) {
     .netflix-refresh-section {
         padding: 1rem;
+        margin: 0.75rem 0;
+        border-radius: 12px;
+    }
+    
+    .netflix-refresh-header {
+        gap: 0.75rem;
+    }
+    
+    .netflix-refresh-icon-wrapper {
+        width: 48px;
+        height: 48px;
+        font-size: 1.25rem;
     }
     
     .netflix-refresh-title {
         font-size: 1.25rem;
     }
     
+    .netflix-refresh-subtitle {
+        font-size: 0.85rem;
+    }
+    
+    .netflix-info-card {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+    }
+    
+    .netflix-preset-btn {
+        padding: 0.625rem 0.875rem;
+        font-size: 0.85rem;
+    }
+    
     .netflix-refresh-stats {
         grid-template-columns: 1fr;
+        gap: 0.5rem;
     }
     
     .netflix-stat-item {
         padding: 0.75rem;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.75rem;
     }
     
     .netflix-stat-icon {
         width: 40px;
         height: 40px;
         font-size: 1.25rem;
+        flex-shrink: 0;
     }
     
     .netflix-stat-value {
         font-size: 1.5rem;
+    }
+    
+    .netflix-stat-label {
+        font-size: 0.85rem;
+    }
+    
+    .netflix-refresh-output {
+        font-size: 0.8rem;
+        padding: 0.75rem;
+        max-height: 250px;
+    }
+    
+    .netflix-btn-refresh {
+        padding: 0.875rem;
+        font-size: 0.95rem;
     }
 }
 

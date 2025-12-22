@@ -97,3 +97,4 @@
 - Los controles se ocultan automáticamente después de 3 segundos de inactividad
 
 
+

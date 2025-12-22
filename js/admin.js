@@ -132,15 +132,24 @@ function setupEventListeners() {
     // Función para abrir/cerrar el menú
     function toggleSidebar() {
         if (sidebar) {
+            const isActive = sidebar.classList.contains('active');
             sidebar.classList.toggle('active');
             if (sidebarOverlay) {
                 sidebarOverlay.classList.toggle('active');
             }
             // Prevenir scroll del body cuando el menú está abierto
-            if (sidebar.classList.contains('active')) {
+            if (!isActive) {
+                document.body.classList.add('sidebar-open');
                 document.body.style.overflow = 'hidden';
+                document.body.style.position = 'fixed';
+                document.body.style.width = '100%';
+                document.body.style.height = '100%';
             } else {
+                document.body.classList.remove('sidebar-open');
                 document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.width = '';
+                document.body.style.height = '';
             }
         }
     }
@@ -152,7 +161,11 @@ function setupEventListeners() {
             if (sidebarOverlay) {
                 sidebarOverlay.classList.remove('active');
             }
+            document.body.classList.remove('sidebar-open');
             document.body.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.height = '';
         }
     }
 

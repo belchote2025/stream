@@ -3363,6 +3363,29 @@ async function handleContentSubmit(e) {
 
     const form = e.target;
     const formData = new FormData(form);
+    const formDataObj = {};
+    
+    // Convertir FormData a objeto
+    formData.forEach((value, key) => {
+        if (formDataObj[key]) {
+            if (!Array.isArray(formDataObj[key])) {
+                formDataObj[key] = [formDataObj[key]];
+            }
+            formDataObj[key].push(value);
+        } else {
+            formDataObj[key] = value;
+        }
+    });
+    
+    // Convertir campos numéricos
+    if (formDataObj.release_year) formDataObj.release_year = parseInt(formDataObj.release_year, 10);
+    if (formDataObj.duration) formDataObj.duration = parseInt(formDataObj.duration, 10);
+    if (formDataObj.rating) formDataObj.rating = parseFloat(formDataObj.rating);
+    
+    // Convertir checkboxes a booleanos
+    formDataObj.is_featured = formDataObj.is_featured === 'on' ? 1 : 0;
+    formDataObj.is_trending = formDataObj.is_trending === 'on' ? 1 : 0;
+    formDataObj.is_premium = formDataObj.is_premium === 'on' ? 1 : 0;
 
     // Mostrar indicador de carga
     const submitBtn = form.querySelector('button[type="submit"]');
@@ -3371,6 +3394,12 @@ async function handleContentSubmit(e) {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Guardando...';
     }
+
+    // Variables para las URLs de los archivos subidos
+    let posterUrl = null;
+    let backdropUrl = null;
+    let videoUrl = null;
+    let trailerUrl = null;
 
     try {
         // Validar campos requeridos
@@ -3407,7 +3436,7 @@ async function handleContentSubmit(e) {
             if (!posterJson.success || !posterJson.data?.url) {
                 throw new Error(posterJson.error || 'Error al subir el póster');
             }
-            formDataObj.poster_url = posterJson.data.url;
+            posterUrl = posterJson.data.url;
         }
 
         // Procesar backdrop si existe
@@ -3432,7 +3461,7 @@ async function handleContentSubmit(e) {
             if (!bdJson.success || !bdJson.data?.url) {
                 throw new Error(bdJson.error || 'Error al subir el backdrop');
             }
-            formDataObj.backdrop_url = bdJson.data.url;
+            backdropUrl = bdJson.data.url;
         }
 
         // Subir archivo de video (opcional)
@@ -3486,15 +3515,7 @@ async function handleContentSubmit(e) {
             }
         }
 
-        // Preparar datos del formulario
-        const data = Object.fromEntries(formData.entries());
-
-        // Convertir checkboxes a booleanos (0 o 1)
-        data.is_featured = data.is_featured ? 1 : 0;
-        data.is_trending = data.is_trending ? 1 : 0;
-        data.is_premium = data.is_premium ? 1 : 0;
-
-        // Determinar la URL y el método de la API
+        // Determinar el tipo de contenido
         const type = appState.currentSubsection || 'peliculas'; // 'peliculas', 'series', etc.
         const contentType = type === 'peliculas' ? 'movie' : 'series';
 
@@ -3514,20 +3535,21 @@ async function handleContentSubmit(e) {
 
         // Preparar datos para la API
         const apiData = {
-            title: data.title,
-            description: data.description,
-            release_year: data.release_year ? parseInt(data.release_year) : null,
-            duration: data.duration ? parseInt(data.duration) : null,
+            title: formDataObj.title,
+            description: formDataObj.description,
+            release_year: formDataObj.release_year || null,
+            duration: formDataObj.duration || null,
             type: contentType,
-            poster_url: posterUrl || null,
-            backdrop_url: backdropUrl || null,
-            video_url: videoUrl || null,
-            trailer_url: trailerUrl || null,
-            torrent_magnet: data.torrent_magnet || null,
-            age_rating: data.age_rating || null,
-            is_featured: data.is_featured === '1' || data.is_featured === true ? 1 : 0,
-            is_trending: data.is_trending === '1' || data.is_trending === true ? 1 : 0,
-            is_premium: data.is_premium === '1' || data.is_premium === true ? 1 : 0
+            poster_url: posterUrl || formDataObj.poster_url || null,
+            backdrop_url: backdropUrl || formDataObj.backdrop_url || null,
+            video_url: videoUrl || formDataObj.video_url || null,
+            trailer_url: trailerUrl || formDataObj.trailer_url || null,
+            torrent_magnet: formDataObj.torrent_magnet || null,
+            age_rating: formDataObj.age_rating || null,
+            is_featured: formDataObj.is_featured || 0,
+            is_trending: formDataObj.is_trending || 0,
+            is_premium: formDataObj.is_premium || 0,
+            genres: formDataObj.genres || []
         };
 
         let url = '/api/movies/index.php';
@@ -5452,9 +5474,6 @@ function initContentRefresh() {
                     'Accept': 'application/json'
                 },
                 credentials: 'include'
-                    min_seeds: minSeeds,
-                    dry_run: dryRun
-                })
             });
 
             console.log('Respuesta recibida:', response.status, response.statusText);

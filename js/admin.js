@@ -3373,20 +3373,9 @@ async function handleContentSubmit(e) {
     }
 
     try {
-        // Validar archivos requeridos
-        const posterFileInput = document.getElementById('poster_file');
-        if (!posterFileInput || !posterFileInput.files || !posterFileInput.files[0]) {
-            showNotification('Por favor, selecciona un archivo de póster', 'error');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-            }
-            return;
-        }
-
-        const backdropFileInput = document.getElementById('backdrop_file');
-        if (!backdropFileInput || !backdropFileInput.files || !backdropFileInput.files[0]) {
-            showNotification('Por favor, selecciona un archivo de backdrop', 'error');
+        // Validar campos requeridos
+        if (!formDataObj.title || !formDataObj.description || !formDataObj.release_year || !formDataObj.duration) {
+            showNotification('Por favor, completa todos los campos obligatorios', 'error');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
@@ -3396,13 +3385,8 @@ async function handleContentSubmit(e) {
 
         const videoFileInput = document.getElementById('video_file');
 
-        // Validar archivos antes de subir (solo si existen)
-        let posterUrl = '';
-        let backdropUrl = '';
-        let videoUrl = '';
-        let trailerUrl = '';
-
-        // Procesar póster (opcional)
+        // Procesar archivos si existen
+        const posterFileInput = document.getElementById('poster_file');
         if (posterFileInput && posterFileInput.files && posterFileInput.files[0]) {
             if (!validateImageInput(posterFileInput, 'poster_file_info', 5242880)) {
                 if (submitBtn) {
@@ -3423,10 +3407,11 @@ async function handleContentSubmit(e) {
             if (!posterJson.success || !posterJson.data?.url) {
                 throw new Error(posterJson.error || 'Error al subir el póster');
             }
-            posterUrl = posterJson.data.url;
+            formDataObj.poster_url = posterJson.data.url;
         }
 
-        // Procesar backdrop (opcional)
+        // Procesar backdrop si existe
+        const backdropFileInput = document.getElementById('backdrop_file');
         if (backdropFileInput && backdropFileInput.files && backdropFileInput.files[0]) {
             if (!validateImageInput(backdropFileInput, 'backdrop_file_info', 6291456)) {
                 if (submitBtn) {
@@ -3447,7 +3432,7 @@ async function handleContentSubmit(e) {
             if (!bdJson.success || !bdJson.data?.url) {
                 throw new Error(bdJson.error || 'Error al subir el backdrop');
             }
-            backdropUrl = bdJson.data.url;
+            formDataObj.backdrop_url = bdJson.data.url;
         }
 
         // Subir archivo de video (opcional)
@@ -5451,16 +5436,22 @@ function initContentRefresh() {
             const apiUrl = (baseUrl || '') + '/api/content/refresh-latest.php';
             console.log('Llamando a:', apiUrl);
 
+            const formDataObj = {
+                type: type,
+                limit: limit,
+                since_days: sinceDays,
+                min_seeds: minSeeds,
+                dry_run: dryRun
+            };
+
             const response = await fetch(apiUrl, {
                 method: 'POST',
+                body: JSON.stringify(formDataObj),
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
-                credentials: 'include',
-                body: JSON.stringify({
-                    type: type,
-                    limit: limit,
-                    since_days: sinceDays,
+                credentials: 'include'
                     min_seeds: minSeeds,
                     dry_run: dryRun
                 })

@@ -119,3 +119,5 @@ El archivo `.env` debe estar en la raíz del proyecto (mismo nivel que `index.ph
 - El `GOOGLE_CLIENT_SECRET` debe mantenerse secreto (solo en el servidor)
 - Puedes tener diferentes credenciales para desarrollo y producción
 
+
+

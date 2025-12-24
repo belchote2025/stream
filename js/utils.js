@@ -14,11 +14,21 @@ function getApiUrl(endpoint) {
     }
 
     // Use the global base URL if defined (set in header.php)
-    const baseUrl = window.__APP_BASE_URL ||
-        window.location.origin +
-        (window.location.pathname.includes('streaming-platform')
-            ? '/streaming-platform'
-            : '');
+    // Usar función getBaseUrl() si está disponible, o window.__APP_BASE_URL, o detectar automáticamente
+    let baseUrl = '';
+    if (typeof window !== 'undefined' && typeof window.getBaseUrl === 'function') {
+        baseUrl = window.getBaseUrl();
+    } else if (typeof window !== 'undefined' && window.__APP_BASE_URL) {
+        baseUrl = window.__APP_BASE_URL;
+    } else {
+        // Detectar automáticamente desde location
+        const pathname = window.location.pathname;
+        if (pathname.includes('/streaming-platform/') || pathname.includes('/streaming-platform')) {
+            baseUrl = window.location.origin + '/streaming-platform';
+        } else {
+            baseUrl = window.location.origin;
+        }
+    }
 
     return `${baseUrl}${endpoint}`;
 }

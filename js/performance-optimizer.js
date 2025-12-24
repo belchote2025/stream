@@ -176,22 +176,137 @@ class PerformanceOptimizer {
     }
 
     prefetchImportantPages() {
-        // Prefetch de páginas importantes cuando el navegador esté idle
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(() => {
-                const importantPages = [
-                    '/streaming-platform/movies.php',
-                    '/streaming-platform/series.php',
-                    '/streaming-platform/my-list.php'
-                ];
+        // Deshabilitar prefetch en páginas de reproducción y otras páginas críticas
+        // para evitar interferencias con el streaming y errores NS_BINDING_ABORTED
+        const currentPath = window.location.pathname;
+        const skipPrefetchPages = ['watch.php', 'content.php', 'content-detail.php'];
+        
+        if (skipPrefetchPages.some(page => currentPath.includes(page))) {
+            return; // No hacer prefetch en estas páginas
+        }
+        
+        // Solo hacer prefetch si el usuario está inactivo por al menos 5 segundos
+        // y solo en la página principal (index.php) o en páginas de listado
+        // Detectar página principal de forma dinámica (funciona en local y producción)
+        const pathParts = currentPath.split('/').filter(p => p);
+        const isRoot = currentPath === '/' || currentPath.endsWith('/');
+        const isIndexPage = currentPath.includes('index.php') || 
+                           (pathParts.length === 0) ||
+                           (pathParts.length === 1 && pathParts[0] === 'streaming-platform');
+        
+        const isMainPage = isRoot || isIndexPage;
+        
+        if (!isMainPage) {
+            return; // Solo prefetch desde la página principal
+        }
+        
+        // Verificar que los archivos existan antes de hacer prefetch
+        // (esto se hace verificando que no estemos en una ruta que ya falló)
+        if (sessionStorage.getItem('prefetch_disabled')) {
+            return; // Prefetch deshabilitado por errores previos
+        }
+        
+        let idleTimer;
+        let prefetchDone = false;
+        
+        const handleUserActivity = () => {
+            clearTimeout(idleTimer);
+            if (prefetchDone) return; // Ya se hizo el prefetch
+            
+            idleTimer = setTimeout(() => {
+                // Usuario inactivo por 5 segundos, hacer prefetch de forma inteligente
+                if ('requestIdleCallback' in window && !prefetchDone) {
+                    requestIdleCallback(() => {
+                        // Solo prefetch si no hay peticiones activas y la página está visible
+                        if (document.readyState === 'complete' && !document.hidden && !prefetchDone) {
+                            // Usar función getBaseUrl() si está disponible, o window.__APP_BASE_URL, o construir desde location
+                            let basePath = '';
+                            if (typeof window !== 'undefined' && typeof window.getBaseUrl === 'function') {
+                                // Usar la función helper global si está disponible
+                                basePath = window.getBaseUrl();
+                            } else if (typeof window !== 'undefined' && window.__APP_BASE_URL) {
+                                basePath = window.__APP_BASE_URL.replace(/\/$/, '');
+                            } else {
+                                // Construir desde location de forma dinámica
+                                const pathParts = currentPath.split('/').filter(p => p);
+                                // Detectar el path base automáticamente
+                                if (pathParts.length > 0) {
+                                    // Si el primer segmento parece ser un directorio del proyecto, usarlo
+                                    const firstPart = pathParts[0];
+                                    if (firstPart === 'streaming-platform' || firstPart === 'htdocs' || firstPart === 'www') {
+                                        basePath = '/' + firstPart;
+                                    } else if (pathParts.length > 1) {
+                                        // Si hay múltiples partes, el primero podría ser el directorio base
+                                        basePath = '/' + firstPart;
+                                    } else {
+                                        // En la raíz, no usar path base
+                                        basePath = '';
+                                    }
+                                } else {
+                                    // En la raíz del servidor
+                                    basePath = '';
+                                }
+                            }
+                            
+                            // Usar rutas relativas simples para evitar problemas de 404
+                            const importantPages = [
+                                'movies.php',
+                                'series.php',
+                                'my-list.php'
+                            ];
 
-                importantPages.forEach(page => {
-                    const link = document.createElement('link');
-                    link.rel = 'prefetch';
-                    link.href = page;
-                    document.head.appendChild(link);
-                });
-            });
+                            importantPages.forEach(page => {
+                                // Construir ruta completa
+                                const fullPath = basePath ? `${basePath}/${page}` : page;
+                                
+                                // Verificar que no exista ya un prefetch para esta página
+                                const existingPrefetch = document.querySelector(`link[rel="prefetch"][href="${fullPath}"], link[rel="prefetch"][href="/${fullPath}"], link[rel="prefetch"][href="${page}"]`);
+                                if (!existingPrefetch) {
+                                    try {
+                                        const link = document.createElement('link');
+                                        link.rel = 'prefetch';
+                                        // Usar ruta relativa para evitar problemas
+                                        link.href = fullPath.startsWith('/') ? fullPath : `/${fullPath}`;
+                                        // Agregar atributos para mejor manejo
+                                        link.as = 'document';
+                                        // No usar crossOrigin para rutas del mismo origen
+                                        // Silenciar errores de prefetch
+                                        link.onerror = () => {
+                                            // Si hay errores de prefetch, deshabilitar para esta sesión
+                                            const errorCount = parseInt(sessionStorage.getItem('prefetch_errors') || '0') + 1;
+                                            sessionStorage.setItem('prefetch_errors', errorCount.toString());
+                                            if (errorCount >= 2) {
+                                                sessionStorage.setItem('prefetch_disabled', 'true');
+                                            }
+                                        };
+                                        link.onload = () => {
+                                            // Prefetch exitoso, resetear contador de errores
+                                            sessionStorage.removeItem('prefetch_errors');
+                                        };
+                                        document.head.appendChild(link);
+                                    } catch (e) {
+                                        // Ignorar errores de prefetch silenciosamente
+                                    }
+                                }
+                            });
+                            
+                            prefetchDone = true; // Marcar como hecho
+                        }
+                    }, { timeout: 3000 }); // Timeout más corto
+                }
+            }, 5000); // Esperar 5 segundos de inactividad (aumentado)
+        };
+        
+        // Escuchar actividad del usuario
+        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+            document.addEventListener(event, handleUserActivity, { passive: true, once: false });
+        });
+        
+        // Iniciar el timer después de que la página se cargue completamente
+        if (document.readyState === 'complete') {
+            handleUserActivity();
+        } else {
+            window.addEventListener('load', handleUserActivity, { once: true });
         }
     }
 

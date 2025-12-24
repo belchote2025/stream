@@ -314,7 +314,8 @@ function createContentCard($item) {
     // Preparar datos para handlers de torrent e IMDb
     $titleEscaped = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $yearEscaped = htmlspecialchars($releaseYear, ENT_QUOTES, 'UTF-8');
-    $onclickHandler = "if(!event.target.closest('.action-btn')){window.location.href=this.dataset.detailUrl;}";
+    // Modificar onclick para abrir modal de torrents en lugar de redirigir
+    $onclickHandler = "if(!event.target.closest('.action-btn') && !event.target.closest('.content-trailer-container')){event.preventDefault();event.stopPropagation();if(typeof showTorrentModal === 'function'){showTorrentModal(" . $id . ", '" . addslashes($title) . "', " . ($releaseYear ?: 'null') . ", '" . $type . "');}else if(typeof openTorrentModal === 'function'){openTorrentModal({id:" . $id . ",title:'" . addslashes($title) . "',year:" . ($releaseYear ?: 'null') . ",type:'" . $type . "'});}else{window.location.href=this.dataset.detailUrl;}}";
     
     $trailerUrlEscaped = htmlspecialchars($item['trailer_url'] ?? '', ENT_QUOTES, 'UTF-8');
     $html = '<div class="content-card" data-id="' . $id . '" data-type="' . $type . '" data-detail-url="' . $detailUrlEscaped . '" data-title="' . $titleEscaped . '" data-year="' . $yearEscaped . '" data-trailer-url="' . $trailerUrlEscaped . '" onclick="' . htmlspecialchars($onclickHandler, ENT_QUOTES, 'UTF-8') . '">';

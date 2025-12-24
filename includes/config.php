@@ -45,8 +45,16 @@ if (file_exists($envFile) && is_readable($envFile)) {
 $httpHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $isCli = php_sapi_name() === 'cli';
 $isLocalHost = in_array($httpHost, ['localhost', '127.0.0.1'], true) || strpos($httpHost, '.local') !== false || strpos($httpHost, 'ngrok') !== false;
-$appEnv = getenv('APP_ENV') ?: (($isCli || $isLocalHost) ? 'local' : 'production');
-$appEnv = strtolower($appEnv) === 'local' ? 'local' : 'production';
+
+// Prioridad: Si está en localhost, SIEMPRE usar 'local' (ignorar APP_ENV del .env)
+// Esto evita que el .env de producción interfiera con el desarrollo local
+if ($isLocalHost || $isCli) {
+    $appEnv = 'local';
+} else {
+    // Solo en producción, usar APP_ENV del .env o detectar automáticamente
+    $appEnv = getenv('APP_ENV') ?: 'production';
+    $appEnv = strtolower($appEnv) === 'local' ? 'local' : 'production';
+}
 define('APP_ENV', $appEnv);
 
 // Definir ENVIRONMENT basado en APP_ENV
@@ -64,12 +72,13 @@ if (ENVIRONMENT === 'development') {
 }
 
 // Configuración de base de datos - Las credenciales reales deben estar en .env
+// En local, usar siempre los valores por defecto de XAMPP, ignorando el .env
 $dbDefaults = [
     'local' => [
-        'host' => getenv('DB_HOST') ?: '127.0.0.1',
-        'user' => getenv('DB_USER') ?: 'root',
-        'pass' => getenv('DB_PASS') ?: '',
-        'name' => getenv('DB_NAME') ?: 'streaming_platform',
+        'host' => '127.0.0.1',
+        'user' => 'root',
+        'pass' => '',
+        'name' => 'streaming_platform',
     ],
     'production' => [
         'host' => getenv('DB_HOST') ?: 'localhost',
@@ -80,10 +89,19 @@ $dbDefaults = [
 ];
 $currentDbDefaults = $dbDefaults[APP_ENV] ?? $dbDefaults['production'];
 
-define('DB_HOST', getenv('DB_HOST') ?: $currentDbDefaults['host']);
-define('DB_USER', getenv('DB_USER') ?: $currentDbDefaults['user']);
-define('DB_PASS', getenv('DB_PASS') ?: $currentDbDefaults['pass']);
-define('DB_NAME', getenv('DB_NAME') ?: $currentDbDefaults['name']);
+// En local, forzar los valores por defecto de XAMPP (ignorar .env)
+if (APP_ENV === 'local') {
+    define('DB_HOST', $currentDbDefaults['host']);
+    define('DB_USER', $currentDbDefaults['user']);
+    define('DB_PASS', $currentDbDefaults['pass']);
+    define('DB_NAME', $currentDbDefaults['name']);
+} else {
+    // En producción, usar valores del .env
+    define('DB_HOST', getenv('DB_HOST') ?: $currentDbDefaults['host']);
+    define('DB_USER', getenv('DB_USER') ?: $currentDbDefaults['user']);
+    define('DB_PASS', getenv('DB_PASS') ?: $currentDbDefaults['pass']);
+    define('DB_NAME', getenv('DB_NAME') ?: $currentDbDefaults['name']);
+}
 
 // Configuración de la aplicación
 if (!defined('SITE_URL')) {

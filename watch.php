@@ -418,10 +418,13 @@ $baseUrl = rtrim(SITE_URL, '/');
         // Convertir URL relativa a absoluta si es necesario
         if ($videoUrl && !empty($videoUrl)) {
             // Si es una ruta relativa que empieza con /uploads/, convertirla a URL absoluta
-            if (strpos($videoUrl, '/uploads/') === 0 || strpos($videoUrl, '/streaming-platform/uploads/') === 0) {
-                // Remover /streaming-platform si existe
+            // Remover cualquier referencia a /streaming-platform en la ruta (funciona en local y producción)
+            if (strpos($videoUrl, '/streaming-platform/uploads/') === 0) {
                 $videoUrl = str_replace('/streaming-platform', '', $videoUrl);
-                // Si no empieza con http, convertir a URL absoluta
+            }
+            
+            if (strpos($videoUrl, '/uploads/') === 0) {
+                // Si no empieza con http, convertir a URL absoluta usando SITE_URL
                 if (strpos($videoUrl, 'http://') !== 0 && strpos($videoUrl, 'https://') !== 0) {
                     $baseUrl = rtrim(SITE_URL, '/');
                     $videoUrl = $baseUrl . $videoUrl;
@@ -561,7 +564,10 @@ const BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? wind
 if (typeof window !== 'undefined' && !window.__APP_BASE_URL) {
     window.__APP_BASE_URL = '<?php echo rtrim(SITE_URL, '/'); ?>';
 }
-const APP_BASE_URL = window.__APP_BASE_URL || '<?php echo rtrim(SITE_URL, '/'); ?>';
+// Solo declarar APP_BASE_URL si no existe (evitar redeclaración)
+if (typeof APP_BASE_URL === 'undefined') {
+    var APP_BASE_URL = window.__APP_BASE_URL || '<?php echo rtrim(SITE_URL, '/'); ?>';
+}
 
 // WebTorrent se cargará de forma asíncrona, no verificar aquí
 // La verificación se hará cuando realmente se necesite usar WebTorrent

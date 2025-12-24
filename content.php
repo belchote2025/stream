@@ -135,28 +135,64 @@ include __DIR__ . '/includes/footer.php';
 
 <!-- Scripts específicos de la galería -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-    
-    // Manejar clic en las tarjetas
-    document.querySelectorAll('.content-card').forEach(card => {
-        card.addEventListener('click', function(e) {
-            // Evitar que se active el clic si se hace clic en un botón dentro de la tarjeta
-            if (e.target.closest('button')) {
+// Esperar a que main.js se haya cargado completamente
+(function() {
+    function initContentCards() {
+        // Inicializar tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // Manejar clic en las tarjetas - Abrir modal de torrents
+        // Usar delegación de eventos para capturar clics en fichas existentes y nuevas
+        document.addEventListener('click', function(e) {
+            const card = e.target.closest('.content-card');
+            if (!card) return;
+            
+            // Evitar que se active el clic si se hace clic en un botón dentro de la tarjeta o en el contenedor del trailer
+            if (e.target.closest('button') || e.target.closest('.content-trailer-container')) {
                 return;
             }
             
-            const contentId = this.dataset.id;
-            const contentType = this.dataset.type;
+            // Prevenir el comportamiento por defecto del onclick inline
+            e.preventDefault();
+            e.stopPropagation();
             
-            // Cargar vista previa del contenido
-            loadContentPreview(contentId, contentType);
+            const contentId = card.dataset.id;
+            const contentType = card.dataset.type || 'movie';
+            const title = card.dataset.title || '';
+            const year = card.dataset.year || null;
+            
+            // Abrir modal de búsqueda de torrents
+            if (typeof showTorrentModal === 'function') {
+                showTorrentModal(contentId, title, year, contentType);
+            } else if (typeof openTorrentModal === 'function') {
+                openTorrentModal({
+                    id: contentId,
+                    title: title,
+                    year: year,
+                    type: contentType
+                });
+            } else {
+                // Fallback: redirigir a detalles si no hay modal disponible
+                const detailUrl = card.dataset.detailUrl || window.location.href;
+                window.location.href = detailUrl;
+            }
+        }, true); // Usar capture phase para interceptar antes que otros handlers
+    }
+    
+    // Intentar inicializar inmediatamente si el DOM ya está listo
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            // Esperar un poco más para asegurar que main.js se haya cargado
+            setTimeout(initContentCards, 100);
         });
-    });
+    } else {
+        // El DOM ya está listo, esperar un poco para que main.js se cargue
+        setTimeout(initContentCards, 100);
+    }
+})();
     
     // Función para cargar la vista previa del contenido
     function loadContentPreview(contentId, contentType) {

@@ -103,18 +103,22 @@
                         message.includes('i18n_redirected') ||
                         message.includes('auth.strategy') ||
                         message.includes('ha sido rechazada porque se encuentra en un contexto de sitios cruzados') ||
-                        message.includes('ha sido rechazada') && message.includes('SameSite') ||
-                        message.includes('pronto será rechazada') && message.includes('Partitioned') ||
-                        message.includes('SameSite') && (message.includes('Lax') || message.includes('Strict')) ||
+                        (message.includes('ha sido rechazada') && message.includes('SameSite')) ||
+                        (message.includes('pronto será rechazada') && message.includes('Partitioned')) ||
+                        (message.includes('SameSite') && (message.includes('Lax') || message.includes('Strict'))) ||
                         message.includes('cookie particionada') ||
                         message.includes('partición de estado dinámico') ||
                         message.includes('se carga en el contexto de terceros') ||
+                        message.includes('se encuentra en un contexto de sitios cruzados') ||
                         message.includes('Se ha proporcionado cookie particionada') ||
-                        message.includes('cookie') && message.includes('rechazada') ||
-                        message.includes('cookie') && message.includes('SameSite') ||
+                        (message.includes('cookie') && message.includes('rechazada')) ||
+                        (message.includes('cookie') && message.includes('SameSite')) ||
+                        (message.includes('cookie') && message.includes('contexto de sitios cruzados')) ||
                         message.includes('Advertencias de cookies') ||
                         message.trim() === 'Advertencias de cookies' ||
-                        /^Advertencias de cookies \d+$/.test(message.trim())) {
+                        /^Advertencias de cookies \d+$/.test(message.trim()) ||
+                        /cookie.*rechazada.*SameSite/i.test(message) ||
+                        /cookie.*contexto.*sitios.*cruzados/i.test(message)) {
                         return;
                     }
                     // Suprimir warnings de "unreachable code" de archivos minificados

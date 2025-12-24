@@ -16,7 +16,45 @@ const appState = {
     torrentCache: {}
 };
 
-const APP_BASE_URL = (typeof window !== 'undefined' && window.__APP_BASE_URL) ? window.__APP_BASE_URL : '';
+// Función helper para obtener el base URL de forma dinámica (funciona en local y producción)
+function getBaseUrl() {
+    if (typeof window !== 'undefined' && window.__APP_BASE_URL) {
+        return window.__APP_BASE_URL.replace(/\/$/, '');
+    }
+    // Detectar automáticamente desde location
+    const pathname = window.location.pathname;
+    const pathParts = pathname.split('/').filter(p => p);
+    
+    // Si estamos en un subdirectorio, detectarlo automáticamente
+    if (pathParts.length > 0) {
+        const firstPart = pathParts[0];
+        // Si el path incluye el nombre del proyecto, usarlo
+        if (pathname.includes('/streaming-platform/') || pathname.includes('/streaming-platform')) {
+            return window.location.origin + '/streaming-platform';
+        }
+        // En localhost, puede estar en htdocs o directamente en la raíz
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            // En local, si hay un directorio en el path, usarlo como base
+            // Ejemplo: localhost/streaming-platform/ -> usar /streaming-platform
+            if (firstPart && firstPart !== 'index.php' && firstPart !== 'movies.php' && 
+                firstPart !== 'series.php' && !firstPart.endsWith('.php')) {
+                return window.location.origin + '/' + firstPart;
+            }
+            // Si no hay directorio claro, usar solo origin (raíz del servidor)
+        }
+    }
+    
+    // Por defecto, usar solo el origin
+    return window.location.origin;
+}
+
+// Hacer la función disponible globalmente
+window.getBaseUrl = getBaseUrl;
+
+// Solo declarar APP_BASE_URL si no existe (evitar redeclaración)
+if (typeof APP_BASE_URL === 'undefined') {
+    var APP_BASE_URL = getBaseUrl();
+}
 
 // Elementos del DOM
 const elements = {
@@ -215,7 +253,7 @@ function createCarouselSlide(item, index) {
     slide.querySelector('.play-btn').addEventListener('click', () => playContent(item.id, 'movie'));
     slide.querySelector('.btn-outline').addEventListener('click', () => {
         // Redirigir a la página de detalles del contenido
-        const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+        const baseUrl = getBaseUrl();
         window.location.href = `${baseUrl}/content.php?id=${item.id}`;
     });
 
@@ -382,7 +420,7 @@ function createContentCard(item, type) {
     card.dataset.type = type;
     card.dataset.title = item.title || '';
     card.dataset.year = item.release_year || '';
-    const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+    const baseUrl = getBaseUrl();
     card.dataset.detailUrl = `${baseUrl}/content.php?id=${item.id}`;
     card.dataset.trailerUrl = item.trailer_url || '';
     
@@ -458,7 +496,7 @@ function createContentCard(item, type) {
             });
         } else {
             // Fallback: redirigir a detalles si no hay modal disponible
-            const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+            const baseUrl = getBaseUrl();
             window.location.href = `${baseUrl}/content.php?id=${item.id}`;
         }
     });
@@ -478,7 +516,7 @@ function createContentCard(item, type) {
                     type: contentType
                 });
             } else {
-                const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+                const baseUrl = getBaseUrl();
                 window.location.href = `${baseUrl}/content.php?id=${item.id}`;
             }
         });
@@ -1082,115 +1120,105 @@ async function selectTorrentForPlayback(magnetLink, contentId) {
         `;
     }
     
-    // Si tenemos un contentId, actualizar el contenido en la base de datos
-    if (contentId) {
-        try {
-            const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
-            
-            // Obtener información del contenido actual para preservar otros campos
-            const contentResponse = await fetch(`${baseUrl}/api/content/index.php?id=${contentId}`, {
-                credentials: 'same-origin'
-            });
-            
-            let contentData = {};
-            let contentType = 'movie';
-            
-            if (contentResponse.ok) {
-                const contentResult = await contentResponse.json();
-                if (contentResult.success && contentResult.data) {
-                    contentData = contentResult.data;
-                    contentType = contentData.type || 'movie';
-                }
-            }
-            
-            // Determinar la API correcta según el tipo de contenido
-            const apiEndpoint = contentType === 'series' 
-                ? `${baseUrl}/api/series/index.php` 
-                : `${baseUrl}/api/movies/index.php`;
-            
-            // Actualizar solo el campo torrent_magnet, preservando todos los demás campos
-            const updateData = {
-                id: contentId,
-                title: contentData.title || '',
-                description: contentData.description || '',
-                release_year: contentData.release_year || null,
-                duration: contentData.duration || null,
-                type: contentType,
-                poster_url: contentData.poster_url || null,
-                backdrop_url: contentData.backdrop_url || null,
-                video_url: contentData.video_url || null,
-                trailer_url: contentData.trailer_url || null,
-                torrent_magnet: magnetLink, // Actualizar el magnet link
-                age_rating: contentData.age_rating || null,
-                is_featured: contentData.is_featured ? 1 : 0,
-                is_trending: contentData.is_trending ? 1 : 0,
-                is_premium: contentData.is_premium ? 1 : 0
-            };
-            
-            const updateResponse = await fetch(`${apiEndpoint}?id=${contentId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify(updateData)
-            });
-            
-            if (updateResponse.ok) {
-                const updateResult = await updateResponse.json();
-                if (updateResult.success) {
-                    if (typeof showNotification === 'function') {
-                        showNotification('✓ Contenido actualizado correctamente. Iniciando reproducción...', 'success');
-                    }
-                    // Actualizar el cache local si existe
-                    if (appState.contentCache && appState.contentCache[`${contentType}s`]) {
-                        const index = appState.contentCache[`${contentType}s`].findIndex(item => item.id === contentId);
-                        if (index !== -1) {
-                            appState.contentCache[`${contentType}s`][index].torrent_magnet = magnetLink;
-                        }
-                    }
-                } else {
-                    throw new Error(updateResult.error || 'Error al actualizar contenido');
-                }
-            } else {
-                const errorText = await updateResponse.text();
-                let errorMessage = 'Error al actualizar contenido';
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    errorMessage = errorJson.error || errorMessage;
-                } catch (e) {
-                    errorMessage = errorText.substring(0, 100) || errorMessage;
-                }
-                throw new Error(errorMessage);
-            }
-        } catch (error) {
-            console.warn('Error al actualizar contenido:', error);
-            // Continuar con la reproducción aunque falle la actualización
-            if (typeof showNotification === 'function') {
-                showNotification(`⚠ ${error.message || 'Error al actualizar'}. Reproduciendo torrent directamente...`, 'warning');
-            }
-        } finally {
-            // Ocultar indicador de carga
-            if (elements.torrentSearchStatus) {
-                elements.torrentSearchStatus.style.display = 'none';
-            }
-        }
-    }
-    
-    // Cerrar el modal antes de reproducir
+    // Cerrar el modal inmediatamente
     closeTorrentModal();
     
-    // Reproducir el contenido
+    // Reproducir el contenido inmediatamente sin esperar la actualización de BD
     const baseUrl = (APP_BASE_URL || '').replace(/\/$/, '');
     const contentType = appState.activeTorrentContent?.type || 'movie';
     
-    // Intentar reproducir en la misma ventana si hay un reproductor disponible
+    // Intentar reproducir inmediatamente
     if (typeof playContent === 'function' && contentId) {
-        // Pequeño delay para asegurar que el modal se cierre
-        setTimeout(() => {
-            playContent(contentId, contentType);
-        }, 300);
+        // Reproducir inmediatamente
+        playContent(contentId, contentType);
     } else {
+        // Fallback: abrir en nueva pestaña con el magnet link
+        const watchUrl = `${baseUrl}/watch.php?id=${contentId}&torrent=${encodeURIComponent(magnetLink)}`;
+        window.open(watchUrl, '_blank');
+        return;
+    }
+    
+    // Actualizar la base de datos en segundo plano (sin bloquear la reproducción)
+    if (contentId) {
+        // Usar un timeout para no bloquear la UI
+        setTimeout(async () => {
+            try {
+                const contentResponse = await fetch(`${baseUrl}/api/content/index.php?id=${contentId}`, {
+                    credentials: 'same-origin'
+                });
+                
+                let contentData = {};
+                let contentType = 'movie';
+                
+                if (contentResponse.ok) {
+                    const contentResult = await contentResponse.json();
+                    if (contentResult.success && contentResult.data) {
+                        contentData = contentResult.data;
+                        contentType = contentData.type || 'movie';
+                    }
+                }
+                
+                // Determinar la API correcta según el tipo de contenido
+                const apiEndpoint = contentType === 'series' 
+                    ? `${baseUrl}/api/series/index.php` 
+                    : `${baseUrl}/api/movies/index.php`;
+                
+                // Actualizar solo el campo torrent_magnet, preservando todos los demás campos
+                const updateData = {
+                    id: contentId,
+                    title: contentData.title || '',
+                    description: contentData.description || '',
+                    release_year: contentData.release_year || null,
+                    duration: contentData.duration || null,
+                    type: contentType,
+                    poster_url: contentData.poster_url || null,
+                    backdrop_url: contentData.backdrop_url || null,
+                    video_url: contentData.video_url || null,
+                    trailer_url: contentData.trailer_url || null,
+                    torrent_magnet: magnetLink, // Actualizar el magnet link
+                    age_rating: contentData.age_rating || null,
+                    is_featured: contentData.is_featured ? 1 : 0,
+                    is_trending: contentData.is_trending ? 1 : 0,
+                    is_premium: contentData.is_premium ? 1 : 0
+                };
+                
+                const updateResponse = await fetch(`${apiEndpoint}?id=${contentId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (updateResponse.ok) {
+                    const updateResult = await updateResponse.json();
+                    if (updateResult.success) {
+                        // Actualizar el cache local si existe
+                        if (appState.contentCache && appState.contentCache[`${contentType}s`]) {
+                            const index = appState.contentCache[`${contentType}s`].findIndex(item => item.id === contentId);
+                            if (index !== -1) {
+                                appState.contentCache[`${contentType}s`][index].torrent_magnet = magnetLink;
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Error al actualizar contenido en segundo plano:', error);
+                // No mostrar error al usuario ya que la reproducción ya está en curso
+            } finally {
+                // Ocultar indicador de carga
+                if (elements.torrentSearchStatus) {
+                    elements.torrentSearchStatus.style.display = 'none';
+                }
+            }
+        }, 100); // Pequeño delay para no interferir con la reproducción
+    } else {
+        // Ocultar indicador de carga si no hay contentId
+        if (elements.torrentSearchStatus) {
+            elements.torrentSearchStatus.style.display = 'none';
+        }
+        
         // Fallback: abrir en nueva pestaña
         const url = `${baseUrl}/watch.php?id=${contentId || ''}&torrent=${encodeURIComponent(magnetLink)}`;
         window.open(url, '_blank');
@@ -1225,8 +1253,15 @@ function triggerTorrentModal(id, title, year = '', type = 'movie') {
 window.closeTorrentModal = closeTorrentModal;
 window.selectTorrentForPlayback = selectTorrentForPlayback;
 window.triggerTorrentModal = triggerTorrentModal;
-window.handleMoviePosterClick = (id, title, year) => triggerTorrentModal(id, title, year, 'movie');
-window.handleSeriesPosterClick = (id, title, year) => triggerTorrentModal(id, title, year, 'series');
+window.handleMoviePosterClick = (id, title, year) => {
+    console.log(`Buscando torrents para película: ${title} (${year})`);
+    triggerTorrentModal(id, title, year, 'movie');
+};
+
+window.handleSeriesPosterClick = (id, title, year) => {
+    console.log(`Buscando torrents para serie: ${title} (${year})`);
+    triggerTorrentModal(id, title, year, 'series');
+};
 
 // Navegación
 function navigateTo(section) {
@@ -2464,7 +2499,7 @@ function enhanceExistingContentCards() {
         if (!card.dataset.title && title) card.dataset.title = title;
         if (!card.dataset.year && year) card.dataset.year = year;
         if (!card.dataset.detailUrl) {
-            const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+            const baseUrl = getBaseUrl();
             card.dataset.detailUrl = `${baseUrl}/content.php?id=${id}`;
         }
         
@@ -2520,7 +2555,7 @@ function enhanceExistingContentCards() {
                 if (typeof showTorrentModal === 'function') {
                     showTorrentModal(id, title, year || null, type);
                 } else {
-                    const baseUrl = window.__APP_BASE_URL || window.location.origin + (window.location.pathname.includes('streaming-platform') ? '/streaming-platform' : '');
+                    const baseUrl = getBaseUrl();
                     window.location.href = card.dataset.detailUrl || `${baseUrl}/content.php?id=${id}`;
                 }
             });

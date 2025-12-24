@@ -680,9 +680,37 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                                         <button type="button" id="retryTorrentBtn" class="netflix-btn netflix-btn-outline netflix-btn-torrent" title="Reintentar búsqueda">
                                             <i class="fas fa-redo"></i> Reintentar
                                         </button>
+                                        <button type="button" id="toggleFiltersBtn" class="netflix-btn netflix-btn-outline netflix-btn-torrent" title="Filtros avanzados">
+                                            <i class="fas fa-filter"></i> Filtros
+                                        </button>
                                     </div>
                                 </div>
-                                <p class="netflix-help-text">Busca automáticamente enlaces (YTS, EZTV, TPB, Torrentio)</p>
+                                
+                                <!-- Filtros avanzados -->
+                                <div id="torrent-filters" class="netflix-torrent-filters" style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                        <div>
+                                            <label for="torrent_quality" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333;">Calidad</label>
+                                            <select id="torrent_quality" class="netflix-select" style="width: 100%;">
+                                                <option value="">Todas</option>
+                                                <option value="4K">4K</option>
+                                                <option value="1080p">1080p</option>
+                                                <option value="720p">720p</option>
+                                                <option value="480p">480p</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="torrent_min_seeds" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333;">Mínimo Seeds</label>
+                                            <input type="number" id="torrent_min_seeds" class="netflix-input" placeholder="0" min="0" style="width: 100%;">
+                                        </div>
+                                        <div>
+                                            <label for="torrent_sources" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333;">Fuentes (separadas por coma)</label>
+                                            <input type="text" id="torrent_sources" class="netflix-input" placeholder="YTS,TPB,Torrentio" style="width: 100%;">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <p class="netflix-help-text">Busca automáticamente enlaces (YTS, EZTV, TPB, Torrentio, 1337x, RARBG, LimeTorrents, Torlock, TorrentGalaxy)</p>
                                 <div id="torrent-results" class="netflix-torrent-results" style="display: none;">
                                     <div id="torrent-results-content"></div>
                                 </div>

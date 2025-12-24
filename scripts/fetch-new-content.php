@@ -1067,6 +1067,398 @@ function searchTPB(string $title): array
     return $results;
 }
 
+/**
+ * Buscar en 1337x usando scraping web (sin API)
+ */
+function search1337xWeb(string $title, string $type): array
+{
+    $results = [];
+    $query = urlencode($title);
+    $category = $type === 'tv' ? 'TV' : 'Movies';
+    
+    $urls = [
+        "https://1337x.to/search/{$query}/1/",
+        "https://www.1377x.to/search/{$query}/1/",
+    ];
+    
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
+    
+    foreach ($urls as $url) {
+        try {
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                    'timeout' => 8,
+                    'ignore_errors' => true,
+                ]
+            ]);
+            
+            $html = @file_get_contents($url, false, $context);
+            if (!$html) continue;
+            
+            // Extraer magnet links del HTML
+            if (preg_match_all('/magnet:\?xt=urn:btih:([a-f0-9]{40})[^"]*/i', $html, $matches)) {
+                foreach ($matches[0] as $magnet) {
+                    // Extraer título si es posible
+                    preg_match('/dn=([^&]+)/', $magnet, $dnMatch);
+                    $torrentTitle = $dnMatch[1] ? urldecode($dnMatch[1]) : $title;
+                    
+                    // Agregar trackers
+                    foreach ($trackers as $tracker) {
+                        if (strpos($magnet, urlencode($tracker)) === false) {
+                            $magnet .= '&tr=' . urlencode($tracker);
+                        }
+                    }
+                    
+                    $results[] = [
+                        'title' => $torrentTitle,
+                        'quality' => extractQualityFromTitle($torrentTitle),
+                        'seeds' => 0, // No disponible en scraping simple
+                        'peers' => 0,
+                        'magnet' => $magnet,
+                        'source' => '1337x'
+                    ];
+                }
+                if (count($results) > 0) break; // Si encontramos resultados, no intentar más URLs
+            }
+        } catch (Exception $e) {
+            // Continuar con siguiente URL
+        }
+    }
+    
+    return $results;
+}
+
+/**
+ * Buscar en RARBG usando scraping web (sin API)
+ */
+function searchRARBGWeb(string $title, ?string $year): array
+{
+    $results = [];
+    $query = urlencode($title);
+    
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
+    
+    try {
+        $url = "https://rarbg.to/torrents.php?search={$query}";
+        if ($year) {
+            $url .= "&year={$year}";
+        }
+        
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                'timeout' => 8,
+                'ignore_errors' => true,
+            ]
+        ]);
+        
+        $html = @file_get_contents($url, false, $context);
+        if ($html) {
+            // Extraer magnet links
+            if (preg_match_all('/magnet:\?xt=urn:btih:([a-f0-9]{40})[^"]*/i', $html, $matches)) {
+                foreach ($matches[0] as $magnet) {
+                    preg_match('/dn=([^&]+)/', $magnet, $dnMatch);
+                    $torrentTitle = $dnMatch[1] ? urldecode($dnMatch[1]) : $title;
+                    
+                    foreach ($trackers as $tracker) {
+                        if (strpos($magnet, urlencode($tracker)) === false) {
+                            $magnet .= '&tr=' . urlencode($tracker);
+                        }
+                    }
+                    
+                    $results[] = [
+                        'title' => $torrentTitle,
+                        'quality' => extractQualityFromTitle($torrentTitle),
+                        'seeds' => 0,
+                        'peers' => 0,
+                        'magnet' => $magnet,
+                        'source' => 'RARBG'
+                    ];
+                }
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciar errores
+    }
+    
+    return $results;
+}
+
+/**
+ * Buscar en LimeTorrents usando scraping web
+ */
+function searchLimeTorrentsWeb(string $title, string $type): array
+{
+    $results = [];
+    $query = urlencode($title);
+    $category = $type === 'tv' ? 'TV-shows' : 'Movies';
+    
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
+    
+    try {
+        $url = "https://www.limetorrents.lol/search/{$category}/{$query}/seeds/1/";
+        
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                'timeout' => 8,
+                'ignore_errors' => true,
+            ]
+        ]);
+        
+        $html = @file_get_contents($url, false, $context);
+        if ($html && preg_match_all('/magnet:\?xt=urn:btih:([a-f0-9]{40})[^"]*/i', $html, $matches)) {
+            foreach ($matches[0] as $magnet) {
+                preg_match('/dn=([^&]+)/', $magnet, $dnMatch);
+                $torrentTitle = $dnMatch[1] ? urldecode($dnMatch[1]) : $title;
+                
+                foreach ($trackers as $tracker) {
+                    if (strpos($magnet, urlencode($tracker)) === false) {
+                        $magnet .= '&tr=' . urlencode($tracker);
+                    }
+                }
+                
+                $results[] = [
+                    'title' => $torrentTitle,
+                    'quality' => extractQualityFromTitle($torrentTitle),
+                    'seeds' => 0,
+                    'peers' => 0,
+                    'magnet' => $magnet,
+                    'source' => 'LimeTorrents'
+                ];
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciar errores
+    }
+    
+    return $results;
+}
+
+/**
+ * Buscar en Torlock usando scraping web
+ */
+function searchTorlockWeb(string $title, string $type): array
+{
+    $results = [];
+    $query = urlencode($title);
+    
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
+    
+    try {
+        $url = "https://www.torlock.com/all/torrents/{$title}.html?sort=seeds";
+        
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                'timeout' => 8,
+                'ignore_errors' => true,
+            ]
+        ]);
+        
+        $html = @file_get_contents($url, false, $context);
+        if ($html && preg_match_all('/magnet:\?xt=urn:btih:([a-f0-9]{40})[^"]*/i', $html, $matches)) {
+            foreach ($matches[0] as $magnet) {
+                foreach ($trackers as $tracker) {
+                    if (strpos($magnet, urlencode($tracker)) === false) {
+                        $magnet .= '&tr=' . urlencode($tracker);
+                    }
+                }
+                
+                $results[] = [
+                    'title' => $title,
+                    'quality' => extractQualityFromTitle($title),
+                    'seeds' => 0,
+                    'peers' => 0,
+                    'magnet' => $magnet,
+                    'source' => 'Torlock'
+                ];
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciar errores
+    }
+    
+    return $results;
+}
+
+/**
+ * Buscar en TorrentGalaxy usando scraping web
+ */
+function searchTorrentGalaxyWeb(string $title, string $type): array
+{
+    $results = [];
+    $query = urlencode($title);
+    $category = $type === 'tv' ? '41' : '4'; // 4 = Movies, 41 = TV
+    
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
+    
+    try {
+        $url = "https://torrentgalaxy.to/torrents.php?search={$query}&cat={$category}&sort=seeders&order=desc";
+        
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                'timeout' => 8,
+                'ignore_errors' => true,
+            ]
+        ]);
+        
+        $html = @file_get_contents($url, false, $context);
+        if ($html && preg_match_all('/magnet:\?xt=urn:btih:([a-f0-9]{40})[^"]*/i', $html, $matches)) {
+            foreach ($matches[0] as $magnet) {
+                foreach ($trackers as $tracker) {
+                    if (strpos($magnet, urlencode($tracker)) === false) {
+                        $magnet .= '&tr=' . urlencode($tracker);
+                    }
+                }
+                
+                $results[] = [
+                    'title' => $title,
+                    'quality' => extractQualityFromTitle($title),
+                    'seeds' => 0,
+                    'peers' => 0,
+                    'magnet' => $magnet,
+                    'source' => 'TorrentGalaxy'
+                ];
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciar errores
+    }
+    
+    return $results;
+}
+
+/**
+ * Buscar en Zooqle usando scraping web
+ */
+function searchZooqleWeb(string $title, string $type): array
+{
+    $results = [];
+    $query = urlencode($title);
+    
+    $trackers = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://tracker.bittor.pw:1337/announce',
+        'udp://public.popcorn-tracker.org:6969/announce',
+        'udp://tracker.dler.org:6969/announce',
+        'udp://exodus.desync.com:6969',
+        'udp://open.demonii.com:1337/announce'
+    ];
+    
+    try {
+        $url = "https://zooqle.com/search?q={$query}";
+        
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                'timeout' => 8,
+                'ignore_errors' => true,
+            ]
+        ]);
+        
+        $html = @file_get_contents($url, false, $context);
+        if ($html && preg_match_all('/magnet:\?xt=urn:btih:([a-f0-9]{40})[^"]*/i', $html, $matches)) {
+            foreach ($matches[0] as $magnet) {
+                preg_match('/dn=([^&]+)/', $magnet, $dnMatch);
+                $torrentTitle = $dnMatch[1] ? urldecode($dnMatch[1]) : $title;
+                
+                foreach ($trackers as $tracker) {
+                    if (strpos($magnet, urlencode($tracker)) === false) {
+                        $magnet .= '&tr=' . urlencode($tracker);
+                    }
+                }
+                
+                $results[] = [
+                    'title' => $torrentTitle,
+                    'quality' => extractQualityFromTitle($torrentTitle),
+                    'seeds' => 0,
+                    'peers' => 0,
+                    'magnet' => $magnet,
+                    'source' => 'Zooqle'
+                ];
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciar errores
+    }
+    
+    return $results;
+}
+
+/**
+ * Extraer calidad del título del torrent
+ */
+function extractQualityFromTitle(string $title): ?string
+{
+    $titleUpper = strtoupper($title);
+    if (strpos($titleUpper, '4K') !== false || strpos($titleUpper, '2160P') !== false) {
+        return '4K';
+    } elseif (strpos($titleUpper, '1080P') !== false || strpos($titleUpper, 'FULLHD') !== false) {
+        return '1080p';
+    } elseif (strpos($titleUpper, '720P') !== false || strpos($titleUpper, 'HD') !== false) {
+        return '720p';
+    } elseif (strpos($titleUpper, '480P') !== false || strpos($titleUpper, 'SD') !== false) {
+        return '480p';
+    }
+    return null;
+}
+
 function pickBestTorrent(array $results, int $minSeeds): ?array
 {
     if (empty($results)) {
@@ -1659,20 +2051,51 @@ foreach ($items as $show) {
     $bestTorrent = null;
     $hasTorrent = false;
     if (empty($videoUrl)) {
-        scriptOutput("  No se encontró video URL directo, buscando torrents...\n");
-        $torrents = searchTorrentio($title, $type, $releaseYear ? (string)$releaseYear : null, $torrentioBase);
+        scriptOutput("  No se encontró video URL directo, buscando torrents en múltiples fuentes...\n");
+        $torrents = [];
+        
+        // Fuentes con API (más rápidas)
+        scriptOutput("  → Buscando en Torrentio...\n");
+        $torrents = array_merge($torrents, searchTorrentio($title, $type, $releaseYear ? (string)$releaseYear : null, $torrentioBase));
+        
         if ($type === 'movie') {
+            scriptOutput("  → Buscando en YTS...\n");
             $torrents = array_merge($torrents, searchYTS($title, $releaseYear ? (string)$releaseYear : null));
         } else {
+            scriptOutput("  → Buscando en EZTV...\n");
             $torrents = array_merge($torrents, searchEZTV($title));
         }
+        
+        scriptOutput("  → Buscando en The Pirate Bay...\n");
         $torrents = array_merge($torrents, searchTPB($title));
+        
+        // Fuentes con scraping web (sin API, más lentas pero más opciones)
+        scriptOutput("  → Buscando en 1337x (web scraping)...\n");
+        $torrents = array_merge($torrents, search1337xWeb($title, $type));
+        
+        scriptOutput("  → Buscando en RARBG (web scraping)...\n");
+        $torrents = array_merge($torrents, searchRARBGWeb($title, $releaseYear ? (string)$releaseYear : null));
+        
+        scriptOutput("  → Buscando en LimeTorrents (web scraping)...\n");
+        $torrents = array_merge($torrents, searchLimeTorrentsWeb($title, $type));
+        
+        scriptOutput("  → Buscando en Torlock (web scraping)...\n");
+        $torrents = array_merge($torrents, searchTorlockWeb($title, $type));
+        
+        scriptOutput("  → Buscando en TorrentGalaxy (web scraping)...\n");
+        $torrents = array_merge($torrents, searchTorrentGalaxyWeb($title, $type));
+        
+        scriptOutput("  → Buscando en Zooqle (web scraping)...\n");
+        $torrents = array_merge($torrents, searchZooqleWeb($title, $type));
+        
+        scriptOutput("  → Total de torrents encontrados: " . count($torrents) . "\n");
+        
         $bestTorrent = pickBestTorrent($torrents, $minSeeds);
         $hasTorrent = !empty($bestTorrent) && !empty($bestTorrent['magnet']);
         if ($hasTorrent) {
-            scriptOutput("  ✓ Torrent encontrado: " . ($bestTorrent['title'] ?? 'N/A') . " (seeds: " . ($bestTorrent['seeds'] ?? 0) . ")\n");
+            scriptOutput("  ✓ Mejor torrent seleccionado: " . ($bestTorrent['title'] ?? 'N/A') . " (seeds: " . ($bestTorrent['seeds'] ?? 0) . ", fuente: " . ($bestTorrent['source'] ?? 'N/A') . ")\n");
         } else {
-            scriptOutput("  ✗ No se encontraron torrents válidos\n");
+            scriptOutput("  ✗ No se encontraron torrents válidos (con al menos {$minSeeds} seeds)\n");
         }
     } else {
         scriptOutput("  ✓ Video URL encontrado: {$videoUrl}\n");

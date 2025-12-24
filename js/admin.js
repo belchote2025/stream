@@ -333,6 +333,16 @@ function setupEventListeners() {
         if (retryTorrentBtn) {
             retryTorrentBtn.addEventListener('click', handleInvalidTorrent);
         }
+        const toggleFiltersBtn = document.getElementById('toggleFiltersBtn');
+        if (toggleFiltersBtn) {
+            toggleFiltersBtn.addEventListener('click', function() {
+                const filtersDiv = document.getElementById('torrent-filters');
+                if (filtersDiv) {
+                    filtersDiv.style.display = filtersDiv.style.display === 'none' ? 'block' : 'none';
+                    this.innerHTML = filtersDiv.style.display === 'none' ? '<i class="fas fa-filter"></i> Filtros' : '<i class="fas fa-times"></i> Ocultar';
+                }
+            });
+        }
     }
 
     // Formulario de usuarios
@@ -5170,7 +5180,12 @@ async function handleSearchTorrent(event, presetQuery = null) {
     const year = presetQuery?.year ?? yearInput?.value ?? '';
     const type = presetQuery?.type ?? typeInput?.value ?? 'movie';
 
-    window.__lastTorrentQuery = { title, year, type };
+    // Obtener valores de filtros
+    const quality = presetQuery?.quality ?? document.getElementById('torrent_quality')?.value ?? '';
+    const minSeeds = presetQuery?.min_seeds ?? document.getElementById('torrent_min_seeds')?.value ?? '';
+    const sources = presetQuery?.sources ?? document.getElementById('torrent_sources')?.value ?? '';
+
+    window.__lastTorrentQuery = { title, year, type, quality, min_seeds: minSeeds, sources };
 
     const loadingBtn = presetQuery?.trigger === 'retry' ? retryBtn : searchBtn;
     if (loadingBtn) {
@@ -5226,7 +5241,16 @@ async function handleSearchTorrent(event, presetQuery = null) {
         if (baseUrl) {
             apiPath = baseUrl + (apiPath.startsWith('/') ? apiPath : '/' + apiPath);
         }
-        const url = `${apiPath}?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`;
+        
+        // Obtener valores de filtros
+        const quality = document.getElementById('torrent_quality')?.value ?? '';
+        const minSeeds = document.getElementById('torrent_min_seeds')?.value ?? '';
+        const sources = document.getElementById('torrent_sources')?.value ?? '';
+        
+        let url = `${apiPath}?title=${encodeURIComponent(title)}&year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`;
+        if (quality) url += `&quality=${encodeURIComponent(quality)}`;
+        if (minSeeds) url += `&min_seeds=${encodeURIComponent(minSeeds)}`;
+        if (sources) url += `&sources=${encodeURIComponent(sources)}`;
 
         console.log('[handleSearchTorrent] baseUrl detectado:', baseUrl);
         console.log('[handleSearchTorrent] window.__APP_BASE_URL:', window.__APP_BASE_URL);
@@ -5287,26 +5311,34 @@ async function handleSearchTorrent(event, presetQuery = null) {
                 const safeMagnet = (torrent.magnet || '').replace(/'/g, "\\'");
                 const qualityBadge = torrent.quality && torrent.quality !== 'Unknown' ? `<span style="background: #e50914; color: white; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.75rem; margin-right: 0.5rem;">${torrent.quality}</span>` : '';
                 const seedsInfo = torrent.seeds > 0 ? `<span style="color: #28a745;"><i class="fas fa-arrow-up"></i> ${torrent.seeds}</span>` : '';
+                const peersInfo = torrent.peers > 0 ? `<span style="color: #ffc107; margin-left: 0.5rem;"><i class="fas fa-arrow-down"></i> ${torrent.peers}</span>` : '';
                 const sizeInfo = torrent.size ? `<span style="color: #666; margin-left: 0.5rem;"><i class="fas fa-hdd"></i> ${torrent.size}</span>` : '';
+                const sourceBadge = `<span style="background: #007bff; color: white; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.75rem; margin-left: 0.5rem;">${torrent.source}</span>`;
 
                 html += `
-                    <div style="padding: 0.75rem; margin-bottom: 0.5rem; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s;" 
-                         onmouseover="this.style.borderColor='#e50914'; this.style.boxShadow='0 2px 4px rgba(229,9,20,0.2)'"
-                         onmouseout="this.style.borderColor='#ddd'; this.style.boxShadow='none'"
+                    <div style="padding: 1rem; margin-bottom: 0.75rem; background: white; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; position: relative;" 
+                         onmouseover="this.style.borderColor='#e50914'; this.style.boxShadow='0 4px 8px rgba(229,9,20,0.15)'; this.style.transform='translateY(-1px)'"
+                         onmouseout="this.style.borderColor='#ddd'; this.style.boxShadow='none'; this.style.transform='none'"
                          onclick="selectTorrent('${safeMagnet}')">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; margin-bottom: 0.25rem;">${torrent.title}</div>
-                                <div style="font-size: 0.85rem; color: #666;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem; color: #333; word-break: break-word;">${torrent.title}</div>
+                                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
                                     ${qualityBadge}
                                     ${seedsInfo}
+                                    ${peersInfo}
                                     ${sizeInfo}
-                                    <span style="margin-left: 0.5rem; color: #999;">${torrent.source}</span>
+                                    ${sourceBadge}
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="event.stopPropagation(); selectTorrent('${safeMagnet}')">
-                                <i class="fas fa-check"></i> Usar
-                            </button>
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+                                <button type="button" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem; white-space: nowrap;" onclick="event.stopPropagation(); selectTorrent('${safeMagnet}')">
+                                    <i class="fas fa-check"></i> Usar
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); navigator.clipboard.writeText('${safeMagnet}'); showNotification('Magnet copiado al portapapeles', 'success');">
+                                    <i class="fas fa-copy"></i> Copiar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;

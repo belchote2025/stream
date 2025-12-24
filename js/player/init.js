@@ -6,9 +6,14 @@
 
 // Esperar a que el DOM esté completamente cargado
 document.addEventListener('DOMContentLoaded', function() {
-    // Verificar si el contenedor del reproductor existe
-    if (!document.getElementById('videoPlayer')) {
-        console.warn('No se encontró el contenedor del reproductor');
+    // Verificar si el contenedor del reproductor existe (puede tener diferentes nombres)
+    const container = document.getElementById('videoPlayer') || 
+                     document.getElementById('unifiedVideoContainer') ||
+                     document.querySelector('.video-player-container');
+    
+    if (!container) {
+        // No es un error crítico, solo un warning si no se encuentra
+        // El reproductor puede inicializarse desde otro lugar
         return;
     }
     
@@ -20,8 +25,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.head.appendChild(link);
     }
     
-    // Inicializar el reproductor
-    window.videoPlayer = new UnifiedVideoPlayer('videoPlayer', {
+    // Inicializar el reproductor con el contenedor encontrado
+    const containerId = container.id || 'videoPlayer';
+    window.videoPlayer = new UnifiedVideoPlayer(containerId, {
         autoplay: false,
         controls: true,
         onPlay: function() {

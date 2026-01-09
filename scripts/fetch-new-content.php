@@ -51,13 +51,17 @@ function scriptOutput(string $message, bool $isError = false): void {
         fflush($stream); // Forzar envío inmediato
     } else {
         // En web, la salida se captura con ob_start()
+        // Asegurar que siempre se muestre la salida
         echo $message . "\n";
-        if (ob_get_level() > 0) {
-            ob_flush();
-            flush();
-        }
+        @ob_flush();
+        @flush();
     }
 }
+
+// Mensaje de inicio inmediato para verificar que el script se ejecuta
+scriptOutput("✓ Script iniciado correctamente\n");
+scriptOutput("✓ PHP SAPI: " . php_sapi_name() . "\n");
+scriptOutput("✓ Modo: " . ($isCli ? 'CLI' : 'Web') . "\n");
 
 // -------------------- Configuración CLI/Web --------------------
 if ($isCli) {
@@ -1919,8 +1923,17 @@ function notifyAdmin(PDO $db, string $title, string $message, ?int $contentId = 
 }
 
 // -------------------- Proceso principal --------------------
-scriptOutput("Buscando novedades desde múltiples fuentes (TVMaze, Trakt.tv)...\n");
-scriptOutput("Parámetros: tipo={$type}, límite={$limit}, días={$sinceDays}, min_seeds={$minSeeds}\n");
+scriptOutput("========================================\n");
+scriptOutput("INICIANDO BÚSQUEDA DE NOVEDADES\n");
+scriptOutput("========================================\n");
+scriptOutput("Buscando novedades desde múltiples fuentes (TVMaze, Trakt.tv, TMDB, Addons)...\n");
+scriptOutput("Parámetros:\n");
+scriptOutput("  - Tipo: {$type}\n");
+scriptOutput("  - Límite: {$limit}\n");
+scriptOutput("  - Últimos días: {$sinceDays}\n");
+scriptOutput("  - Mínimo de seeds: {$minSeeds}\n");
+scriptOutput("  - Modo: " . ($isCli ? 'CLI' : 'Web') . "\n");
+scriptOutput("========================================\n\n");
 
 $items = [];
 $seenIds = [];
@@ -2116,6 +2129,7 @@ if (empty($items) || count($items) < $limit) {
 
 // Fuente 4: Addons (si están disponibles y habilitados)
 // Los addons pueden buscar contenido nuevo o contenido que necesita actualización de streams
+$enabledAddons = []; // Inicializar variable para uso posterior
 scriptOutput("\n=== Buscando en Addons ===\n");
 try {
     $addonManager = AddonManager::getInstance();
@@ -2270,23 +2284,39 @@ if ((empty($items) || count($items) < $limit) && !empty($omdbKey) && $omdbKey !=
 }
 
 if (empty($items)) {
-    scriptOutput("\n⚠️ No se encontraron resultados de ninguna fuente.\n");
-    scriptOutput("Sugerencias:\n");
-    scriptOutput("  - Configura TMDB_API_KEY (gratis en https://www.themoviedb.org/settings/api)\n");
-    scriptOutput("  - Configura TRAKT_CLIENT_ID (gratis en https://trakt.tv/oauth/applications)\n");
-    scriptOutput("  - Aumenta el valor de 'Últimos días' (ej: 30 o 365)\n");
-    scriptOutput("  - Reduce el valor de 'Mínimo de seeds' (ej: 5 o 10)\n");
-    scriptOutput("  - Instala y activa addons desde el panel de administración\n");
-    scriptOutput("    Los addons pueden proporcionar streams adicionales para contenido existente\n");
-    scriptOutput("  - Verifica tu conexión a internet\n");
-    scriptOutput("Listo. Creados: 0, actualizados: 0, episodios nuevos: 0\n");
+    scriptOutput("\n========================================\n");
+    scriptOutput("⚠️ NO SE ENCONTRARON RESULTADOS\n");
+    scriptOutput("========================================\n");
+    scriptOutput("No se encontraron resultados de ninguna fuente con los criterios especificados.\n\n");
+    scriptOutput("Resumen de búsqueda:\n");
+    scriptOutput("  - Trakt.tv: " . (!empty($traktClientId) ? "Configurado" : "No configurado") . "\n");
+    scriptOutput("  - TVMaze: " . (function_exists('httpJson') ? "Disponible" : "No disponible") . "\n");
+    scriptOutput("  - TMDB: " . (!empty($tmdbApiKey) ? "Configurado" : "No configurado") . "\n");
+    scriptOutput("  - Addons: " . (count($enabledAddons ?? []) > 0 ? count($enabledAddons) . " activos" : "Ninguno activo") . "\n\n");
+    scriptOutput("Sugerencias para encontrar más contenido:\n");
+    scriptOutput("  1. Configura TMDB_API_KEY (gratis en https://www.themoviedb.org/settings/api)\n");
+    scriptOutput("  2. Configura TRAKT_CLIENT_ID (gratis en https://trakt.tv/oauth/applications)\n");
+    scriptOutput("  3. Aumenta el valor de 'Últimos días' (ej: 30 o 365)\n");
+    scriptOutput("  4. Reduce el valor de 'Mínimo de seeds' (ej: 5 o 10)\n");
+    scriptOutput("  5. Instala y activa addons desde el panel de administración\n");
+    scriptOutput("  6. Verifica tu conexión a internet\n\n");
+    scriptOutput("========================================\n");
+    scriptOutput("RESULTADO FINAL\n");
+    scriptOutput("========================================\n");
+    scriptOutput("Creados: 0, actualizados: 0, episodios nuevos: 0\n");
+    scriptOutput("========================================\n");
     if ($isCli) {
         exit(0);
     }
     // En web, continuar para que el API pueda parsear la salida
 }
 
+scriptOutput("\n========================================\n");
+scriptOutput("CONTENIDO ENCONTRADO\n");
+scriptOutput("========================================\n");
 scriptOutput("Se encontraron " . count($items) . " items para procesar\n");
+scriptOutput("Iniciando procesamiento...\n");
+scriptOutput("========================================\n\n");
 
 $created = 0;
 $updated = 0;
@@ -2718,4 +2748,8 @@ foreach ($items as $show) {
     scriptOutput("Procesado: {$title}\n");
 }
 
-scriptOutput("\n✅ Listo. Creados: {$created}, actualizados: {$updated}, episodios nuevos: {$newEpisodes}\n");
+scriptOutput("\n========================================\n");
+scriptOutput("PROCESAMIENTO COMPLETADO\n");
+scriptOutput("========================================\n");
+scriptOutput("✅ Listo. Creados: {$created}, actualizados: {$updated}, episodios nuevos: {$newEpisodes}\n");
+scriptOutput("========================================\n");

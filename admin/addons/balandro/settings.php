@@ -125,11 +125,14 @@ ob_start();
 $pageTitle = 'Configuración de Balandro';
 include __DIR__ . '/../../includes/header.php';
 ?>
+
 <script>
 // Suprimir errores de extensiones del navegador (spoofer.js) - Debe estar al inicio
 (function() {
     'use strict';
-    var originalError = window.onerror;
+    if (typeof window.onerror === 'function') {
+        var originalError = window.onerror;
+    }
     window.onerror = function(msg, url, line, col, error) {
         if (msg && (
             msg.indexOf('spoofer.js') !== -1 ||
@@ -403,20 +406,41 @@ include __DIR__ . '/../../includes/header.php';
             </div>
             <?php endif; ?>
 
-<script>
-// Mostrar/ocultar campos de rate limit
-$(document).ready(function() {
-    $('input[name="rate_limit_enabled"]').change(function() {
-        if ($(this).is(':checked')) {
-            $(this).closest('.form-group').next('.form-group').removeClass('hidden');
-        } else {
-            $(this).closest('.form-group').next('.form-group').addClass('hidden');
-        }
-    });
-});
-</script>
-
 <?php
 // Incluir pie de página del panel de administración
 include __DIR__ . '/../../includes/footer.php';
 ?>
+
+<script>
+// Esperar a que jQuery esté disponible
+(function() {
+    function initSettings() {
+        // Verificar que jQuery esté disponible
+        if (typeof jQuery === 'undefined' || typeof $ === 'undefined') {
+            // Reintentar después de 100ms
+            setTimeout(initSettings, 100);
+            return;
+        }
+        
+        // Mostrar/ocultar campos de rate limit (si existen)
+        var $rateLimitInput = $('input[name="rate_limit_enabled"]');
+        if ($rateLimitInput.length > 0) {
+            $rateLimitInput.on('change', function() {
+                if ($(this).is(':checked')) {
+                    $(this).closest('.form-group').next('.form-group').removeClass('hidden');
+                } else {
+                    $(this).closest('.form-group').next('.form-group').addClass('hidden');
+                }
+            });
+        }
+    }
+    
+    // Iniciar cuando el DOM esté listo
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSettings);
+    } else {
+        // DOM ya está listo
+        initSettings();
+    }
+})();
+</script>

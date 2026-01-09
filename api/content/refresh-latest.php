@@ -134,6 +134,7 @@ try {
             $startTime = time();
             
             // Leer mientras el proceso esté activo
+            $lastOutputTime = time();
             while (true) {
                 $status = proc_get_status($process);
                 
@@ -141,23 +142,30 @@ try {
                 $read = fread($pipes[1], 8192);
                 if ($read !== false && $read !== '') {
                     $stdout .= $read;
+                    $lastOutputTime = time(); // Actualizar tiempo de última salida
                 }
                 
                 // Leer de stderr
                 $read = fread($pipes[2], 8192);
                 if ($read !== false && $read !== '') {
                     $stderr .= $read;
+                    $lastOutputTime = time(); // Actualizar tiempo de última salida
                 }
                 
                 // Si el proceso terminó, leer el resto
                 if (!$status['running']) {
-                    // Leer el resto de los datos
+                    // Leer el resto de los datos con un pequeño delay para asegurar que todo se capture
+                    usleep(500000); // 0.5 segundos
+                    
+                    // Leer el resto de stdout
                     $remaining = stream_get_contents($pipes[1]);
-                    if ($remaining !== false) {
+                    if ($remaining !== false && $remaining !== '') {
                         $stdout .= $remaining;
                     }
+                    
+                    // Leer el resto de stderr
                     $remaining = stream_get_contents($pipes[2]);
-                    if ($remaining !== false) {
+                    if ($remaining !== false && $remaining !== '') {
                         $stderr .= $remaining;
                     }
                     break;
@@ -167,6 +175,13 @@ try {
                 if ((time() - $startTime) > $timeout) {
                     proc_terminate($process);
                     break;
+                }
+                
+                // Si no hay salida por más de 5 segundos y el proceso sigue corriendo,
+                // puede que esté esperando algo, darle más tiempo
+                if ((time() - $lastOutputTime) > 5 && empty($stdout) && empty($stderr)) {
+                    // Esperar un poco más antes de terminar
+                    usleep(500000); // 0.5 segundos
                 }
                 
                 // Pequeña pausa para no consumir CPU
@@ -189,10 +204,22 @@ try {
             exec($cmd . ' 2>&1', $output, $returnVar);
         }
         
+        // Log para diagnóstico
+        error_log("Script ejecutado - stdout length: " . strlen($stdout) . ", stderr length: " . strlen($stderr));
+        error_log("Return code: {$returnVar}");
+        
         // Si no hay salida, puede ser que el script se ejecutó muy rápido o hubo un error silencioso
         if (empty($output) && $returnVar !== 0) {
             $output[] = "El script se ejecutó pero no generó salida (código de retorno: {$returnVar})";
             $output[] = "Verifica que el script existe y tiene permisos de ejecución.";
+        }
+        
+        // Si hay stdout o stderr pero output está vacío, usar esos directamente
+        if (empty($output) && (!empty($stdout) || !empty($stderr))) {
+            $combined = trim($stdout . "\n" . $stderr);
+            if (!empty($combined)) {
+                $output = explode("\n", $combined);
+            }
         }
         
         // Filtrar errores de Apache que no son relevantes para el usuario
@@ -204,10 +231,20 @@ try {
             }
             
             // Filtrar errores de Apache mpm_winnt (no son críticos)
+            // Estos errores aparecen en diferentes formatos
             if (strpos($line, 'AH02965') !== false || 
                 strpos($line, 'mpm_winnt:crit') !== false ||
-                strpos($line, 'Unable to retrieve my generation') !== false) {
+                strpos($line, 'mpm_winnt') !== false ||
+                strpos($line, 'Unable to retrieve my generation') !== false ||
+                strpos($line, 'Ha terminado la canalización') !== false ||
+                preg_match('/\[.*mpm_winnt.*\]/i', $line) ||
+                preg_match('/\[.*AH02965.*\]/i', $line)) {
                 // Ignorar estas líneas, son advertencias de Apache
+                continue;
+            }
+            
+            // Filtrar líneas que solo contienen timestamps de Apache
+            if (preg_match('/^\[.*\]\s*$/', $line)) {
                 continue;
             }
             
@@ -230,15 +267,36 @@ try {
         if (empty($outputText)) {
             // Si hay output sin filtrar, puede que se haya filtrado demasiado
             $unfilteredOutput = implode("\n", $output);
-            if (!empty($unfilteredOutput)) {
-                // Hay salida sin filtrar, pero se filtró toda
-                // Mostrar al menos las primeras líneas para diagnóstico
-                $lines = explode("\n", $unfilteredOutput);
-                $firstLines = array_slice($lines, 0, 10);
-                $outputText = "Salida del script (primeras líneas):\n" . implode("\n", $firstLines);
-                if (count($lines) > 10) {
-                    $outputText .= "\n... (" . (count($lines) - 10) . " líneas más)";
+            
+            // Filtrar solo errores de Apache del output sin filtrar para diagnóstico
+            $diagnosticLines = [];
+            foreach ($output as $line) {
+                $line = trim($line);
+                if (empty($line)) {
+                    continue;
                 }
+                
+                // Solo filtrar errores de Apache, pero mostrar el resto
+                if (strpos($line, 'AH02965') !== false || 
+                    strpos($line, 'mpm_winnt:crit') !== false ||
+                    strpos($line, 'mpm_winnt') !== false ||
+                    strpos($line, 'Unable to retrieve my generation') !== false ||
+                    strpos($line, 'Ha terminado la canalización') !== false ||
+                    preg_match('/\[.*mpm_winnt.*\]/i', $line) ||
+                    preg_match('/\[.*AH02965.*\]/i', $line)) {
+                    continue;
+                }
+                
+                $diagnosticLines[] = $line;
+            }
+            
+            if (!empty($diagnosticLines)) {
+                // Hay salida válida después de filtrar Apache
+                $outputText = implode("\n", $diagnosticLines);
+            } elseif (!empty($unfilteredOutput)) {
+                // Solo había errores de Apache, no hay salida real
+                $outputText = "El script se ejecutó pero solo generó errores de Apache (no críticos).\n";
+                $outputText .= "Esto puede indicar que el script se ejecutó muy rápido o no generó salida visible.\n";
             } else {
                 // Realmente no hay salida
                 if ($returnVar === 0) {
@@ -303,13 +361,28 @@ try {
         $lines = explode("\n", $outputText);
         $filteredLines = [];
         foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) {
+                continue;
+            }
+            
             // Filtrar errores de Apache mpm_winnt (no son críticos)
             if (strpos($line, 'AH02965') !== false || 
                 strpos($line, 'mpm_winnt:crit') !== false ||
-                strpos($line, 'Unable to retrieve my generation') !== false) {
+                strpos($line, 'mpm_winnt') !== false ||
+                strpos($line, 'Unable to retrieve my generation') !== false ||
+                strpos($line, 'Ha terminado la canalización') !== false ||
+                preg_match('/\[.*mpm_winnt.*\]/i', $line) ||
+                preg_match('/\[.*AH02965.*\]/i', $line)) {
                 // Ignorar estas líneas, son advertencias de Apache
                 continue;
             }
+            
+            // Filtrar líneas que solo contienen timestamps de Apache
+            if (preg_match('/^\[.*\]\s*$/', $line)) {
+                continue;
+            }
+            
             $filteredLines[] = $line;
         }
         $outputText = implode("\n", $filteredLines);
@@ -349,9 +422,8 @@ try {
     
     // Determinar si fue exitoso
     // Si solo hay advertencias de Apache (AH02965), considerar como éxito
-    $hasOnlyApacheWarnings = !empty($outputText) && 
-        preg_match('/AH02965|mpm_winnt:crit|Unable to retrieve my generation/', $outputText) &&
-        !preg_match('/Error|Fatal|Exception/i', $outputText);
+    // Pero después de filtrar, no deberían quedar estas advertencias
+    $hasOnlyApacheWarnings = false; // Ya filtramos Apache, así que esto no debería ser necesario
     
     // Return code 3 puede ser una advertencia, no necesariamente un error
     // Si el script se ejecutó y generó salida, considerar como éxito parcial

@@ -98,6 +98,10 @@ class UnifiedVideoPlayer {
                         // Para YouTube, intentar cargar con iframe
                         this.loadYouTube(source).then(resolve).catch(reject);
                         return;
+                    case 'embed':
+                        // Para embeds (vidsrc, upstream, etc.), usar iframe
+                        this.loadEmbed(source).then(resolve).catch(reject);
+                        return;
                     case 'torrent':
                         // Para torrents, usar WebTorrent
                         // Asegurar que WebTorrent esté inicializado antes de cargar
@@ -295,6 +299,19 @@ class UnifiedVideoPlayer {
             return 'torrent';
         }
         
+        // Verificar si es un embed (vidsrc, upstream, etc.)
+        if (url.includes('/embed/') || 
+            url.includes('vidsrc.to') || 
+            url.includes('vidsrc.cc') || 
+            url.includes('embed.smashystream.com') ||
+            url.includes('upstream.to') ||
+            url.includes('filemoon.sx') ||
+            url.includes('streamtape.com') ||
+            url.includes('streamwish.to') ||
+            url.includes('powvideo.net')) {
+            return 'embed';
+        }
+        
         // Verificar si es una URL local
         if (url.startsWith('/') || !url.includes('://') || url.startsWith(window.location.origin)) {
             return 'local';
@@ -423,6 +440,67 @@ class UnifiedVideoPlayer {
                 resolve();
             } catch (error) {
                 console.error('Error en loadYouTube():', error);
+                this.handleError(error);
+                reject(error);
+            }
+        });
+    }
+    
+    // Carga embeds genéricos (vidsrc, upstream, etc.) usando iframe
+    loadEmbed(source) {
+        return new Promise((resolve, reject) => {
+            try {
+                // Limpiar contenedor
+                if (this.container) {
+                    this.container.innerHTML = '';
+                }
+                
+                // Crear iframe para el embed
+                const iframe = document.createElement('iframe');
+                iframe.src = source;
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.border = 'none';
+                iframe.allow = 'autoplay; encrypted-media; fullscreen';
+                iframe.allowFullscreen = true;
+                iframe.setAttribute('frameborder', '0');
+                iframe.setAttribute('scrolling', 'no');
+                
+                // Añadir referrerpolicy para algunos servicios
+                if (source.includes('vidsrc') || source.includes('upstream') || source.includes('filemoon')) {
+                    iframe.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
+                }
+                
+                if (this.container) {
+                    this.container.appendChild(iframe);
+                }
+                
+                // Esperar a que el iframe cargue
+                iframe.onload = () => {
+                    console.log('✅ Embed cargado correctamente');
+                    this.videoType = 'embed';
+                    this.hideLoading();
+                    resolve();
+                };
+                
+                iframe.onerror = (error) => {
+                    console.error('❌ Error al cargar el embed:', error);
+                    this.handleError(new Error('No se pudo cargar el reproductor embed. Verifica que la URL sea válida.'));
+                    reject(error);
+                };
+                
+                // Timeout de seguridad
+                setTimeout(() => {
+                    if (this.videoType !== 'embed') {
+                        console.warn('⚠️ Timeout al cargar embed, pero continuando...');
+                        this.videoType = 'embed';
+                        this.hideLoading();
+                        resolve();
+                    }
+                }, 5000);
+                
+            } catch (error) {
+                console.error('Error en loadEmbed():', error);
                 this.handleError(error);
                 reject(error);
             }

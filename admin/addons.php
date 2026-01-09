@@ -92,6 +92,61 @@ include __DIR__ . '/includes/header.php';
     </button>
 </div>
 
+<!-- Sección de Búsqueda Manual de Enlaces -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-search me-2"></i>Buscar Enlaces Manualmente</span>
+    </div>
+    <div class="card-body">
+        <form id="searchStreamsForm">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label for="contentType" class="form-label">Tipo de Contenido</label>
+                    <select class="form-select" id="contentType" required>
+                        <option value="all">Todos</option>
+                        <option value="movie">Películas</option>
+                        <option value="series">Series</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="contentSelect" class="form-label">Contenido</label>
+                    <select class="form-select" id="contentSelect" required>
+                        <option value="">Cargando contenidos...</option>
+                    </select>
+                </div>
+                <div class="col-md-2 mb-3 d-flex align-items-end">
+                    <button type="button" class="btn btn-secondary w-100" id="refreshContentList">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row" id="seriesFields" style="display: none;">
+                <div class="col-md-6 mb-3">
+                    <label for="seasonNumber" class="form-label">Temporada</label>
+                    <input type="number" class="form-control" id="seasonNumber" min="1" value="1">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="episodeNumber" class="form-label">Episodio</label>
+                    <input type="number" class="form-control" id="episodeNumber" min="1" value="1">
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search me-1"></i> Buscar Enlaces
+                </button>
+            </div>
+        </form>
+        
+        <div id="streamsResults" class="mt-4" style="display: none;">
+            <hr>
+            <h5><i class="fas fa-link me-2"></i>Resultados</h5>
+            <div id="streamsList" class="mt-3"></div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="fas fa-plug me-2"></i>Addons Instalados</span>
@@ -158,6 +213,364 @@ window.addEventListener('error', function(e) {
         jQuery(document).ready(function($) {
             // Cargar addons al iniciar
             loadAddons();
+            
+            // Cargar lista de contenidos al iniciar
+            loadContentList();
+            
+            // Manejar cambio de tipo de contenido
+            $('#contentType').on('change', function() {
+                loadContentList();
+            });
+            
+            // Manejar cambio de contenido seleccionado
+            $('#contentSelect').on('change', function() {
+                const selectedOption = $(this).find('option:selected');
+                const contentType = selectedOption.data('type');
+                
+                if (contentType === 'series') {
+                    $('#seriesFields').show();
+                } else {
+                    $('#seriesFields').hide();
+                }
+            });
+            
+            // Manejar actualización de lista de contenidos
+            $('#refreshContentList').on('click', function() {
+                loadContentList();
+            });
+            
+            // Manejar búsqueda de enlaces
+            $('#searchStreamsForm').on('submit', function(e) {
+                e.preventDefault();
+                searchStreams();
+            });
+            
+            // Función para cargar lista de contenidos
+            function loadContentList() {
+                const type = $('#contentType').val();
+                const $select = $('#contentSelect');
+                
+                $select.html('<option value="">Cargando...</option>');
+                
+                $.ajax({
+                    url: '../api/addons/get-content-list.php',
+                    method: 'GET',
+                    data: { type: type, limit: 200 },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success && response.data.length > 0) {
+                            $select.html('<option value="">Selecciona un contenido</option>');
+                            response.data.forEach(function(content) {
+                                $select.append(
+                                    $('<option></option>')
+                                        .attr('value', content.id)
+                                        .attr('data-type', content.type)
+                                        .text(content.display)
+                                );
+                            });
+                        } else {
+                            $select.html('<option value="">No hay contenidos disponibles</option>');
+                        }
+                    },
+                    error: function() {
+                        $select.html('<option value="">Error al cargar contenidos</option>');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'No se pudieron cargar los contenidos'
+                        });
+                    }
+                });
+            }
+            
+            // Función para buscar enlaces
+            function searchStreams() {
+                const contentId = $('#contentSelect').val();
+                const selectedOption = $('#contentSelect').find('option:selected');
+                const contentType = selectedOption.data('type') === 'series' ? 'series' : 'movie';
+                const season = contentType === 'series' ? $('#seasonNumber').val() : null;
+                const episode = contentType === 'series' ? $('#episodeNumber').val() : null;
+                
+                if (!contentId) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Atención',
+                        text: 'Por favor, selecciona un contenido'
+                    });
+                    return;
+                }
+                
+                // Mostrar loading
+                Swal.fire({
+                    title: 'Buscando enlaces...',
+                    html: 'Por favor espera mientras buscamos enlaces en los addons',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+                
+                // Construir URL
+                let url = `../api/addons/streams.php?content_id=${contentId}&content_type=${contentType}`;
+                if (contentType === 'series' && season && episode) {
+                    url += `&season=${season}&episode=${episode}`;
+                }
+                
+                $.ajax({
+                    url: url,
+                    method: 'GET',
+                    dataType: 'json',
+                    timeout: 30000, // 30 segundos
+                    success: function(response) {
+                        Swal.close();
+                        
+                        if (response.success && response.data.streams && response.data.streams.length > 0) {
+                            displayStreams(response.data);
+                        } else {
+                            // Mostrar información más detallada sobre por qué no se encontraron enlaces
+                            let message = 'No se encontraron enlaces para este contenido.\n\n';
+                            
+                            if (response.data && response.data.addon_details) {
+                                const details = response.data.addon_details;
+                                if (details._info) {
+                                    message += 'Addons activos: ' + details._info.total_active + '\n';
+                                    if (details._info.active_addons && details._info.active_addons.length > 0) {
+                                        message += 'Addons verificados:\n';
+                                        details._info.active_addons.forEach(function(addon) {
+                                            message += '  - ' + addon.name + (addon.hasGetStreams ? ' ✓' : ' ✗ (sin método onGetStreams)') + '\n';
+                                        });
+                                    }
+                                }
+                                
+                                // Verificar configuración del addon
+                                message += '\nSugerencias:\n';
+                                message += '1. Verifica que el addon Balandro esté activo\n';
+                                message += '2. Configura el addon (enable_vidsrc, enable_upstream)\n';
+                                message += '3. El contenido necesita tener IMDb ID para Vidsrc\n';
+                                message += '4. Verifica que el contenido tenga video_url o torrent_magnet';
+                            }
+                            
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'Sin resultados',
+                                text: message,
+                                width: '600px'
+                            });
+                            $('#streamsResults').hide();
+                        }
+                    },
+                    error: function(xhr) {
+                        Swal.close();
+                        
+                        let errorMsg = 'Error al buscar enlaces';
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response.error) {
+                                errorMsg = response.error;
+                            }
+                        } catch (e) {
+                            errorMsg = xhr.responseText || errorMsg;
+                        }
+                        
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMsg
+                        });
+                        $('#streamsResults').hide();
+                    }
+                });
+            }
+            
+            // Función para mostrar los enlaces encontrados
+            function displayStreams(data) {
+                const $results = $('#streamsResults');
+                const $list = $('#streamsList');
+                
+                const contentId = data.content_id;
+                const contentType = data.content_type;
+                const season = data.season || null;
+                const episode = data.episode || null;
+                
+                let html = `<div class="alert alert-info">
+                    <strong>Contenido:</strong> ${$('#contentSelect option:selected').text()}<br>
+                    <strong>Enlaces encontrados:</strong> ${data.total}
+                </div>`;
+                
+                html += '<div class="list-group">';
+                
+                data.streams.forEach(function(stream, index) {
+                    const qualityBadge = stream.quality ? `<span class="badge bg-primary">${stream.quality}</span>` : '';
+                    const typeBadge = stream.type ? `<span class="badge bg-secondary">${stream.type}</span>` : '';
+                    const providerBadge = stream.addon ? `<span class="badge bg-success">${stream.addon}</span>` : '';
+                    const streamId = `stream-${contentId}-${index}`;
+                    
+                    html += `<div class="list-group-item" id="${streamId}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">Enlace ${index + 1}</h6>
+                                <p class="mb-1 text-break"><small>${stream.url || 'URL no disponible'}</small></p>
+                                <div class="mt-2">
+                                    ${qualityBadge} ${typeBadge} ${providerBadge}
+                                </div>
+                                <div class="mt-2 stream-status" id="status-${streamId}" style="display: none;">
+                                    <span class="badge bg-info">Verificando...</span>
+                                </div>
+                            </div>
+                            <div class="ms-3 d-flex flex-column gap-2">
+                                <button class="btn btn-sm btn-outline-primary" onclick="copyToClipboard('${stream.url || ''}')">
+                                    <i class="fas fa-copy"></i> Copiar
+                                </button>
+                                ${stream.url ? `
+                                <a href="${stream.url}" target="_blank" class="btn btn-sm btn-outline-success" 
+                                   onclick="verifyAndSaveStream(event, ${contentId}, '${contentType}', '${stream.url.replace(/'/g, "\\'")}', '${stream.type || 'direct'}', ${season || 'null'}, ${episode || 'null'}, '${streamId}')">
+                                    <i class="fas fa-external-link-alt"></i> Abrir y Guardar
+                                </a>
+                                <button class="btn btn-sm btn-outline-warning" 
+                                        onclick="saveStream(${contentId}, '${contentType}', '${stream.url.replace(/'/g, "\\'")}', '${stream.type || 'direct'}', ${season || 'null'}, ${episode || 'null'}, '${streamId}')">
+                                    <i class="fas fa-save"></i> Guardar
+                                </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                
+                html += '</div>';
+                
+                $list.html(html);
+                $results.show();
+            }
+            
+            // Función para verificar y guardar el stream al abrir
+            window.verifyAndSaveStream = function(event, contentId, contentType, streamUrl, streamType, season, episode, streamId) {
+                event.preventDefault();
+                
+                // Abrir en nueva pestaña
+                window.open(streamUrl, '_blank');
+                
+                // Guardar automáticamente después de abrir
+                saveStream(contentId, contentType, streamUrl, streamType, season, episode, streamId, true);
+            };
+            
+            // Función para guardar el stream en el contenido
+            window.saveStream = function(contentId, contentType, streamUrl, streamType, season, episode, streamId, autoSave = false) {
+                const $status = $(`#status-${streamId}`);
+                $status.show().html('<span class="badge bg-warning"><i class="fas fa-spinner fa-spin"></i> Verificando y guardando...</span>');
+                
+                const data = {
+                    content_id: contentId,
+                    content_type: contentType,
+                    stream_url: streamUrl,
+                    stream_type: streamType,
+                    verify_url: true
+                };
+                
+                if (season !== null && episode !== null) {
+                    data.season = season;
+                    data.episode = episode;
+                }
+                
+                $.ajax({
+                    url: '../api/addons/save-stream.php',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                    dataType: 'json',
+                    timeout: 15000,
+                    success: function(response) {
+                        if (response.success) {
+                            $status.html(`<span class="badge bg-success"><i class="fas fa-check"></i> ${response.message || 'Guardado correctamente'}</span>`);
+                            
+                            if (!autoSave) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: '¡Guardado!',
+                                    text: response.message || 'El enlace se ha guardado correctamente en el contenido.',
+                                    timer: 3000,
+                                    showConfirmButton: false
+                                });
+                            } else {
+                                // Mostrar notificación toast si es guardado automático
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Enlace guardado',
+                                    text: 'El enlace se ha añadido automáticamente al contenido.',
+                                    toast: true,
+                                    position: 'top-end',
+                                    showConfirmButton: false,
+                                    timer: 3000
+                                });
+                            }
+                        } else {
+                            $status.html(`<span class="badge bg-danger"><i class="fas fa-times"></i> Error: ${response.error || 'Error desconocido'}</span>`);
+                            
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.error || 'No se pudo guardar el enlace'
+                            });
+                        }
+                    },
+                    error: function(xhr) {
+                        let errorMsg = 'Error al guardar el enlace';
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response.error) {
+                                errorMsg = response.error;
+                            }
+                        } catch (e) {
+                            errorMsg = xhr.responseText || errorMsg;
+                        }
+                        
+                        $status.html(`<span class="badge bg-danger"><i class="fas fa-times"></i> ${errorMsg}</span>`);
+                        
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMsg
+                        });
+                    }
+                });
+            };
+            
+            // Función global para copiar al portapapeles
+            window.copyToClipboard = function(text) {
+                if (!text) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Atención',
+                        text: 'No hay URL para copiar'
+                    });
+                    return;
+                }
+                
+                navigator.clipboard.writeText(text).then(function() {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Copiado',
+                        text: 'URL copiada al portapapeles',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }).catch(function() {
+                    // Fallback para navegadores antiguos
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Copiado',
+                        text: 'URL copiada al portapapeles',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                });
+            };
     
             // Manejar clic en el botón de actualizar
             $('#refreshAddons').on('click', function() {

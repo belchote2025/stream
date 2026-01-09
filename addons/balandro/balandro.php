@@ -539,68 +539,123 @@ class BalandroAddon extends BaseAddon {
             
             // 3. Usar vidsrc si está habilitado (como en Kodi/Balandro)
             // Vidsrc es la fuente principal que usa Balandro
-            if ($this->config['enable_vidsrc'] && !empty($imdbId)) {
-                if (function_exists('buildEmbedProviders')) {
-                    // Si es serie y tenemos temporada/episodio, pasarlos
-                    if ($contentType === 'tv' && $season !== null && $episode !== null) {
-                        $vidsrcStreams = buildEmbedProviders($imdbId, $contentType, $season, $episode);
-                    } else {
-                        $vidsrcStreams = buildEmbedProviders($imdbId, $contentType);
+            if ($this->config['enable_vidsrc']) {
+                // Intentar obtener IMDb ID si no lo tenemos
+                if (empty($imdbId)) {
+                    try {
+                        // Intentar buscar IMDb ID usando scraping web
+                        $imdbId = $this->scrapeImdbId($title, $year, $contentType);
+                    } catch (Exception $e) {
+                        if ($this->config['debug_mode']) {
+                            error_log("Error obteniendo IMDb ID: " . $e->getMessage());
+                        }
                     }
-                    
-                    foreach ($vidsrcStreams as $index => $stream) {
-                        $streams[] = [
-                            'quality' => $this->config['default_quality'],
-                            'type' => 'embed',
-                            'url' => $stream,
-                            'provider' => 'vidsrc',
-                            'format' => 'iframe',
-                            'name' => 'Vidsrc' . ($index > 0 ? ' ' . ($index + 1) : '')
-                        ];
+                }
+                
+                // Si tenemos IMDb ID, construir URLs de Vidsrc
+                if (!empty($imdbId)) {
+                    try {
+                        // Construir URLs de Vidsrc manualmente
+                        $vidsrcUrls = [];
+                        if ($contentType === 'tv' && $season !== null && $episode !== null) {
+                            $vidsrcUrls = [
+                                "https://vidsrc.to/embed/tv/{$imdbId}/{$season}-{$episode}",
+                                "https://vidsrc.cc/v2/embed/tv/{$imdbId}/{$season}-{$episode}",
+                                "https://embed.smashystream.com/play/{$imdbId}/{$season}-{$episode}"
+                            ];
+                        } elseif ($contentType === 'tv') {
+                            $vidsrcUrls = [
+                                "https://vidsrc.to/embed/tv/{$imdbId}",
+                                "https://vidsrc.cc/v2/embed/tv/{$imdbId}",
+                                "https://embed.smashystream.com/play/{$imdbId}"
+                            ];
+                        } else {
+                            $vidsrcUrls = [
+                                "https://vidsrc.to/embed/movie/{$imdbId}",
+                                "https://vidsrc.cc/v2/embed/movie/{$imdbId}",
+                                "https://embed.smashystream.com/play/{$imdbId}"
+                            ];
+                        }
+                        
+                        foreach ($vidsrcUrls as $index => $url) {
+                            $streams[] = [
+                                'quality' => $this->config['default_quality'],
+                                'type' => 'embed',
+                                'url' => $url,
+                                'provider' => 'vidsrc',
+                                'format' => 'iframe',
+                                'name' => 'Vidsrc' . ($index > 0 ? ' ' . ($index + 1) : '')
+                            ];
+                        }
+                    } catch (Exception $e) {
+                        if ($this->config['debug_mode']) {
+                            error_log("Error construyendo URLs de Vidsrc: " . $e->getMessage());
+                        }
                     }
+                } elseif ($this->config['debug_mode']) {
+                    error_log("Vidsrc: No se pudo obtener IMDb ID para: {$title}");
                 }
             }
             
             // 4. Buscar en fuentes de streaming web (upstream, powvideo, etc.)
             // Esto simula el comportamiento de navegación web de Balandro
             if ($this->config['enable_upstream'] && $this->config['enable_web_scraping']) {
-                if (function_exists('searchStreamingSources')) {
-                    $streamingSources = searchStreamingSources($title, $contentType, $year, $imdbId);
-                    foreach ($streamingSources as $sourceUrl) {
-                        // Usar StreamExtractor para extraer enlaces reales (como en Kodi)
-                        require_once __DIR__ . '/StreamExtractor.php';
-                        $extractor = new StreamExtractor();
-                        $extractedStreams = $extractor->extractFromUrl($sourceUrl);
-                        
-                        if (!empty($extractedStreams)) {
-                            foreach ($extractedStreams as $extracted) {
+                try {
+                    // Buscar en múltiples sitios web directamente
+                    $streamingSources = $this->searchStreamingSources($title, $contentType, $year, $imdbId);
+                    
+                    if (!empty($streamingSources) && is_array($streamingSources)) {
+                        foreach ($streamingSources as $sourceUrl) {
+                            if (empty($sourceUrl)) {
+                                continue;
+                            }
+                            
+                            // Usar StreamExtractor para extraer enlaces reales (como en Kodi)
+                            $extractedStreams = [];
+                            if (file_exists(__DIR__ . '/StreamExtractor.php')) {
+                                require_once __DIR__ . '/StreamExtractor.php';
+                                if (class_exists('StreamExtractor')) {
+                                    $extractor = new StreamExtractor();
+                                    $extractedStreams = $extractor->extractFromUrl($sourceUrl);
+                                }
+                            }
+                            
+                            if (!empty($extractedStreams)) {
+                                foreach ($extractedStreams as $extracted) {
+                                    if (!empty($extracted['url'])) {
+                                        $streams[] = [
+                                            'quality' => $extracted['quality'] ?? $this->config['default_quality'],
+                                            'type' => $extracted['type'] ?? 'direct',
+                                            'url' => $extracted['url'],
+                                            'provider' => $extracted['provider'] ?? 'unknown',
+                                            'format' => 'mp4',
+                                            'name' => ucfirst($extracted['provider'] ?? 'Unknown')
+                                        ];
+                                    }
+                                }
+                            } else {
+                                // Si no se puede extraer, usar la URL directamente como embed
+                                $provider = $this->detectProviderFromUrl($sourceUrl);
                                 $streams[] = [
-                                    'quality' => $extracted['quality'] ?? $this->config['default_quality'],
-                                    'type' => $extracted['type'] ?? 'direct',
-                                    'url' => $extracted['url'],
-                                    'provider' => $extracted['provider'] ?? 'unknown',
-                                    'format' => 'mp4',
-                                    'name' => ucfirst($extracted['provider'] ?? 'Unknown')
+                                    'quality' => $this->config['default_quality'],
+                                    'type' => 'embed',
+                                    'url' => $sourceUrl,
+                                    'provider' => $provider,
+                                    'format' => 'iframe',
+                                    'name' => ucfirst($provider)
                                 ];
                             }
-                        } else {
-                            // Si no se puede extraer, usar la URL directamente
-                            $provider = $this->detectProviderFromUrl($sourceUrl);
-                            $streams[] = [
-                                'quality' => $this->config['default_quality'],
-                                'type' => 'direct',
-                                'url' => $sourceUrl,
-                                'provider' => $provider,
-                                'format' => 'mp4',
-                                'name' => ucfirst($provider)
-                            ];
                         }
+                    }
+                } catch (Exception $e) {
+                    if ($this->config['debug_mode']) {
+                        error_log("Error buscando en fuentes web: " . $e->getMessage());
                     }
                 }
             }
             
-            // 5. Buscar torrents si está habilitado y no hay streams
-            if ($this->config['enable_torrents'] && empty($streams) && !empty($content['torrent_magnet'])) {
+            // 5. Si no hay streams y tenemos torrent, usarlo como último recurso
+            if (empty($streams) && !empty($content['torrent_magnet'])) {
                 $streams[] = [
                     'quality' => $this->config['default_quality'],
                     'type' => 'torrent',
@@ -610,6 +665,7 @@ class BalandroAddon extends BaseAddon {
                     'name' => 'Torrent'
                 ];
             }
+            
             
             // Guardar en caché
             if ($this->config['enable_caching'] && !empty($streams)) {
@@ -804,6 +860,124 @@ class BalandroAddon extends BaseAddon {
         if (strpos($url, 'streamwish') !== false) return 'streamwish';
         
         return 'unknown';
+    }
+    
+    /**
+     * Obtiene IMDb ID mediante scraping web
+     */
+    private function scrapeImdbId($title, $year, $type) {
+        $query = urlencode(trim($title) . ' ' . ($year ?: ''));
+        $ttype = ($type === 'tv') ? 'tv' : 'ft';
+        $url = "https://www.imdb.com/find?q={$query}&s=tt&ttype={$ttype}";
+        
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n",
+                'timeout' => 4,
+                'ignore_errors' => true,
+            ]
+        ]);
+        
+        try {
+            $html = @file_get_contents($url, false, $context);
+            if (!$html) {
+                return '';
+            }
+            if (preg_match('/\/title\/(tt\d+)/', $html, $m)) {
+                return $m[1];
+            }
+        } catch (Exception $e) {
+            if ($this->config['debug_mode']) {
+                error_log("Error en scrapeImdbId: " . $e->getMessage());
+            }
+        }
+        return '';
+    }
+    
+    /**
+     * Busca enlaces de streaming en múltiples sitios web
+     */
+    private function searchStreamingSources($title, $type, $year, $imdbId) {
+        $results = [];
+        
+        // Si tenemos IMDb ID, construir URLs de diferentes servicios
+        if (!empty($imdbId)) {
+            // 1. Upstream
+            try {
+                $upstreamUrl = $type === 'tv' 
+                    ? "https://upstream.to/embed/tv/{$imdbId}"
+                    : "https://upstream.to/embed/movie/{$imdbId}";
+                
+                // Verificar que el enlace sea accesible
+                $context = stream_context_create([
+                    'http' => [
+                        'method' => 'HEAD',
+                        'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                        'timeout' => 5,
+                        'ignore_errors' => true,
+                    ]
+                ]);
+                
+                $headers = @get_headers($upstreamUrl, 1, $context);
+                if ($headers && strpos($headers[0], '200') !== false) {
+                    $results[] = $upstreamUrl;
+                }
+            } catch (Exception $e) {
+                // Ignorar errores
+            }
+            
+            // 2. Filemoon
+            try {
+                $filemoonUrl = $type === 'tv'
+                    ? "https://filemoon.sx/embed/tv/{$imdbId}"
+                    : "https://filemoon.sx/embed/movie/{$imdbId}";
+                
+                $context = stream_context_create([
+                    'http' => [
+                        'method' => 'HEAD',
+                        'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                        'timeout' => 5,
+                        'ignore_errors' => true,
+                    ]
+                ]);
+                
+                $headers = @get_headers($filemoonUrl, 1, $context);
+                if ($headers && strpos($headers[0], '200') !== false) {
+                    $results[] = $filemoonUrl;
+                }
+            } catch (Exception $e) {
+                // Ignorar errores
+            }
+            
+            // 3. Streamwish
+            try {
+                $streamwishUrl = $type === 'tv'
+                    ? "https://streamwish.to/embed/tv/{$imdbId}"
+                    : "https://streamwish.to/embed/movie/{$imdbId}";
+                
+                $context = stream_context_create([
+                    'http' => [
+                        'method' => 'HEAD',
+                        'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+                        'timeout' => 5,
+                        'ignore_errors' => true,
+                    ]
+                ]);
+                
+                $headers = @get_headers($streamwishUrl, 1, $context);
+                if ($headers && strpos($headers[0], '200') !== false) {
+                    $results[] = $streamwishUrl;
+                }
+            } catch (Exception $e) {
+                // Ignorar errores
+            }
+        }
+        
+        // También buscar por título en sitios que lo permitan
+        // (Esto requiere scraping más complejo, por ahora solo con IMDb ID)
+        
+        return $results;
     }
     
     // Métodos de contenido (para integración futura)

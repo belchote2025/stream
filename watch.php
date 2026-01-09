@@ -396,9 +396,13 @@ $baseUrl = rtrim(SITE_URL, '/');
         $hasVideo = false;
         $torrentMagnet = null;
         $videoUrl = $videoUrl ?? '';
+        $addonStreams = [];
         
-        // Verificar si hay un enlace torrent en la URL
-        if (isset($_GET['torrent']) && !empty($_GET['torrent'])) {
+        // Verificar si hay un enlace torrent en la URL (soporta 'magnet' y 'torrent')
+        if (isset($_GET['magnet']) && !empty($_GET['magnet'])) {
+            $torrentMagnet = urldecode($_GET['magnet']);
+            $hasVideo = true;
+        } elseif (isset($_GET['torrent']) && !empty($_GET['torrent'])) {
             $torrentMagnet = urldecode($_GET['torrent']);
             $hasVideo = true;
         } elseif ($episode && !empty($episode['video_url'])) {
@@ -413,6 +417,39 @@ $baseUrl = rtrim(SITE_URL, '/');
         } elseif (!empty($content['torrent_magnet'])) {
             $torrentMagnet = $content['torrent_magnet'];
             $hasVideo = true;
+        } else {
+            // Si no hay video local, intentar obtener desde addons
+            try {
+                require_once __DIR__ . '/includes/addons/AddonManager.php';
+                $addonManager = AddonManager::getInstance();
+                $addonManager->loadAddons();
+                
+                $contentType = $content['type'] === 'series' ? 'series' : 'movie';
+                $allStreams = $addonManager->getStreams($contentId, $contentType, $episodeId);
+                
+                // Combinar todos los streams de addons
+                foreach ($allStreams as $addonId => $streams) {
+                    if (is_array($streams)) {
+                        foreach ($streams as $stream) {
+                            if (!empty($stream['url'])) {
+                                $addonStreams[] = $stream;
+                                
+                                // Usar el primer stream disponible como fallback
+                                if (!$hasVideo && !empty($stream['url'])) {
+                                    if ($stream['type'] === 'torrent' || strpos($stream['url'], 'magnet:') === 0) {
+                                        $torrentMagnet = $stream['url'];
+                                    } else {
+                                        $videoUrl = $stream['url'];
+                                    }
+                                    $hasVideo = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                error_log("Error obteniendo streams de addons: " . $e->getMessage());
+            }
         }
         
         // Convertir URL relativa a absoluta si es necesario
@@ -479,6 +516,35 @@ $baseUrl = rtrim(SITE_URL, '/');
     </div>
     
     <div class="video-info">
+        <div class="video-title-section">
+            <h1><?php echo htmlspecialchars($content['title']); ?><?php if ($episode): ?> - <?php echo htmlspecialchars($episode['title']); ?><?php endif; ?></h1>
+            <div class="video-meta">
+                <?php if ($content['release_year']): ?>
+                    <span><?php echo $content['release_year']; ?></span>
+                <?php endif; ?>
+                <?php if ($content['rating']): ?>
+                    <span>⭐ <?php echo number_format($content['rating'], 1); ?>/10</span>
+                <?php endif; ?>
+                <?php if ($episode && $episode['duration']): ?>
+                    <span><?php echo formatDuration($episode['duration']); ?></span>
+                <?php elseif ($content['duration']): ?>
+                    <span><?php echo formatDuration($content['duration']); ?></span>
+                <?php endif; ?>
+            </div>
+            <?php if (isLoggedIn()): ?>
+            <div class="watch-party-actions" style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center;">
+                <button class="btn btn-primary" id="createWatchPartyBtn" onclick="createWatchParty()">
+                    <i class="fas fa-users"></i> Crear Watch Party
+                </button>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="text" id="joinPartyCode" placeholder="Código del party" maxlength="8" style="padding: 0.5rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; width: 150px;">
+                    <button class="btn btn-secondary" onclick="joinWatchParty()">
+                        <i class="fas fa-sign-in-alt"></i> Unirse
+                    </button>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
         <?php if ($content['type'] === 'series'): ?>
         <div class="episodes-container">
             <h3>Temporadas y Episodios</h3>
@@ -553,9 +619,23 @@ $baseUrl = rtrim(SITE_URL, '/');
 // Versión de cache-busting basada en la fecha de modificación de main.js
 $playerVersion = @filemtime(__DIR__ . '/js/player/main.js') ?: time();
 ?>
+<!-- Cargar scripts del reproductor en orden correcto -->
 <script src="<?php echo $baseUrl; ?>/js/player/config.js?v=<?php echo $playerVersion; ?>"></script>
-<script src="<?php echo $baseUrl; ?>/js/player/main.js?v=<?php echo $playerVersion; ?>"></script>
+<script src="<?php echo $baseUrl; ?>/js/player/main.js?v=<?php echo $playerVersion; ?>" onerror="console.error('Error al cargar main.js')"></script>
+<!-- init.js se carga después para asegurar que UnifiedVideoPlayer esté definido -->
+<script>
+// Verificar que UnifiedVideoPlayer esté disponible antes de cargar init.js
+if (typeof UnifiedVideoPlayer === 'undefined') {
+    console.error('❌ UnifiedVideoPlayer no está definido. Verifica que main.js se cargó correctamente.');
+} else {
+    console.log('✅ UnifiedVideoPlayer está disponible');
+}
+</script>
 <script src="<?php echo $baseUrl; ?>/js/player/init.js?v=<?php echo $playerVersion; ?>"></script>
+<!-- Script de diagnóstico de torrents (solo en local o con ?debug=1) -->
+<?php if ((defined('APP_ENV') && APP_ENV === 'local') || isset($_GET['debug'])): ?>
+<script src="<?php echo $baseUrl; ?>/js/torrent-debugger.js?v=<?php echo time(); ?>"></script>
+<?php endif; ?>
 
 <script>
 // Configuración global
@@ -565,8 +645,27 @@ if (typeof window !== 'undefined' && !window.__APP_BASE_URL) {
     window.__APP_BASE_URL = '<?php echo rtrim(SITE_URL, '/'); ?>';
 }
 // Solo declarar APP_BASE_URL si no existe (evitar redeclaración)
+// Usar window.APP_BASE_URL para evitar conflictos con main.js
+if (typeof window.APP_BASE_URL === 'undefined') {
+    window.APP_BASE_URL = window.__APP_BASE_URL || '<?php echo rtrim(SITE_URL, '/'); ?>';
+}
+// Crear alias para compatibilidad (solo si no existe)
 if (typeof APP_BASE_URL === 'undefined') {
-    var APP_BASE_URL = window.__APP_BASE_URL || '<?php echo rtrim(SITE_URL, '/'); ?>';
+    // Usar una función para obtener el valor sin redeclarar
+    (function() {
+        var baseUrl = window.__APP_BASE_URL || window.APP_BASE_URL || '<?php echo rtrim(SITE_URL, '/'); ?>';
+        try {
+            Object.defineProperty(window, 'APP_BASE_URL', {
+                value: baseUrl,
+                writable: false,
+                configurable: true,
+                enumerable: true
+            });
+        } catch (e) {
+            // Si falla, simplemente asignar
+            window.APP_BASE_URL = baseUrl;
+        }
+    })();
 }
 
 // WebTorrent se cargará de forma asíncrona, no verificar aquí
@@ -680,15 +779,61 @@ document.addEventListener('DOMContentLoaded', function() {
                     clearInterval(checkWebTorrent);
                     console.log('WebTorrent cargado, iniciando reproducción de torrent...');
                     try {
-                        player.loadVideo(urlToLoad).then(() => {
-                            console.log('Torrent cargado correctamente');
-                        }).catch(error => {
-                            console.error('Error al cargar el torrent:', error);
-                            showVideoError('Error al cargar el torrent. Por favor, intenta más tarde.');
-                        });
+                        // Verificar que el reproductor esté inicializado
+                        if (!player) {
+                            console.error('❌ El reproductor no está inicializado');
+                            showVideoError('El reproductor no está inicializado. Por favor, recarga la página.');
+                            return;
+                        }
+                        
+                        console.log('✅ Reproductor disponible, cargando torrent...');
+                        console.log('🔗 URL del torrent:', urlToLoad.substring(0, 100) + '...');
+                        
+                        // Verificar que loadVideo existe y es una función
+                        if (typeof player.loadVideo !== 'function') {
+                            console.error('❌ player.loadVideo no es una función');
+                            console.log('Tipo de player:', typeof player);
+                            console.log('Métodos disponibles:', Object.keys(player));
+                            showVideoError('El reproductor no tiene el método loadVideo. Por favor, recarga la página.');
+                            return;
+                        }
+                        
+                        // Intentar cargar el torrent
+                        const loadPromise = player.loadVideo(urlToLoad, 'torrent');
+                        
+                        if (loadPromise && typeof loadPromise.then === 'function') {
+                            loadPromise.then(() => {
+                                console.log('✅ Torrent cargado correctamente');
+                            }).catch(error => {
+                                console.error('❌ Error al cargar el torrent:', error);
+                                console.error('📋 Detalles del error:', {
+                                    message: error.message,
+                                    stack: error.stack,
+                                    name: error.name,
+                                    toString: error.toString()
+                                });
+                                showVideoError('Error al cargar el torrent: ' + (error.message || 'Error desconocido'));
+                            });
+                        } else {
+                            console.warn('⚠️ loadVideo no devolvió una promesa');
+                            console.log('Valor devuelto:', loadPromise);
+                            // Intentar de todas formas
+                            try {
+                                player.loadVideo(urlToLoad, 'torrent');
+                            } catch (e) {
+                                console.error('❌ Error al ejecutar loadVideo:', e);
+                                showVideoError('Error al cargar el torrent: ' + (e.message || 'Error desconocido'));
+                            }
+                        }
                     } catch (error) {
-                        console.error('Error al cargar el torrent:', error);
-                        showVideoError('Error al cargar el torrent. Por favor, intenta más tarde.');
+                        console.error('❌ Error al cargar el torrent (catch):', error);
+                        console.error('📋 Detalles del error:', {
+                            message: error.message,
+                            stack: error.stack,
+                            name: error.name,
+                            toString: error.toString()
+                        });
+                        showVideoError('Error al cargar el torrent: ' + (error.message || 'Error desconocido'));
                     }
                 }
             }, 100);
@@ -860,6 +1005,76 @@ function playTrailer() {
         window.location.href = `${BASE_URL}/watch.php?id=<?php echo $contentId; ?>&trailer=1`;
     <?php endif; ?>
 }
+
+// Funciones de Watch Party
+async function createWatchParty() {
+    const btn = document.getElementById('createWatchPartyBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
+    }
+    
+    try {
+        const response = await fetch(`${BASE_URL}/api/watch-party/create.php`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                content_id: <?php echo $contentId; ?>,
+                content_type: '<?php echo $content['type']; ?>',
+                episode_id: <?php echo $episodeId ? $episodeId : 'null'; ?>,
+                party_name: '<?php echo htmlspecialchars($content['title']); ?>' + (<?php echo $episodeId ? 'true' : 'false'; ?> ? ' - <?php echo $episode ? htmlspecialchars($episode['title']) : ''; ?>' : '')
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Redirigir a la página del watch party
+            window.location.href = data.data.url;
+        } else {
+            alert('Error al crear Watch Party: ' + (data.error || 'Error desconocido'));
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-users"></i> Crear Watch Party';
+            }
+        }
+    } catch (error) {
+        console.error('Error al crear Watch Party:', error);
+        alert('Error al crear Watch Party. Por favor, intenta de nuevo.');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-users"></i> Crear Watch Party';
+        }
+    }
+}
+
+function joinWatchParty() {
+    const codeInput = document.getElementById('joinPartyCode');
+    if (!codeInput) return;
+    
+    const code = codeInput.value.trim().toUpperCase();
+    
+    if (!code || code.length !== 8) {
+        alert('Por favor, ingresa un código válido de 8 caracteres');
+        return;
+    }
+    
+    window.location.href = `${BASE_URL}/watch-party.php?code=${code}`;
+}
+
+// Permitir unirse con Enter
+document.addEventListener('DOMContentLoaded', function() {
+    const codeInput = document.getElementById('joinPartyCode');
+    if (codeInput) {
+        codeInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                joinWatchParty();
+            }
+        });
+    }
+});
 
     // Guardar al cerrar la página
     window.addEventListener('beforeunload', function() {

@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba de Reproducción de Torrent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #141414;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #e50914;
+            margin-bottom: 20px;
+        }
+        
+        .test-section {
+            background: #1f1f1f;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .test-section h2 {
+            color: #e50914;
+            margin-bottom: 15px;
+        }
+        
+        .torrent-input {
+            width: 100%;
+            padding: 12px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            background: #e50914;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .btn:hover {
+            background: #f40612;
+        }
+        
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #555;
+        }
+        
+        .btn-secondary:hover {
+            background: #666;
+        }
+        
+        #unifiedVideoContainer {
+            width: 100%;
+            height: 500px;
+            background: #000;
+            border-radius: 8px;
+            margin-top: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .status {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .status-item {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-left: 3px solid #e50914;
+            padding-left: 10px;
+        }
+        
+        .status-item.success {
+            border-left-color: #4caf50;
+        }
+        
+        .status-item.error {
+            border-left-color: #f44336;
+        }
+        
+        .status-item.warning {
+            border-left-color: #ff9800;
+        }
+        
+        .example-torrents {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .example-torrent {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .example-torrent:hover {
+            border-color: #e50914;
+            transform: translateY(-2px);
+        }
+        
+        .example-torrent h3 {
+            color: #e50914;
+            margin-bottom: 10px;
+        }
+        
+        .example-torrent p {
+            color: #aaa;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+        
+        #unifiedVideoContainer video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Prueba de Reproducción de Torrent</h1>
+        
+        <div class="test-section">
+            <h2>Prueba Rápida</h2>
+            <p style="margin-bottom: 15px; color: #aaa;">
+                Haz clic en el botón para probar con un torrent de ejemplo conocido:
+            </p>
+            <button class="btn" onclick="loadQuickTest()" style="font-size: 18px; padding: 15px 30px;">
+                🚀 Prueba Rápida (Cargar Torrent de Ejemplo)
+            </button>
+        </div>
+        
+        <div class="test-section">
+            <h2>Torrents de Ejemplo</h2>
+            <p style="margin-bottom: 15px; color: #aaa;">
+                Selecciona un torrent de ejemplo o ingresa tu propio enlace magnet:
+            </p>
+            
+            <div class="example-torrents">
+                <div class="example-torrent" onclick="loadExampleTorrent('example1')">
+                    <h3>Ejemplo 1: Video Corto de Prueba</h3>
+                    <p><strong>Hash:</strong> Big Buck Bunny (ejemplo educativo)</p>
+                    <p><strong>Tipo:</strong> Video MP4</p>
+                    <p><strong>Nota:</strong> Torrent público de prueba</p>
+                </div>
+                
+                <div class="example-torrent" onclick="loadExampleTorrent('example2')">
+                    <h3>Ejemplo 2: Torrent de Prueba</h3>
+                    <p><strong>Hash:</strong> Sintel (ejemplo educativo)</p>
+                    <p><strong>Tipo:</strong> Video MP4</p>
+                    <p><strong>Nota:</strong> Torrent público de prueba</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Enlace Magnet Personalizado</h2>
+            <input 
+                type="text" 
+                id="magnetInput" 
+                class="torrent-input" 
+                placeholder="magnet:?xt=urn:btih:..."
+                value=""
+            >
+            <button class="btn" onclick="loadCustomTorrent()">Cargar Torrent</button>
+            <button class="btn btn-secondary" onclick="clearPlayer()">Limpiar Reproductor</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>Reproductor de Video</h2>
+            <div id="unifiedVideoContainer">
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">
+                    <p>Esperando torrent...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Estado del Torrent</h2>
+            <div id="status" class="status">
+                <div class="status-item">Esperando acción...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Cargar WebTorrent -->
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    
+    <!-- Cargar el reproductor (en orden correcto) -->
+    <script src="js/player/config.js"></script>
+    <script src="js/player/main.js"></script>
+    <script src="js/player/init.js"></script>
+    
+    <script>
+        let player = null;
+        let torrentClient = null;
+        let currentTorrent = null;
+        let isRendering = false; // Flag para evitar renderizado múltiple
+        
+        // Torrents de ejemplo (públicos y legales para pruebas)
+        // Sintel - Cortometraje de código abierto (muy popular, siempre tiene seeders)
+        const exampleTorrents = {
+            example1: {
+                name: 'Sintel (Cortometraje Open Source)',
+                magnet: 'magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10&dn=Sintel&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com'
+            },
+            example2: {
+                name: 'Big Buck Bunny (Cortometraje Open Source)',
+                magnet: 'magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com'
+            }
+        };
+        
+        // Función de prueba rápida
+        function loadQuickTest() {
+            addStatus('🚀 Iniciando prueba rápida...', 'info');
+            // Usar Sintel que es muy popular y siempre tiene seeders
+            loadTorrent(exampleTorrents.example1.magnet, exampleTorrents.example1.name);
+        }
+        
+        function addStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const item = document.createElement('div');
+            item.className = `status-item ${type}`;
+            item.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            statusDiv.appendChild(item);
+            statusDiv.scrollTop = statusDiv.scrollHeight;
+        }
+        
+        function clearStatus() {
+            document.getElementById('status').innerHTML = '';
+        }
+        
+        function initPlayer() {
+            return new Promise((resolve) => {
+                if (typeof UnifiedVideoPlayer !== 'undefined') {
+                    addStatus('✅ UnifiedVideoPlayer disponible', 'success');
+                    resolve();
+                    return;
+                }
+                
+                // Esperar a que se cargue
+                const checkInterval = setInterval(() => {
+                    if (typeof UnifiedVideoPlayer !== 'undefined') {
+                        clearInterval(checkInterval);
+                        addStatus('✅ UnifiedVideoPlayer disponible', 'success');
+                        resolve();
+                    }
+                }, 100);
+                
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    addStatus('⚠️ UnifiedVideoPlayer no se cargó, usando WebTorrent directamente', 'warning');
+                    resolve();
+                }, 5000);
+            });
+        }
+        
+        function initWebTorrent() {
+            if (typeof WebTorrent === 'undefined') {
+                addStatus('❌ WebTorrent no está disponible', 'error');
+                return null;
+            }
+            
+            if (!torrentClient) {
+                torrentClient = new WebTorrent();
+                addStatus('✅ Cliente WebTorrent inicializado', 'success');
+            }
+            
+            return torrentClient;
+        }
+        
+        async function loadTorrent(magnetLink, torrentName = 'Torrent') {
+            clearStatus();
+            addStatus(`🔄 Iniciando carga de torrent: ${torrentName}`, 'info');
+            
+            // Inicializar WebTorrent
+            const client = initWebTorrent();
+            if (!client) {
+                addStatus('❌ No se pudo inicializar WebTorrent', 'error');
+                return;
+            }
+            
+            // Limpiar torrent anterior completamente
+            if (currentTorrent) {
+                addStatus('🗑️ Limpiando torrent anterior...', 'info');
+                try {
+                    // Detener todos los streams del torrent
+                    if (currentTorrent.files) {
+                        currentTorrent.files.forEach(file => {
+                            if (file.stream && file.stream.destroy) {
+                                try {
+                                    file.stream.destroy();
+                                } catch (e) {
+                                    // Ignorar errores al destruir streams
+                                }
+                            }
+                        });
+                    }
+                    currentTorrent.destroy();
+                } catch (e) {
+                    console.warn('Error al limpiar torrent anterior:', e);
+                }
+                currentTorrent = null;
+            }
+            
+            // Limpiar contenedor completamente
+            const container = document.getElementById('unifiedVideoContainer');
+            
+            // Limpiar video anterior si existe
+            const existingVideo = container.querySelector('#testVideoPlayer');
+            if (existingVideo) {
+                try {
+                    existingVideo.pause();
+                    // Limpiar MediaSource si existe
+                    if (existingVideo.srcObject) {
+                        const mediaSource = existingVideo.srcObject;
+                        if (mediaSource.readyState === 'open') {
+                            try {
+                                mediaSource.endOfStream();
+                            } catch (e) {}
+                        }
+                        existingVideo.srcObject = null;
+                    }
+                    // Limpiar blob URLs
+                    if (existingVideo.src && existingVideo.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(existingVideo.src);
+                    }
+                    existingVideo.src = '';
+                    existingVideo.load();
+                } catch (e) {
+                    console.warn('Error al limpiar video anterior:', e);
+                }
+                existingVideo.remove();
+            }
+            
+            // Limpiar todos los mensajes
+            const messages = container.querySelectorAll('#loadingMessage, #waitingMessage');
+            messages.forEach(msg => msg.remove());
+            
+            container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;"><p>Cargando torrent...</p></div>';
+            
+            // Crear elemento de video nuevo
+            const video = document.createElement('video');
+            video.id = 'testVideoPlayer';
+            video.controls = true;
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.style.display = 'none';
+            video.dataset.rendered = 'false';
+            video.dataset.torrentHash = '';
+            
+            container.innerHTML = '';
+            container.appendChild(video);
+            
+            addStatus(`🔗 Agregando torrent al cliente...`, 'info');
+            addStatus(`📋 Magnet: ${magnetLink.substring(0, 80)}...`, 'info');
+            
+            try {
+                // Mostrar mensaje de carga inicial
+                const container = document.getElementById('unifiedVideoContainer');
+                const loadingMsg = document.createElement('div');
+                loadingMsg.id = 'loadingMessage';
+                loadingMsg.style.cssText = `
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0, 0, 0, 0.9);
+                    color: #fff;
+                    padding: 30px;
+                    border-radius: 8px;
+                    text-align: center;
+                    z-index: 1000;
+                `;
+                loadingMsg.innerHTML = `
+                    <div style="font-size: 24px; margin-bottom: 15px;">⏳</div>
+                    <p>Conectando al torrent...</p>
+                    <p style="font-size: 12px; margin-top: 10px; color: #aaa;">Esto puede tardar unos momentos</p>
+                `;
+                container.appendChild(loadingMsg);
+                
+                // Verificar si el torrent ya existe en el cliente
+                const sourceInfoHash = magnetLink.match(/btih:([a-fA-F0-9]{40})/i);
+                if (sourceInfoHash) {
+                    const expectedHash = sourceInfoHash[1].toUpperCase();
+                    const existingTorrent = client.torrents.find(t => {
+                        const torrentHash = t.infoHash ? t.infoHash.toUpperCase() : '';
+                        return torrentHash === expectedHash || torrentHash.includes(expectedHash) || expectedHash.includes(torrentHash);
+                    });
+                    
+                    if (existingTorrent) {
+                        addStatus('⚠️ Torrent ya existe en el cliente, usando el existente...', 'warning');
+                        currentTorrent = existingTorrent;
+                        // Ejecutar lógica del callback directamente
+                        setTimeout(() => {
+                            if (existingTorrent.files && existingTorrent.files.length > 0) {
+                                const videoFile = existingTorrent.files.find(file => {
+                                    const name = file.name.toLowerCase();
+                                    return name.endsWith('.mp4') || name.endsWith('.webm') || 
+                                           name.endsWith('.mkv') || name.endsWith('.avi') ||
+                                           name.endsWith('.m4v');
+                                }) || existingTorrent.files[0];
+                                
+                                if (videoFile) {
+                                    renderVideoFile(videoFile, existingTorrent, video);
+                                }
+                            }
+                        }, 100);
+                        return;
+                    }
+                }
+                
+                // Agregar torrent
+                currentTorrent = client.add(magnetLink, (torrent) => {
+                    // Ocultar mensaje de carga inicial
+                    const loadingMsgEl = document.getElementById('loadingMessage');
+                    if (loadingMsgEl) loadingMsgEl.remove();
+                    addStatus(`✅ Torrent agregado: ${torrent.name || 'Sin nombre'}`, 'success');
+                    addStatus(`📊 InfoHash: ${torrent.infoHash}`, 'info');
+                    addStatus(`📁 Archivos: ${torrent.files.length}`, 'info');
+                    
+                    // Listar archivos
+                    torrent.files.forEach((file, index) => {
+                        const sizeMB = (file.length / 1024 / 1024).toFixed(2);
+                        addStatus(`  ${index + 1}. ${file.name} (${sizeMB} MB)`, 'info');
+                    });
+                    
+                    // Buscar archivo de video
+                    const videoFile = torrent.files.find(file => {
+                        const name = file.name.toLowerCase();
+                        return name.endsWith('.mp4') || name.endsWith('.webm') || 
+                               name.endsWith('.mkv') || name.endsWith('.avi') ||
+                               name.endsWith('.m4v');
+                    }) || torrent.files[0];
+                    
+                    if (!videoFile) {
+                        addStatus('❌ No se encontró archivo de video', 'error');
+                        return;
+                    }
+                    
+                    addStatus(`🎬 Archivo seleccionado: ${videoFile.name}`, 'success');
+                    addStatus(`📏 Tamaño: ${(videoFile.length / 1024 / 1024).toFixed(2)} MB`, 'info');
+                    
+                    // Renderizar video usando función separada
+                    renderVideoFile(videoFile, torrent, video);
+                });
+                
+                // Función para renderizar el archivo de video
+                function renderVideoFile(videoFile, torrent, videoElement) {
+                    // Prevenir renderizado múltiple
+                    if (isRendering) {
+                        addStatus('⚠️ Ya se está renderizando un video, esperando...', 'warning');
+                        return;
+                    }
+                    
+                    // Verificar si ya hay un video renderizado para este torrent
+                    const container = document.getElementById('unifiedVideoContainer');
+                    const existingRendered = container.querySelector('#testVideoPlayer[data-rendered="true"]');
+                    if (existingRendered && existingRendered.dataset.torrentHash === torrent.infoHash) {
+                        addStatus('⚠️ Video ya renderizado para este torrent', 'warning');
+                        return;
+                    }
+                    
+                    isRendering = true;
+                    addStatus('🎥 Renderizando video...', 'info');
+                    
+                    // Limpiar completamente cualquier video anterior
+                    const existingVideo = container.querySelector('#testVideoPlayer');
+                    if (existingVideo) {
+                        addStatus('🗑️ Limpiando video anterior...', 'info');
+                        existingVideo.pause();
+                        // Si tiene un MediaSource, cerrarlo
+                        if (existingVideo.srcObject) {
+                            const mediaSource = existingVideo.srcObject;
+                            if (mediaSource.readyState === 'open') {
+                                mediaSource.endOfStream();
+                            }
+                            existingVideo.srcObject = null;
+                        }
+                        // Si tiene blob URL, revocarlo
+                        if (existingVideo.src && existingVideo.src.startsWith('blob:')) {
+                            URL.revokeObjectURL(existingVideo.src);
+                        }
+                        existingVideo.src = '';
+                        existingVideo.load();
+                        existingVideo.remove();
+                    }
+                    
+                    // Crear nuevo elemento de video limpio
+                    const newVideo = document.createElement('video');
+                    newVideo.id = 'testVideoPlayer';
+                    newVideo.controls = true;
+                    newVideo.style.width = '100%';
+                    newVideo.style.height = '100%';
+                    newVideo.style.display = 'block';
+                    newVideo.dataset.rendered = 'true';
+                    newVideo.dataset.torrentHash = torrent.infoHash;
+                    container.appendChild(newVideo);
+                    
+                    // Mostrar mensaje de espera
+                    const waitingMsg = document.createElement('div');
+                    waitingMsg.id = 'waitingMessage';
+                    waitingMsg.style.cssText = `
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: rgba(0, 0, 0, 0.8);
+                        color: #fff;
+                        padding: 20px;
+                        border-radius: 8px;
+                        text-align: center;
+                        z-index: 1000;
+                    `;
+                    waitingMsg.innerHTML = `
+                        <p>⏳ Esperando datos del torrent...</p>
+                        <p style="font-size: 12px; margin-top: 10px; color: #aaa;">Esto puede tardar unos momentos</p>
+                    `;
+                    container.appendChild(waitingMsg);
+                    
+                    // Renderizar usando renderTo (método estándar de WebTorrent)
+                    // Asegurarse de que solo se llama una vez
+                    let renderCalled = false;
+                    
+                    try {
+                        addStatus('📡 Iniciando renderizado de video...', 'info');
+                        
+                        videoFile.renderTo(newVideo, {
+                            autoplay: false,
+                            controls: true
+                        }, (err) => {
+                            if (renderCalled) {
+                                addStatus('⚠️ Renderizado ya completado, ignorando callback duplicado', 'warning');
+                                return;
+                            }
+                            renderCalled = true;
+                            
+                            // Ocultar mensaje de espera
+                            const waitingMsgEl = document.getElementById('waitingMessage');
+                            if (waitingMsgEl) waitingMsgEl.remove();
+                            
+                            if (err) {
+                                isRendering = false; // Permitir nuevo intento
+                                addStatus(`❌ Error al renderizar: ${err.message}`, 'error');
+                                console.error('Error al renderizar:', err);
+                                newVideo.dataset.rendered = 'false';
+                                
+                                // Mostrar mensaje de error
+                                const errorMsg = document.createElement('div');
+                                errorMsg.style.cssText = `
+                                    position: absolute;
+                                    top: 50%;
+                                    left: 50%;
+                                    transform: translate(-50%, -50%);
+                                    background: rgba(244, 67, 54, 0.9);
+                                    color: #fff;
+                                    padding: 20px;
+                                    border-radius: 8px;
+                                    text-align: center;
+                                    z-index: 1000;
+                                `;
+                                errorMsg.innerHTML = `
+                                    <p>❌ Error al renderizar video</p>
+                                    <p style="font-size: 12px; margin-top: 10px;">${err.message}</p>
+                                    <p style="font-size: 11px; margin-top: 10px; color: #ccc;">Intenta recargar la página</p>
+                                `;
+                                container.appendChild(errorMsg);
+                            } else {
+                                isRendering = false; // Renderizado completado
+                                addStatus('✅ Video renderizado correctamente', 'success');
+                                addStatus('▶️ Listo para reproducir', 'success');
+                                
+                                // Mostrar mensaje de éxito temporal
+                                const successMsg = document.createElement('div');
+                                successMsg.style.cssText = `
+                                    position: absolute;
+                                    top: 20px;
+                                    left: 50%;
+                                    transform: translateX(-50%);
+                                    background: rgba(76, 175, 80, 0.9);
+                                    color: #fff;
+                                    padding: 15px 30px;
+                                    border-radius: 8px;
+                                    z-index: 1000;
+                                    animation: fadeOut 3s forwards;
+                                `;
+                                successMsg.innerHTML = '✅ Video listo para reproducir';
+                                container.appendChild(successMsg);
+                                
+                                setTimeout(() => {
+                                    if (successMsg.parentNode) {
+                                        successMsg.remove();
+                                    }
+                                }, 3000);
+                            }
+                        });
+                    } catch (renderError) {
+                        isRendering = false; // Permitir nuevo intento
+                        if (!renderCalled) {
+                            addStatus(`❌ Error al intentar renderizar: ${renderError.message}`, 'error');
+                            console.error('Error al intentar renderizar:', renderError);
+                            newVideo.dataset.rendered = 'false';
+                        }
+                    }
+                }
+                    
+                    // Monitorear progreso
+                    let lastProgress = 0;
+                    torrent.on('download', () => {
+                        const progress = (torrent.progress * 100).toFixed(1);
+                        const speed = (torrent.downloadSpeed / 1024).toFixed(2);
+                        const peers = torrent.numPeers || 0;
+                        
+                        // Solo loggear si hay cambio significativo
+                        if (Math.abs(parseFloat(progress) - parseFloat(lastProgress)) > 1 || torrent.downloadSpeed > 0) {
+                            addStatus(`📥 Descargando: ${progress}% (${speed} KB/s) - Peers: ${peers}`, 'info');
+                            lastProgress = progress;
+                            
+                            // Actualizar mensaje de espera si existe
+                            const waitingMsg = document.getElementById('waitingMessage');
+                            if (waitingMsg) {
+                                waitingMsg.innerHTML = `
+                                    <p>📥 Descargando: ${progress}%</p>
+                                    <p style="font-size: 12px; margin-top: 10px; color: #aaa;">
+                                        Velocidad: ${speed} KB/s | Peers: ${peers}
+                                    </p>
+                                `;
+                            }
+                        }
+                    });
+                    
+                    // Monitorear cuando no hay peers
+                    let noPeersWarningShown = false;
+                    torrent.on('noPeers', () => {
+                        if (!noPeersWarningShown) {
+                            addStatus('⚠️ No hay peers disponibles. El torrent puede tardar en iniciar.', 'warning');
+                            noPeersWarningShown = true;
+                            
+                            const waitingMsg = document.getElementById('waitingMessage');
+                            if (waitingMsg) {
+                                waitingMsg.innerHTML = `
+                                    <p>⏳ Buscando peers...</p>
+                                    <p style="font-size: 12px; margin-top: 10px; color: #aaa;">
+                                        Esto puede tardar unos momentos. Verifica tu conexión.
+                                    </p>
+                                `;
+                            }
+                        }
+                    });
+                    
+                    // Monitorear cuando se conecta a peers
+                    torrent.on('wire', (wire) => {
+                        addStatus(`🔌 Conectado a peer: ${wire.remoteAddress || 'N/A'}`, 'info');
+                    });
+                    
+                    torrent.on('ready', () => {
+                        addStatus('✅ Torrent listo', 'success');
+                    });
+                    
+                    torrent.on('done', () => {
+                        addStatus('✅ Descarga completada', 'success');
+                    });
+                    
+                    torrent.on('error', (err) => {
+                        addStatus(`❌ Error en torrent: ${err.message}`, 'error');
+                    });
+                });
+                
+                // Manejar errores del cliente
+                client.on('error', (err) => {
+                    addStatus(`❌ Error del cliente: ${err.message}`, 'error');
+                });
+                
+                addStatus('⏳ Esperando respuesta del torrent...', 'info');
+                
+                // Timeout para detectar si el callback nunca se ejecuta
+                const callbackTimeout = setTimeout(() => {
+                    if (client.torrents.length > 0 && !currentTorrent) {
+                        // El torrent se agregó pero el callback no se ejecutó
+                        addStatus('⚠️ Torrent agregado pero callback no ejecutado, usando torrent directamente...', 'warning');
+                        const addedTorrent = client.torrents[client.torrents.length - 1];
+                        currentTorrent = addedTorrent;
+                        
+                        // Ejecutar lógica del callback manualmente
+                        addStatus(`✅ Torrent encontrado: ${addedTorrent.name || 'Sin nombre'}`, 'success');
+                        addStatus(`📊 InfoHash: ${addedTorrent.infoHash}`, 'info');
+                        addStatus(`📁 Archivos: ${addedTorrent.files ? addedTorrent.files.length : 0}`, 'info');
+                        
+                        if (addedTorrent.files && addedTorrent.files.length > 0) {
+                            // Buscar archivo de video
+                            const videoFile = addedTorrent.files.find(file => {
+                                const name = file.name.toLowerCase();
+                                return name.endsWith('.mp4') || name.endsWith('.webm') || 
+                                       name.endsWith('.mkv') || name.endsWith('.avi') ||
+                                       name.endsWith('.m4v');
+                            }) || addedTorrent.files[0];
+                            
+                            if (videoFile) {
+                                addStatus(`🎬 Archivo seleccionado: ${videoFile.name}`, 'success');
+                                
+                                // Renderizar video
+                                const video = document.getElementById('testVideoPlayer');
+                                if (video && video.dataset.rendered !== 'true') {
+                                    video.style.display = 'block';
+                                    video.dataset.rendered = 'true';
+                                    
+                                    videoFile.renderTo(video, {
+                                        autoplay: false,
+                                        controls: true
+                                    }, (err) => {
+                                        const waitingMsg = document.getElementById('waitingMessage');
+                                        if (waitingMsg) waitingMsg.remove();
+                                        
+                                        if (err) {
+                                            addStatus(`❌ Error al renderizar: ${err.message}`, 'error');
+                                        } else {
+                                            addStatus('✅ Video renderizado correctamente', 'success');
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    } else if (client.torrents.length === 0) {
+                        addStatus('❌ El torrent no se pudo agregar después de 15 segundos', 'error');
+                        const loadingMsg = document.getElementById('loadingMessage');
+                        if (loadingMsg) {
+                            loadingMsg.innerHTML = `
+                                <div style="font-size: 24px; margin-bottom: 15px;">❌</div>
+                                <p>Error al cargar el torrent</p>
+                                <p style="font-size: 12px; margin-top: 10px; color: #aaa;">
+                                    Verifica el enlace magnet y tu conexión a internet
+                                </p>
+                            `;
+                        }
+                    }
+                }, 15000); // 15 segundos
+                
+                // Limpiar timeout cuando el callback se ejecute
+                const originalCallback = currentTorrent;
+                
+                // Timeout para mostrar advertencia si no hay actividad
+                setTimeout(() => {
+                    if (currentTorrent && !currentTorrent.ready) {
+                        addStatus('⚠️ El torrent está tardando en iniciar. Esto puede ser normal si no hay peers disponibles.', 'warning');
+                        
+                        const waitingMsg = document.getElementById('waitingMessage');
+                        if (waitingMsg) {
+                            waitingMsg.innerHTML = `
+                                <p>⏳ Esperando torrent...</p>
+                                <p style="font-size: 12px; margin-top: 10px; color: #aaa;">
+                                    Si no hay peers disponibles, el torrent puede tardar en iniciar.<br>
+                                    Verifica tu conexión a internet y firewall.
+                                </p>
+                            `;
+                        }
+                    }
+                }, 10000); // 10 segundos
+                
+            } catch (error) {
+                addStatus(`❌ Error al agregar torrent: ${error.message}`, 'error');
+                console.error('Error:', error);
+            }
+        }
+        
+        function loadExampleTorrent(exampleId) {
+            const example = exampleTorrents[exampleId];
+            if (example) {
+                document.getElementById('magnetInput').value = example.magnet;
+                loadTorrent(example.magnet, example.name);
+            }
+        }
+        
+        function loadCustomTorrent() {
+            const magnetInput = document.getElementById('magnetInput');
+            const magnetLink = magnetInput.value.trim();
+            
+            if (!magnetLink) {
+                addStatus('❌ Por favor, ingresa un enlace magnet', 'error');
+                return;
+            }
+            
+            if (!magnetLink.startsWith('magnet:')) {
+                addStatus('❌ El enlace debe comenzar con "magnet:"', 'error');
+                return;
+            }
+            
+            loadTorrent(magnetLink, 'Torrent personalizado');
+        }
+        
+        function clearPlayer() {
+            clearStatus();
+            addStatus('🗑️ Limpiando reproductor...', 'info');
+            
+            // Resetear flag de renderizado
+            isRendering = false;
+            
+            // Limpiar torrent completamente
+            if (currentTorrent) {
+                try {
+                    // Detener todos los streams
+                    if (currentTorrent.files) {
+                        currentTorrent.files.forEach(file => {
+                            if (file.stream && file.stream.destroy) {
+                                try {
+                                    file.stream.destroy();
+                                } catch (e) {}
+                            }
+                        });
+                    }
+                    currentTorrent.destroy();
+                } catch (e) {
+                    console.warn('Error al limpiar torrent:', e);
+                }
+                currentTorrent = null;
+            }
+            
+            // Limpiar contenedor
+            const container = document.getElementById('unifiedVideoContainer');
+            const video = container.querySelector('#testVideoPlayer');
+            if (video) {
+                try {
+                    video.pause();
+                    if (video.srcObject) {
+                        const mediaSource = video.srcObject;
+                        if (mediaSource.readyState === 'open') {
+                            mediaSource.endOfStream();
+                        }
+                        video.srcObject = null;
+                    }
+                    if (video.src && video.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(video.src);
+                    }
+                    video.src = '';
+                    video.load();
+                } catch (e) {
+                    console.warn('Error al limpiar video:', e);
+                }
+            }
+            
+            // Limpiar mensajes
+            const messages = container.querySelectorAll('#loadingMessage, #waitingMessage');
+            messages.forEach(msg => msg.remove());
+            
+            container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;"><p>Esperando torrent...</p></div>';
+            
+            addStatus('✅ Reproductor limpiado', 'success');
+        }
+        
+        // Inicializar cuando la página cargue
+        window.addEventListener('DOMContentLoaded', async () => {
+            addStatus('🔄 Inicializando...', 'info');
+            
+            // Esperar a que WebTorrent se cargue
+            if (typeof WebTorrent === 'undefined') {
+                addStatus('⏳ Esperando WebTorrent...', 'info');
+                const checkWebTorrent = setInterval(() => {
+                    if (typeof WebTorrent !== 'undefined') {
+                        clearInterval(checkWebTorrent);
+                        addStatus('✅ WebTorrent cargado', 'success');
+                        initWebTorrent();
+                    }
+                }, 100);
+            } else {
+                addStatus('✅ WebTorrent disponible', 'success');
+                initWebTorrent();
+            }
+            
+            // Intentar inicializar el reproductor unificado
+            await initPlayer();
+            
+            addStatus('✅ Sistema listo. Selecciona un torrent de ejemplo o ingresa tu propio enlace magnet.', 'success');
+        });
+    </script>
+</body>
+</html>
+

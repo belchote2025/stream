@@ -131,6 +131,12 @@ $pageTitle = 'Panel de Administración - ' . SITE_NAME;
                             <span>Configuración</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="#addons">
+                            <i class="fas fa-puzzle-piece"></i>
+                            <span>Addons</span>
+                        </a>
+                    </li>
                 </ul>
             </nav>
             <div class="logout">

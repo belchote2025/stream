@@ -8,6 +8,7 @@
 ob_start();
 
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../scripts/fetch-new-content.php';
 
 // Limpiar cualquier output que haya generado config.php
 ob_clean();
@@ -79,11 +80,60 @@ try {
         ucwords(strtolower($titleClean)), // Capitalizado
     ];
     
+    // PRIMERO: Buscar enlaces de streaming directo (upstream, powvideo, filemoon, streamtape, streamwish)
+    // Estos son más rápidos que los torrents y no requieren descarga
+    $streamingResults = [];
+    try {
+        $imdbId = null;
+        // Intentar obtener IMDb ID para búsquedas más precisas
+        if (function_exists('resolveImdbId')) {
+            $imdbId = resolveImdbId($titleClean, $year ? (int)$year : null, $type, null);
+        }
+        
+        $streamingSources = searchStreamingSources($titleClean, $type, $year ? (int)$year : null, $imdbId);
+        foreach ($streamingSources as $streamUrl) {
+            if (!empty($streamUrl)) {
+                $streamingResults[] = [
+                    'title' => $titleClean,
+                    'magnet' => null,
+                    'url' => $streamUrl,
+                    'source' => 'streaming',
+                    'quality' => 'HD',
+                    'seeds' => 999, // Prioridad alta para streaming
+                    'size' => null,
+                    'type' => 'streaming'
+                ];
+            }
+        }
+        $searchLog[] = "Streaming (upstream/powvideo/filemoon/streamtape/streamwish): " . count($streamingResults) . " resultados";
+        if (!empty($streamingResults)) {
+            $results = array_merge($results, $streamingResults);
+        }
+    } catch (Exception $e) {
+        $searchLog[] = "Error en búsqueda de streaming: " . $e->getMessage();
+    }
+    
     // Búsqueda en paralelo de todas las fuentes para obtener más resultados
     // Orden optimizado: primero APIs rápidas, luego scraping web
     
     // Agregar filtros a debug
     $searchLog[] = "Filtros aplicados - Calidad: '{$quality}', Min Seeds: {$min_seeds}, Fuentes: '{$sources}'";
+    
+    // Opción 0: Jackett (si está configurado - agrega múltiples indexadores)
+    try {
+        $jackettUrl = getenv('JACKETT_URL') ?: (defined('JACKETT_URL') ? JACKETT_URL : '');
+        $jackettApiKey = getenv('JACKETT_API_KEY') ?: (defined('JACKETT_API_KEY') ? JACKETT_API_KEY : '');
+        
+        if (!empty($jackettUrl) && !empty($jackettApiKey)) {
+            $jackettResults = searchJackett($titleClean, $type, $year, $jackettUrl, $jackettApiKey);
+            $searchLog[] = "Jackett: " . count($jackettResults) . " resultados";
+            if (!empty($jackettResults)) {
+                $results = array_merge($results, $jackettResults);
+            }
+        }
+    } catch (Exception $e) {
+        $searchLog[] = "Jackett error: " . $e->getMessage();
+    }
     
     // Opción 1: Torrentio (más rápido y confiable)
     $torrentioResults = searchTorrentio($titleClean, $type, $year);
@@ -1060,6 +1110,162 @@ function sortByQuality($results) {
         // Si misma calidad, ordenar por seeds
         return ($b['seeds'] ?? 0) - ($a['seeds'] ?? 0);
     });
+    
+    return $results;
+}
+
+/**
+ * Buscar torrents usando Jackett API
+ * Jackett es un servidor proxy que agrega múltiples indexadores de torrents
+ * 
+ * @param string $title Título a buscar
+ * @param string $type Tipo: 'movie' o 'series'
+ * @param string $year Año (opcional)
+ * @param string $jackettUrl URL base de Jackett (ej: http://localhost:9117)
+ * @param string $apiKey API key de Jackett
+ * @return array Array de resultados de torrents
+ * 
+ * Referencia: https://www.rapidseedbox.com/blog/guide-to-jackett
+ */
+function searchJackett($title, $type = 'movie', $year = '', $jackettUrl = '', $apiKey = '') {
+    $results = [];
+    
+    if (empty($jackettUrl) || empty($apiKey)) {
+        return $results;
+    }
+    
+    try {
+        // Normalizar URL de Jackett (eliminar trailing slash)
+        $jackettUrl = rtrim($jackettUrl, '/');
+        
+        // Construir query para Jackett
+        // Jackett usa formato: /api/v2.0/indexers/{indexer}/results?Query={query}
+        // O podemos usar /api/v2.0/indexers/all/results para buscar en todos los indexadores
+        $query = $title;
+        if (!empty($year) && $type === 'movie') {
+            $query .= ' ' . $year;
+        }
+        
+        // Categorías de Jackett:
+        // 2000 = Movies, 5000 = TV Shows
+        $category = ($type === 'movie') ? '2000' : '5000';
+        
+        // URL de búsqueda en todos los indexadores
+        $searchUrl = $jackettUrl . '/api/v2.0/indexers/all/results?apikey=' . urlencode($apiKey) . 
+                     '&Query=' . urlencode($query) . 
+                     '&Category[]=' . $category;
+        
+        // Configurar contexto HTTP
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n" .
+                           "Accept: application/json\r\n",
+                'timeout' => 15,
+                'ignore_errors' => true,
+            ]
+        ]);
+        
+        // Realizar búsqueda
+        $response = @file_get_contents($searchUrl, false, $context);
+        
+        if ($response === false) {
+            error_log("Jackett: No se pudo conectar a {$jackettUrl}");
+            return $results;
+        }
+        
+        $data = json_decode($response, true);
+        
+        if (!isset($data['Results']) || !is_array($data['Results'])) {
+            return $results;
+        }
+        
+        // Procesar resultados
+        foreach ($data['Results'] as $item) {
+            // Jackett devuelve resultados con esta estructura:
+            // {
+            //   "FirstSeen": "2024-01-01T00:00:00Z",
+            //   "Tracker": "ThePirateBay",
+            //   "TrackerId": "thepiratebay",
+            //   "CategoryDesc": "Movies",
+            //   "BlackholeLink": null,
+            //   "MagnetUri": "magnet:?xt=urn:btih:...",
+            //   "Title": "Movie Title 2024 1080p",
+            //   "Guid": "...",
+            //   "Link": "https://...",
+            //   "Details": "https://...",
+            //   "PublishDate": "2024-01-01T00:00:00Z",
+            //   "Category": [2000],
+            //   "Size": 1234567890,
+            //   "Files": null,
+            //   "Grabs": 100,
+            //   "Description": "...",
+            //   "RageID": null,
+            //   "TVDBId": null,
+            //   "Imdb": null,
+            //   "TMDb": null,
+            //   "Seeders": 50,
+            //   "Peers": 75,
+            //   ...
+            // }
+            
+            $magnet = $item['MagnetUri'] ?? $item['Link'] ?? null;
+            
+            // Compatibilidad con PHP < 8.0
+            $isMagnet = !empty($magnet) && (function_exists('str_starts_with') ? str_starts_with($magnet, 'magnet:') : strpos($magnet, 'magnet:') === 0);
+            
+            if (empty($magnet) || !$isMagnet) {
+                // Si no hay magnet, intentar construir uno desde el Link
+                if (isset($item['Link']) && preg_match('/btih:([a-f0-9]{40})/i', $item['Link'], $matches)) {
+                    $infoHash = $matches[1];
+                    $titleEncoded = urlencode($item['Title'] ?? $title);
+                    $magnet = "magnet:?xt=urn:btih:{$infoHash}&dn={$titleEncoded}";
+                } else {
+                    continue; // Saltar si no hay magnet válido
+                }
+            }
+            
+            // Extraer calidad del título
+            $quality = extractQuality($item['Title'] ?? $title);
+            
+            // Tamaño en bytes
+            $size = $item['Size'] ?? 0;
+            
+            // Seeds y peers
+            $seeds = $item['Seeders'] ?? $item['Grabs'] ?? 0;
+            $peers = $item['Peers'] ?? 0;
+            
+            // Tracker/source
+            $tracker = $item['Tracker'] ?? 'Jackett';
+            $trackerId = $item['TrackerId'] ?? 'unknown';
+            
+            $results[] = [
+                'title' => $item['Title'] ?? $title,
+                'magnet' => $magnet,
+                'url' => $item['Link'] ?? null,
+                'source' => $tracker,
+                'tracker_id' => $trackerId,
+                'quality' => $quality,
+                'seeds' => (int)$seeds,
+                'peers' => (int)$peers,
+                'size' => $size > 0 ? formatBytes($size) : null,
+                'size_bytes' => $size,
+                'date' => $item['PublishDate'] ?? null,
+                'category' => $item['CategoryDesc'] ?? ($type === 'movie' ? 'Movies' : 'TV Shows'),
+                'details' => $item['Details'] ?? null,
+                'imdb' => $item['Imdb'] ?? null,
+                'tmdb' => $item['TMDb'] ?? null
+            ];
+        }
+        
+        // Ordenar por seeds (mayor a menor)
+        usort($results, function($a, $b) {
+            return ($b['seeds'] ?? 0) - ($a['seeds'] ?? 0);
+        });
+        
+    } catch (Exception $e) {
+        error_log("Error en búsqueda Jackett: " . $e->getMessage());
+    }
     
     return $results;
 }

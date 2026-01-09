@@ -52,40 +52,14 @@ function getCachedContent($callback, $cacheKey, $params = [], $ttl = 3600) {
     return $content;
 }
 
-// Get all content in parallel using caching
-$contentTypes = [
-    'featuredContent' => function() use ($db) {
-        $content = getLatestWithTrailers($db, 5);
-        $data = empty($content) ? getFeaturedContent($db, 5) : $content;
-        return addImdbImagesToContent($data);
-    },
-    'recentMovies' => function() use ($db) {
-        return addImdbImagesToContent(getRecentlyAdded($db, 'movie', 10));
-    },
-    'recentSeries' => function() use ($db) {
-        return addImdbImagesToContent(getRecentlyAdded($db, 'series', 10));
-    },
-    'popularMovies' => function() use ($db) {
-        return addImdbImagesToContent(getMostViewed($db, 'movie', 10));
-    },
-    'popularSeries' => function() use ($db) {
-        return addImdbImagesToContent(getMostViewed($db, 'series', 10));
-    },
-    'imdbMovies' => function() use ($db) {
-        return addImdbImagesToContent(getImdbTopContent($db, 10));
-    },
-    'localVideos' => function() use ($db) {
-        return addImdbImagesToContent(getLocalUploadedVideos($db, 10));
-    }
-];
-
-$results = [];
-foreach ($contentTypes as $key => $callback) {
-    // Cache for 1 hour
-    $results[$key] = getCachedContent($callback, $key . '_' . date('Y-m-d-H'));
-}
-
-extract($results);
+// Optimización: Solo cargar contenido destacado en el servidor, el resto se carga asíncronamente
+// Esto reduce significativamente el tiempo de carga inicial
+$featuredContent = getCachedContent(function() use ($db) {
+    $content = getLatestWithTrailers($db, 5);
+    $data = empty($content) ? getFeaturedContent($db, 5) : $content;
+    // No llamar addImdbImagesToContent aquí para evitar latencia - se hace en el cliente si es necesario
+    return $data;
+}, 'featured_' . date('Y-m-d-H'), [], 1800); // Cache de 30 minutos
 
 // Si el usuario no está autenticado, mostrar página splash
 if (!isLoggedIn()) {
@@ -96,6 +70,8 @@ if (!isLoggedIn()) {
 // Include header
 include __DIR__ . '/includes/header.php';
 ?>
+
+<link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/modern-home.css">
 
 <!-- Hero Section -->
 <section class="hero">
@@ -150,99 +126,29 @@ include __DIR__ . '/includes/header.php';
     <div class="hero-overlay"></div>
 </section>
 
-    <!-- Content Rows -->
+    <!-- Content Rows - Carga asíncrona optimizada -->
 <main class="content-rows fade-in">
-    <!-- Continue Watching (for logged-in users) -->
+    <!-- Continue Watching (for logged-in users) - Carga asíncrona -->
     <?php if (isLoggedIn()): ?>
-        <?php 
-        // Obtener contenido para continuar viendo
-        $continueQuery = "
-            SELECT 
-                c.id,
-                c.title,
-                c.type,
-                c.poster_url,
-                c.backdrop_url,
-                c.release_year,
-                c.duration,
-                c.rating,
-                ph.progress,
-                ph.duration as total_duration,
-                ph.episode_id,
-                e.title as episode_title,
-                e.season_number,
-                e.episode_number
-            FROM playback_history ph
-            INNER JOIN content c ON ph.content_id = c.id
-            LEFT JOIN episodes e ON ph.episode_id = e.id
-            WHERE ph.user_id = :user_id
-            AND ph.completed = 0
-            AND ph.progress > 0
-            ORDER BY ph.updated_at DESC
-            LIMIT 10
-        ";
-        
-        $continueStmt = $db->prepare($continueQuery);
-        $continueStmt->bindValue(':user_id', $_SESSION['user_id'], PDO::PARAM_INT);
-        $continueStmt->execute();
-        $continueWatching = $continueStmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (!empty($continueWatching)): 
-        ?>
-            <div class="row-container">
-                <div class="row-header">
-                    <h2 class="row-title">Continuar viendo</h2>
-                    <a href="<?php echo $baseUrl; ?>/my-list" class="row-link">Ver todo</a>
-                </div>
-                <div class="row-nav prev">
-                    <i class="fas fa-chevron-left"></i>
-                </div>
-                <div class="row-content" id="continue-watching">
-                    <?php foreach ($continueWatching as $item): 
-                        $progressPercent = $item['total_duration'] > 0 
-                            ? round(($item['progress'] / $item['total_duration']) * 100) 
-                            : 0;
-                        $watchUrl = $item['episode_id'] 
-                            ? $baseUrl . "/watch.php?id={$item['id']}&episode_id={$item['episode_id']}"
-                            : $baseUrl . "/watch.php?id={$item['id']}";
-                    ?>
-                        <div class="content-card" data-id="<?php echo $item['id']; ?>" data-type="<?php echo $item['type']; ?>" onclick="window.location.href='<?php echo $watchUrl; ?>';" style="cursor: pointer;">
-                            <?php if ($progressPercent > 0): ?>
-                                <div class="progress-bar" style="position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.3); z-index: 2;">
-                                    <div class="progress" style="height: 100%; background: #e50914; width: <?php echo $progressPercent; ?>%;"></div>
-                                </div>
-                            <?php endif; ?>
-                            <img 
-                                <?php 
-                                $itemPosterUrl = getImageUrl($item['poster_url'] ?? '', '/assets/img/default-poster.svg');
-                                ?>
-                                src="<?php echo htmlspecialchars($itemPosterUrl); ?>" 
-                                alt="<?php echo htmlspecialchars($item['title']); ?>"
-                                loading="lazy"
-                                onerror="this.onerror=null; this.src='<?php echo $baseUrl; ?>/assets/img/default-poster.svg'; this.style.background='linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%)';"
-                                style="background: linear-gradient(135deg, #1f1f1f 0%, #2d2d2d 100%);"
-                            >
-                            <div class="content-info">
-                                <h3><?php echo htmlspecialchars($item['title']); ?></h3>
-                                <?php if ($item['episode_id']): ?>
-                                    <div style="font-size: 0.8rem; color: #999; margin-bottom: 0.5rem;">
-                                        T<?php echo $item['season_number']; ?>E<?php echo $item['episode_number']; ?>: <?php echo htmlspecialchars($item['episode_title']); ?>
-                                    </div>
-                                <?php endif; ?>
-                                <div class="content-actions">
-                                    <button class="action-btn" data-action="play" data-id="<?php echo $item['id']; ?>" title="Continuar viendo" onclick="event.stopPropagation(); window.location.href='<?php echo $watchUrl; ?>';">
-                                        <i class="fas fa-play"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-                <div class="row-nav next">
-                    <i class="fas fa-chevron-right"></i>
+        <div class="row-container" id="continue-watching-container">
+            <div class="row-header">
+                <h2 class="row-title">Continuar viendo</h2>
+                <a href="<?php echo $baseUrl; ?>/my-list" class="row-link">Ver todo</a>
+            </div>
+            <div class="row-nav prev">
+                <i class="fas fa-chevron-left"></i>
+            </div>
+            <div class="row-content" id="continue-watching" data-dynamic="true" data-endpoint="/api/continue-watching.php" data-limit="12">
+                <div class="row-items" style="display: flex; gap: 0.75rem;">
+                    <?php for($i = 0; $i < 6; $i++): ?>
+                        <div class="skeleton-card"></div>
+                    <?php endfor; ?>
                 </div>
             </div>
-        <?php endif; ?>
+            <div class="row-nav next">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        </div>
     <?php endif; ?>
 
     <!-- Películas populares -->
@@ -254,8 +160,12 @@ include __DIR__ . '/includes/header.php';
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
         </div>
-        <div class="row-content" id="popular-movies" data-dynamic="true" data-type="movie" data-sort="popular" data-limit="12" data-cache-key="movies">
-            <p class="loading-placeholder">Cargando películas populares...</p>
+        <div class="row-content" id="popular-movies" data-dynamic="true" data-type="movie" data-sort="popular" data-limit="12">
+            <div class="row-items" style="display: flex; gap: 0.75rem;">
+                <?php for($i = 0; $i < 6; $i++): ?>
+                    <div class="skeleton-card"></div>
+                <?php endfor; ?>
+            </div>
         </div>
         <div class="row-nav next">
             <i class="fas fa-chevron-right"></i>
@@ -271,8 +181,12 @@ include __DIR__ . '/includes/header.php';
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
         </div>
-        <div class="row-content" id="popular-series" data-dynamic="true" data-type="series" data-sort="popular" data-limit="12" data-cache-key="series">
-            <p class="loading-placeholder">Cargando series populares...</p>
+        <div class="row-content" id="popular-series" data-dynamic="true" data-type="series" data-sort="popular" data-limit="12">
+            <div class="row-items" style="display: flex; gap: 0.75rem;">
+                <?php for($i = 0; $i < 6; $i++): ?>
+                    <div class="skeleton-card"></div>
+                <?php endfor; ?>
+            </div>
         </div>
         <div class="row-nav next">
             <i class="fas fa-chevron-right"></i>
@@ -289,7 +203,11 @@ include __DIR__ . '/includes/header.php';
             <i class="fas fa-chevron-left"></i>
         </div>
         <div class="row-content" id="recent-movies" data-dynamic="true" data-type="movie" data-sort="recent" data-limit="12">
-            <p class="loading-placeholder">Cargando películas recientes...</p>
+            <div class="row-items" style="display: flex; gap: 0.75rem;">
+                <?php for($i = 0; $i < 6; $i++): ?>
+                    <div class="skeleton-card"></div>
+                <?php endfor; ?>
+            </div>
         </div>
         <div class="row-nav next">
             <i class="fas fa-chevron-right"></i>
@@ -306,7 +224,11 @@ include __DIR__ . '/includes/header.php';
             <i class="fas fa-chevron-left"></i>
         </div>
         <div class="row-content" id="recent-series" data-dynamic="true" data-type="series" data-sort="recent" data-limit="12">
-            <p class="loading-placeholder">Cargando series recientes...</p>
+            <div class="row-items" style="display: flex; gap: 0.75rem;">
+                <?php for($i = 0; $i < 6; $i++): ?>
+                    <div class="skeleton-card"></div>
+                <?php endfor; ?>
+            </div>
         </div>
         <div class="row-nav next">
             <i class="fas fa-chevron-right"></i>
@@ -322,8 +244,12 @@ include __DIR__ . '/includes/header.php';
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
         </div>
-        <div class="row-content" id="imdb-movies" data-dynamic="true" data-type="movie" data-source="imdb" data-sort="popular" data-limit="12" data-cache-key="imdb-movies">
-            <p class="loading-placeholder">Cargando películas destacadas en IMDb...</p>
+        <div class="row-content" id="imdb-movies" data-dynamic="true" data-type="movie" data-source="imdb" data-sort="popular" data-limit="12">
+            <div class="row-items" style="display: flex; gap: 0.75rem;">
+                <?php for($i = 0; $i < 6; $i++): ?>
+                    <div class="skeleton-card"></div>
+                <?php endfor; ?>
+            </div>
         </div>
         <div class="row-nav next">
             <i class="fas fa-chevron-right"></i>
@@ -339,8 +265,12 @@ include __DIR__ . '/includes/header.php';
         <div class="row-nav prev">
             <i class="fas fa-chevron-left"></i>
         </div>
-        <div class="row-content" id="local-videos" data-dynamic="true" data-type="movie" data-source="local" data-sort="recent" data-limit="12" data-cache-key="local-videos">
-            <p class="loading-placeholder">Cargando videos locales...</p>
+        <div class="row-content" id="local-videos" data-dynamic="true" data-type="movie" data-source="local" data-sort="recent" data-limit="12">
+            <div class="row-items" style="display: flex; gap: 0.75rem;">
+                <?php for($i = 0; $i < 6; $i++): ?>
+                    <div class="skeleton-card"></div>
+                <?php endfor; ?>
+            </div>
         </div>
         <div class="row-nav next">
             <i class="fas fa-chevron-right"></i>
@@ -357,8 +287,12 @@ include __DIR__ . '/includes/header.php';
             <div class="row-nav prev">
                 <i class="fas fa-chevron-left"></i>
             </div>
-            <div class="row-content" id="recommended" data-dynamic="true" data-endpoint="/api/content/recommended.php" data-limit="12" data-cache-key="recommended">
-                <p class="loading-placeholder">Buscando recomendaciones personalizadas...</p>
+            <div class="row-content" id="recommended" data-dynamic="true" data-endpoint="/api/recommendations/improved.php" data-limit="12">
+                <div class="row-items" style="display: flex; gap: 0.75rem;">
+                    <?php for($i = 0; $i < 6; $i++): ?>
+                        <div class="skeleton-card"></div>
+                    <?php endfor; ?>
+                </div>
             </div>
             <div class="row-nav next">
                 <i class="fas fa-chevron-right"></i>
@@ -498,91 +432,33 @@ include __DIR__ . '/includes/header.php';
     }
 </style>
 
+<script src="<?php echo $baseUrl; ?>/js/modern-home-loader.js?v=<?php echo time(); ?>"></script>
 <script>
-// Verificar carga de imágenes del hero y posters
+// Optimización: Precargar imágenes del hero de forma inteligente
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔍 Verificando carga de imágenes...');
-    
-    // Verificar backdrops del hero
-    const heroBackdrops = document.querySelectorAll('.hero-backdrop');
-    console.log(`📸 Backdrops del hero encontrados: ${heroBackdrops.length}`);
-    
-    let backdropLoaded = 0;
-    let backdropErrors = 0;
-    
-    heroBackdrops.forEach((backdrop, index) => {
-        const bgImage = window.getComputedStyle(backdrop).backgroundImage;
+    // Precargar solo la primera imagen del hero para carga rápida
+    const firstHeroBackdrop = document.querySelector('.hero-slide.active .hero-backdrop');
+    if (firstHeroBackdrop) {
+        const bgImage = window.getComputedStyle(firstHeroBackdrop).backgroundImage;
         const urlMatch = bgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
-        const imageUrl = urlMatch ? urlMatch[1] : null;
-        
-        if (imageUrl && imageUrl !== 'none' && imageUrl !== 'null') {
-            console.log(`  Backdrop ${index + 1}: ${imageUrl}`);
-            
-            // Verificar si la imagen se carga
+        if (urlMatch && urlMatch[1] && urlMatch[1] !== 'none') {
             const img = new Image();
-            img.onload = function() {
-                backdropLoaded++;
-                console.log(`  ✅ Backdrop ${index + 1} cargado correctamente`);
-            };
-            img.onerror = function() {
-                backdropErrors++;
-                console.error(`  ❌ Backdrop ${index + 1} NO se pudo cargar: ${imageUrl}`);
-            };
-            img.src = imageUrl;
-        } else {
-            console.warn(`  ⚠️ Backdrop ${index + 1}: Sin URL configurada`);
+            img.src = urlMatch[1];
         }
-    });
-    
-    // Esperar a que las fichas se carguen dinámicamente
-    function checkPosters() {
-        const contentPosters = document.querySelectorAll('.content-card img, .content-poster img, .content-item img');
-        
-        if (contentPosters.length === 0) {
-            // Reintentar después de 1 segundo
-            setTimeout(checkPosters, 1000);
-            return;
-        }
-        
-        console.log(`\n📸 Posters de fichas encontrados: ${contentPosters.length}`);
-        
-        let loadedCount = 0;
-        let errorCount = 0;
-        
-        contentPosters.forEach((img, index) => {
-            if (index < 10) { // Verificar los primeros 10
-                const imgUrl = img.src || img.dataset.src;
-                
-                if (imgUrl && imgUrl !== 'no encontrada' && !imgUrl.includes('data:')) {
-                    console.log(`  Poster ${index + 1}: ${imgUrl.substring(0, 80)}...`);
-                    
-                    if (img.complete && img.naturalHeight > 0) {
-                        loadedCount++;
-                        console.log(`  ✅ Poster ${index + 1} ya estaba cargado`);
-                    } else {
-                        img.onload = function() {
-                            loadedCount++;
-                            console.log(`  ✅ Poster ${index + 1} cargado`);
-                        };
-                        img.onerror = function() {
-                            errorCount++;
-                            console.error(`  ❌ Poster ${index + 1} NO se pudo cargar`);
-                        };
-                    }
-                }
-            }
-        });
-        
-        setTimeout(() => {
-            console.log(`\n📊 Resumen de carga de imágenes:`);
-            console.log(`  Backdrops: ✅ ${backdropLoaded} | ❌ ${backdropErrors}`);
-            console.log(`  Posters: ✅ ${loadedCount} | ❌ ${errorCount}`);
-            console.log(`  📸 Total posters verificados: ${Math.min(contentPosters.length, 10)}`);
-        }, 2000);
     }
     
-    // Iniciar verificación de posters después de un breve delay
-    setTimeout(checkPosters, 2000);
+    // Precargar las siguientes imágenes del hero en segundo plano
+    setTimeout(() => {
+        const heroBackdrops = document.querySelectorAll('.hero-slide:not(.active) .hero-backdrop');
+        heroBackdrops.forEach(backdrop => {
+            const bgImage = window.getComputedStyle(backdrop).backgroundImage;
+            const urlMatch = bgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+            if (urlMatch && urlMatch[1] && urlMatch[1] !== 'none') {
+                const img = new Image();
+                img.src = urlMatch[1];
+            }
+        });
+    }, 1000);
 });
 </script>
 

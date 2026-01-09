@@ -1,0 +1,9 @@
+-- Tabla para almacenar el estado de los addons
+CREATE TABLE IF NOT EXISTS addons (
+    id VARCHAR(100) PRIMARY KEY,
+    enabled BOOLEAN DEFAULT TRUE,
+    settings TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+

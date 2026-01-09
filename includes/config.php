@@ -155,16 +155,30 @@ define('HASH_ALGO', PASSWORD_BCRYPT);
 define('HASH_OPTIONS', ['cost' => 12]);
 
 // Configuración de sesión unificada
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-// Usar HTTPS si estamos en producción o si el servidor lo reporta
-$isHttps = (APP_ENV === 'production') || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on');
-ini_set('session.cookie_secure', $isHttps ? 1 : 0);
-ini_set('session.cookie_samesite', 'Lax');
-
-// Iniciar sesión
+// Solo configurar si la sesión no está activa
 if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.use_only_cookies', 1);
+    // Usar HTTPS si estamos en producción o si el servidor lo reporta
+    $isHttps = (APP_ENV === 'production') || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on');
+    ini_set('session.cookie_secure', $isHttps ? 1 : 0);
+    ini_set('session.cookie_samesite', 'Lax');
+    
+    // Iniciar sesión
     session_start();
+} else {
+    // Si la sesión ya está activa, intentar configurar usando session_set_cookie_params
+    // aunque esto solo afectará a futuras sesiones
+    $isHttps = (APP_ENV === 'production') || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on');
+    $cookieParams = session_get_cookie_params();
+    session_set_cookie_params([
+        'lifetime' => $cookieParams['lifetime'] ?? 0,
+        'path' => $cookieParams['path'] ?? '/',
+        'domain' => $cookieParams['domain'] ?? '',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
 }
 
 /**

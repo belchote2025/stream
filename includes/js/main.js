@@ -52,8 +52,27 @@ function getBaseUrl() {
 window.getBaseUrl = getBaseUrl;
 
 // Solo declarar APP_BASE_URL si no existe (evitar redeclaración)
+// Usar window.APP_BASE_URL para evitar conflictos
+if (typeof window.APP_BASE_URL === 'undefined') {
+    window.APP_BASE_URL = getBaseUrl();
+}
+// Crear alias para compatibilidad (solo si no existe)
 if (typeof APP_BASE_URL === 'undefined') {
-    var APP_BASE_URL = getBaseUrl();
+    // Usar una función para obtener el valor sin redeclarar
+    (function() {
+        var baseUrl = window.__APP_BASE_URL || window.APP_BASE_URL || getBaseUrl();
+        try {
+            Object.defineProperty(window, 'APP_BASE_URL', {
+                value: baseUrl,
+                writable: false,
+                configurable: true,
+                enumerable: true
+            });
+        } catch (e) {
+            // Si falla, simplemente asignar
+            window.APP_BASE_URL = baseUrl;
+        }
+    })();
 }
 
 // Elementos del DOM
@@ -931,6 +950,15 @@ function openTorrentModal(content) {
                 playButtons.forEach(btn => {
                     btn.addEventListener('click', handleTorrentResultClick);
                 });
+                
+                // Añadir listeners para botones de qBittorrent
+                const downloadButtons = document.querySelectorAll('.download-qbittorrent-btn');
+                downloadButtons.forEach(btn => {
+                    btn.addEventListener('click', handleQBittorrentDownload);
+                });
+                
+                // Verificar si qBittorrent está disponible y mostrar indicador
+                checkQBittorrentStatus();
             }, 100);
         })
         .catch((error) => {
@@ -1045,9 +1073,12 @@ function renderTorrentResults(results, content) {
                             <span style="color: #999;"><i class="fas fa-database"></i> ${source}</span>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                         <button class="play-torrent-btn" data-magnet="${safeMagnet}" data-content-id="${content.id}" data-title="${encodeURIComponent(content.title)}" style="background: #e50914; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;" onmouseover="this.style.background='#f40612'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#e50914'; this.style.transform='scale(1)'">
-                            <i class="fas fa-check"></i> Usar
+                            <i class="fas fa-play"></i> Reproducir
+                        </button>
+                        <button class="download-qbittorrent-btn" data-magnet="${safeMagnet}" data-content-id="${content.id}" data-title="${encodeURIComponent(content.title)}" style="background: #007bff; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;" onmouseover="this.style.background='#0056b3'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#007bff'; this.style.transform='scale(1)'">
+                            <i class="fas fa-download"></i> Descargar
                         </button>
                     </div>
                 </div>
@@ -1058,7 +1089,7 @@ function renderTorrentResults(results, content) {
     elements.torrentResultsList.innerHTML = `
         <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(229,9,20,0.1); border-left: 3px solid #e50914; border-radius: 4px;">
             <div style="font-weight: 600; color: #fff; margin-bottom: 0.25rem;">Encontrados ${results.length} resultado${results.length !== 1 ? 's' : ''}</div>
-            <div style="font-size: 0.85rem; color: #ccc;">Selecciona un torrent para actualizar el contenido y reproducirlo</div>
+            <div style="font-size: 0.85rem; color: #ccc;">Selecciona un torrent para reproducir o descargar</div>
         </div>
         ${html}
     `;
@@ -1078,6 +1109,188 @@ function handleTorrentResultClick(event) {
     }
     
     selectTorrentForPlayback(magnet, contentId);
+}
+
+/**
+ * Agregar torrent a qBittorrent para descarga
+ */
+async function handleQBittorrentDownload(event) {
+    const btn = event.target.closest('.download-qbittorrent-btn');
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const magnet = decodeURIComponent(btn.dataset.magnet || '');
+    const contentId = btn.dataset.contentId;
+    const title = decodeURIComponent(btn.dataset.title || 'Torrent');
+    
+    if (!magnet || !magnet.startsWith('magnet:')) {
+        if (typeof showNotification === 'function') {
+            showNotification('Enlace magnet no válido', 'error');
+        }
+        return;
+    }
+    
+    // Deshabilitar botón mientras se procesa
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'not-allowed';
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Agregando...';
+    
+    try {
+        const baseUrl = getBaseUrl();
+        const response = await fetch(`${baseUrl}/api/qbittorrent/index.php?action=add`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                magnet: magnet,
+                category: 'streaming-platform',
+                is_paused: false // Iniciar descarga inmediatamente
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            if (typeof showNotification === 'function') {
+                showNotification(`✓ Torrent agregado a qBittorrent: ${title}`, 'success');
+            }
+            
+            // Actualizar contenido en la base de datos en segundo plano
+            if (contentId) {
+                updateContentWithTorrent(contentId, magnet).catch(err => {
+                    console.warn('Error al actualizar contenido:', err);
+                });
+            }
+            
+            // Cambiar botón a estado de éxito
+            btn.innerHTML = '<i class="fas fa-check"></i> Agregado';
+            btn.style.background = '#28a745';
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.style.background = '#007bff';
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            }, 2000);
+        } else {
+            throw new Error(result.error || 'Error desconocido al agregar torrent');
+        }
+    } catch (error) {
+        console.error('Error al agregar torrent a qBittorrent:', error);
+        if (typeof showNotification === 'function') {
+            showNotification(`Error: ${error.message || 'No se pudo agregar el torrent a qBittorrent'}`, 'error');
+        }
+        
+        // Rehabilitar botón
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        btn.innerHTML = originalHtml;
+    }
+}
+
+/**
+ * Actualizar contenido con torrent magnet (función auxiliar)
+ */
+async function updateContentWithTorrent(contentId, magnetLink) {
+    try {
+        const baseUrl = getBaseUrl();
+        
+        // Obtener información del contenido actual
+        const contentResponse = await fetch(`${baseUrl}/api/content/index.php?id=${contentId}`, {
+            credentials: 'same-origin'
+        });
+        
+        let contentData = {};
+        let contentType = 'movie';
+        
+        if (contentResponse.ok) {
+            const contentResult = await contentResponse.json();
+            if (contentResult.success && contentResult.data) {
+                contentData = contentResult.data;
+                contentType = contentData.type || 'movie';
+            }
+        }
+        
+        // Determinar la API correcta según el tipo de contenido
+        const apiEndpoint = contentType === 'series' 
+            ? `${baseUrl}/api/series/index.php` 
+            : `${baseUrl}/api/movies/index.php`;
+        
+        // Actualizar solo el campo torrent_magnet
+        const updateData = {
+            id: contentId,
+            title: contentData.title || '',
+            description: contentData.description || '',
+            release_year: contentData.release_year || null,
+            duration: contentData.duration || null,
+            type: contentType,
+            poster_url: contentData.poster_url || null,
+            backdrop_url: contentData.backdrop_url || null,
+            video_url: contentData.video_url || null,
+            trailer_url: contentData.trailer_url || null,
+            torrent_magnet: magnetLink,
+            age_rating: contentData.age_rating || null,
+            is_featured: contentData.is_featured ? 1 : 0,
+            is_trending: contentData.is_trending ? 1 : 0,
+            is_premium: contentData.is_premium ? 1 : 0
+        };
+        
+        const updateResponse = await fetch(`${apiEndpoint}?id=${contentId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(updateData)
+        });
+        
+        if (updateResponse.ok) {
+            const updateResult = await updateResponse.json();
+            if (updateResult.success) {
+                console.log('Contenido actualizado con torrent magnet');
+            }
+        }
+    } catch (error) {
+        console.warn('Error al actualizar contenido:', error);
+    }
+}
+
+/**
+ * Verificar si qBittorrent está disponible
+ */
+async function checkQBittorrentStatus() {
+    try {
+        const baseUrl = getBaseUrl();
+        const response = await fetch(`${baseUrl}/api/qbittorrent/index.php?action=status`, {
+            credentials: 'same-origin'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.connected) {
+                // Mostrar indicador de qBittorrent disponible
+                const statusDiv = elements.torrentResultsList?.querySelector('.torrent-status-info');
+                if (!statusDiv && elements.torrentResultsList) {
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'torrent-status-info';
+                    infoDiv.style.cssText = 'margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,123,255,0.1); border-left: 3px solid #007bff; border-radius: 4px; font-size: 0.85rem; color: #4caf50;';
+                    infoDiv.innerHTML = '<i class="fas fa-check-circle"></i> qBittorrent disponible - Puedes descargar torrents';
+                    const headerDiv = elements.torrentResultsList.querySelector('div[style*="margin-bottom: 1rem"]');
+                    if (headerDiv) {
+                        headerDiv.appendChild(infoDiv);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        // Ignorar errores silenciosamente
+    }
 }
 
 async function selectTorrentForPlayback(magnetLink, contentId) {
@@ -1253,6 +1466,8 @@ function triggerTorrentModal(id, title, year = '', type = 'movie') {
 window.closeTorrentModal = closeTorrentModal;
 window.selectTorrentForPlayback = selectTorrentForPlayback;
 window.triggerTorrentModal = triggerTorrentModal;
+window.handleQBittorrentDownload = handleQBittorrentDownload;
+window.handleQBittorrentDownload = handleQBittorrentDownload;
 window.handleMoviePosterClick = (id, title, year) => {
     console.log(`Buscando torrents para película: ${title} (${year})`);
     triggerTorrentModal(id, title, year, 'movie');

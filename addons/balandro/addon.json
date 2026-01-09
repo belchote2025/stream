@@ -1,0 +1,9 @@
+{
+    "name": "Balandro Addon",
+    "id": "balandro",
+    "version": "1.0.0",
+    "description": "Balandro addon for streaming platform",
+    "author": "Your Name",
+    "main": "balandro.php",
+    "class": "BalandroAddon"
+}

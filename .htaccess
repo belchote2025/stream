@@ -36,6 +36,10 @@ RewriteRule ^api/content/([0-9]+)$ api/content/index.php?id=$1 [L]
 RewriteRule ^api/movies/?$ api/movies/index.php [L,QSA]
 RewriteRule ^api/movies/([0-9]+)$ api/movies/index.php?id=$1 [L]
 
+# Redirigir favicon.ico a icono SVG si no existe
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^favicon\.ico$ assets/icons/icon.svg [L]
+
 # Permitir acceso a archivos estáticos
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]

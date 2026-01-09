@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' . SITE_NAME : SITE_NAME; ?></title>
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="<?php echo $baseUrl; ?>/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="<?php echo $baseUrl; ?>/favicon.ico">
+    
     <!-- PWA Configuration -->
     <link rel="manifest" href="<?php echo $baseUrl; ?>/manifest.json">
     <meta name="theme-color" content="#E50914">
@@ -126,7 +130,11 @@
                         return;
                     }
                     // Suprimir warnings de asm.js (no críticos)
-                    if (message.includes('Invalid asm.js') || message.includes('Unexpected token')) {
+                    if (message.includes('Invalid asm.js') || 
+                        message.includes('Unexpected token') ||
+                        (message.includes('asm.js') && message.includes('Unexpected')) ||
+                        fullMessage.includes('Invalid asm.js') ||
+                        /Invalid asm\.js:/.test(message)) {
                         return;
                     }
                     // Suprimir warnings de WEBGL deprecado
@@ -268,13 +276,25 @@
                         return;
                     }
                     // Suprimir errores de spoofer.js (extensiones del navegador) - Mejorado
-                    if (message.includes('spoofer.js') ||
+                    // Capturar todos los posibles formatos del error de spoofer.js
+                    const hasSpoofer = message.includes('spoofer.js') ||
                         fullMessage.includes('spoofer.js') ||
                         stackTrace.includes('spoofer.js') ||
-                        (message.includes('An unexpected error occurred') && (fullMessage.includes('spoofer') || stackTrace.includes('spoofer'))) ||
-                        (message.trim() === 'Error: An unexpected error occurred' && (fullMessage.includes('spoofer') || stackTrace.includes('spoofer'))) ||
                         /spoofer\.js:\d+/.test(fullMessage) ||
-                        /spoofer\.js:\d+/.test(stackTrace)) {
+                        /spoofer\.js:\d+/.test(stackTrace) ||
+                        (source && source.includes && source.includes('spoofer.js'));
+                    
+                    const hasUnexpectedError = message.includes('An unexpected error occurred') ||
+                        message.trim() === 'Error: An unexpected error occurred' ||
+                        message === 'An unexpected error occurred' ||
+                        fullMessage.includes('An unexpected error occurred');
+                    
+                    // Si el error menciona spoofer.js O si es "unexpected error" (generalmente de extensiones)
+                    // También capturar errores sin stack trace que vengan de spoofer o extensiones
+                    if (hasSpoofer || 
+                        (hasUnexpectedError && (hasSpoofer || stackTrace.includes('spoofer') || fullMessage.includes('spoofer'))) ||
+                        (hasUnexpectedError && /spoofer\.js:\d+:\d+/.test(stackTrace)) ||
+                        (hasUnexpectedError && (!stackTrace || stackTrace.trim() === '') && !fullMessage.includes('at '))) {
                         return;
                     }
                     // Suprimir errores de redeclaración (probablemente de extensiones del navegador)
@@ -295,8 +315,13 @@
                     // Suprimir errores de asm.js
                     if (message.includes('asm.js type error') ||
                         message.includes('asm.js optimizer disabled') ||
+                        message.includes('Invalid asm.js') ||
+                        message.includes('Unexpected token') ||
                         message.includes('expecting argument type declaration') ||
-                        message.includes('webtorrent.min.js') && message.includes('asm.js')) {
+                        (message.includes('asm.js') && message.includes('Unexpected')) ||
+                        (message.includes('webtorrent.min.js') && message.includes('asm.js')) ||
+                        fullMessage.includes('Invalid asm.js') ||
+                        /Invalid asm\.js:/.test(message)) {
                         return;
                     }
                     // Suprimir errores de Font Awesome fallback

@@ -98,3 +98,5 @@ Muestra:
 - **En producción**: Asegúrate de que el `.env` tenga las credenciales correctas
 - **En local**: El `.env` puede tener cualquier cosa, se ignorará para la BD
 
+
+

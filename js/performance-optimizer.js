@@ -411,7 +411,10 @@ class ResourceOptimizer {
                 if (encoding && (encoding.includes('gzip') || encoding.includes('br'))) {
                     console.log('✅ Compresión activa:', encoding);
                 } else {
-                    console.warn('⚠️ Compresión no detectada');
+                    // Solo mostrar advertencia en desarrollo, no en producción
+                    if (typeof APP_ENV !== 'undefined' && APP_ENV === 'local') {
+                        console.warn('⚠️ Compresión no detectada (normal en desarrollo local)');
+                    }
                 }
             })
             .catch(e => console.warn('No se pudo verificar compresión'));

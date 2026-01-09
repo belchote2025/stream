@@ -21,8 +21,31 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!document.querySelector('link[href*="video-player.css"]')) {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = '/css/video-player.css';
-        document.head.appendChild(link);
+        // Intentar diferentes rutas posibles
+        const baseUrl = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+        const cssPaths = [
+            baseUrl + '/css/video-player.css',
+            '/css/video-player.css',
+            'css/video-player.css'
+        ];
+        
+        // Intentar cargar el CSS
+        let cssLoaded = false;
+        cssPaths.forEach((path, index) => {
+            if (cssLoaded) return;
+            const testLink = document.createElement('link');
+            testLink.rel = 'stylesheet';
+            testLink.href = path;
+            testLink.onerror = () => {
+                if (index === cssPaths.length - 1) {
+                    console.warn('No se pudo cargar video-player.css desde ninguna ruta');
+                }
+            };
+            testLink.onload = () => {
+                cssLoaded = true;
+            };
+            document.head.appendChild(testLink);
+        });
     }
     
     // Inicializar el reproductor con el contenedor encontrado

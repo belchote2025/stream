@@ -36,6 +36,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/imdb-helper.php';
+require_once __DIR__ . '/../includes/addons/AddonManager.php';
 
 // -------------------- Detectar contexto (CLI o Web) --------------------
 $isCli = php_sapi_name() === 'cli';
@@ -43,12 +44,18 @@ $isCli = php_sapi_name() === 'cli';
 // Función de salida que funciona tanto en CLI como en Web
 function scriptOutput(string $message, bool $isError = false): void {
     global $isCli;
+    // Forzar flush para asegurar que la salida se envíe inmediatamente
     if ($isCli) {
         $stream = $isError ? STDERR : STDOUT;
         fwrite($stream, $message . "\n");
+        fflush($stream); // Forzar envío inmediato
     } else {
         // En web, la salida se captura con ob_start()
         echo $message . "\n";
+        if (ob_get_level() > 0) {
+            ob_flush();
+            flush();
+        }
     }
 }
 
@@ -831,18 +838,242 @@ function scrapeImdbIdFromWeb(string $title, ?int $year, string $type): string
 
 /**
  * Busca enlace de video directo (streaming) para el contenido.
- * Devuelve el primer embed disponible a partir de imdbId.
+ * Busca en múltiples fuentes: vidsrc, upstream, powvideo, filemoon, streamtape, streamwish
+ * Devuelve el primer enlace disponible.
  */
 function searchVideoUrl(string $title, string $type, ?int $year, ?array $omdb, ?string $imdbId = null): ?string
 {
     // Resolver imdbId si no viene
     $imdbId = $imdbId ?: resolveImdbId($title, $year, $type, $omdb);
+    
+    // Buscar en múltiples fuentes de streaming
+    $sources = [];
+    
+    // 1. Vidsrc (ya implementado)
+    if (!empty($imdbId)) {
+        $vidsrcProviders = buildEmbedProviders($imdbId, $type);
+        $sources = array_merge($sources, $vidsrcProviders);
+    }
+    
+    // 2. Buscar en otras fuentes de streaming
+    $streamingSources = searchStreamingSources($title, $type, $year, $imdbId);
+    $sources = array_merge($sources, $streamingSources);
+    
+    // Devolver el primer enlace disponible
+    return $sources[0] ?? null;
+}
+
+/**
+ * Busca enlaces de streaming en múltiples fuentes: upstream, powvideo, filemoon, streamtape, streamwish
+ */
+function searchStreamingSources(string $title, string $type, ?int $year, ?string $imdbId = null): array
+{
+    $results = [];
+    $query = urlencode($title . ($year ? ' ' . $year : ''));
+    
+    // 1. Upstream
+    try {
+        $upstreamUrl = searchUpstream($title, $type, $year, $imdbId);
+        if ($upstreamUrl) {
+            $results[] = $upstreamUrl;
+        }
+    } catch (Exception $e) {
+        // Ignorar errores
+    }
+    
+    // 2. PowVideo
+    try {
+        $powvideoUrl = searchPowVideo($title, $type, $year, $imdbId);
+        if ($powvideoUrl) {
+            $results[] = $powvideoUrl;
+        }
+    } catch (Exception $e) {
+        // Ignorar errores
+    }
+    
+    // 3. Filemoon
+    try {
+        $filemoonUrl = searchFilemoon($title, $type, $year, $imdbId);
+        if ($filemoonUrl) {
+            $results[] = $filemoonUrl;
+        }
+    } catch (Exception $e) {
+        // Ignorar errores
+    }
+    
+    // 4. Streamtape
+    try {
+        $streamtapeUrl = searchStreamtape($title, $type, $year, $imdbId);
+        if ($streamtapeUrl) {
+            $results[] = $streamtapeUrl;
+        }
+    } catch (Exception $e) {
+        // Ignorar errores
+    }
+    
+    // 5. Streamwish
+    try {
+        $streamwishUrl = searchStreamwish($title, $type, $year, $imdbId);
+        if ($streamwishUrl) {
+            $results[] = $streamwishUrl;
+        }
+    } catch (Exception $e) {
+        // Ignorar errores
+    }
+    
+    return $results;
+}
+
+/**
+ * Busca enlace en Upstream
+ */
+function searchUpstream(string $title, string $type, ?int $year, ?string $imdbId = null): ?string
+{
     if (empty($imdbId)) {
         return null;
     }
+    
+    // Upstream usa estructura similar a vidsrc
+    $url = $type === 'tv' 
+        ? "https://upstream.to/embed/tv/{$imdbId}"
+        : "https://upstream.to/embed/movie/{$imdbId}";
+    
+    // Verificar que el enlace sea accesible
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'HEAD',
+            'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+            'timeout' => 5,
+            'ignore_errors' => true,
+        ]
+    ]);
+    
+    $headers = @get_headers($url, 1, $context);
+    if ($headers && strpos($headers[0], '200') !== false) {
+        return $url;
+    }
+    
+    return null;
+}
 
-    $providers = buildEmbedProviders($imdbId, $type);
-    return $providers[0] ?? null;
+/**
+ * Busca enlace en PowVideo
+ */
+function searchPowVideo(string $title, string $type, ?int $year, ?string $imdbId = null): ?string
+{
+    if (empty($imdbId)) {
+        return null;
+    }
+    
+    $url = $type === 'tv'
+        ? "https://powvideo.net/embed/tv/{$imdbId}"
+        : "https://powvideo.net/embed/movie/{$imdbId}";
+    
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'HEAD',
+            'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+            'timeout' => 5,
+            'ignore_errors' => true,
+        ]
+    ]);
+    
+    $headers = @get_headers($url, 1, $context);
+    if ($headers && strpos($headers[0], '200') !== false) {
+        return $url;
+    }
+    
+    return null;
+}
+
+/**
+ * Busca enlace en Filemoon
+ */
+function searchFilemoon(string $title, string $type, ?int $year, ?string $imdbId = null): ?string
+{
+    if (empty($imdbId)) {
+        return null;
+    }
+    
+    $url = $type === 'tv'
+        ? "https://filemoon.to/embed/tv/{$imdbId}"
+        : "https://filemoon.to/embed/movie/{$imdbId}";
+    
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'HEAD',
+            'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+            'timeout' => 5,
+            'ignore_errors' => true,
+        ]
+    ]);
+    
+    $headers = @get_headers($url, 1, $context);
+    if ($headers && strpos($headers[0], '200') !== false) {
+        return $url;
+    }
+    
+    return null;
+}
+
+/**
+ * Busca enlace en Streamtape
+ */
+function searchStreamtape(string $title, string $type, ?int $year, ?string $imdbId = null): ?string
+{
+    if (empty($imdbId)) {
+        return null;
+    }
+    
+    $url = $type === 'tv'
+        ? "https://streamtape.com/embed/tv/{$imdbId}"
+        : "https://streamtape.com/embed/movie/{$imdbId}";
+    
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'HEAD',
+            'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+            'timeout' => 5,
+            'ignore_errors' => true,
+        ]
+    ]);
+    
+    $headers = @get_headers($url, 1, $context);
+    if ($headers && strpos($headers[0], '200') !== false) {
+        return $url;
+    }
+    
+    return null;
+}
+
+/**
+ * Busca enlace en Streamwish
+ */
+function searchStreamwish(string $title, string $type, ?int $year, ?string $imdbId = null): ?string
+{
+    if (empty($imdbId)) {
+        return null;
+    }
+    
+    $url = $type === 'tv'
+        ? "https://streamwish.to/embed/tv/{$imdbId}"
+        : "https://streamwish.to/embed/movie/{$imdbId}";
+    
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'HEAD',
+            'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n",
+            'timeout' => 5,
+            'ignore_errors' => true,
+        ]
+    ]);
+    
+    $headers = @get_headers($url, 1, $context);
+    if ($headers && strpos($headers[0], '200') !== false) {
+        return $url;
+    }
+    
+    return null;
 }
 
 // -------------------- Búsqueda de Trailer en YouTube --------------------
@@ -1883,7 +2114,154 @@ if (empty($items) || count($items) < $limit) {
     }
 }
 
-// Fuente 4: OMDb como último recurso (solo si tenemos API key y aún no hay resultados)
+// Fuente 4: Addons (si están disponibles y habilitados)
+// Los addons pueden buscar contenido nuevo o contenido que necesita actualización de streams
+scriptOutput("\n=== Buscando en Addons ===\n");
+try {
+    $addonManager = AddonManager::getInstance();
+    $addonManager->loadAddons();
+    $activeAddons = $addonManager->getAddons();
+    $enabledAddons = array_filter($activeAddons, function($addon) {
+        return $addon->isEnabled();
+    });
+    
+    if (!empty($enabledAddons)) {
+        scriptOutput("Addons activos encontrados: " . count($enabledAddons) . "\n");
+        foreach ($enabledAddons as $addonId => $addon) {
+            scriptOutput("  → Buscando en addon: {$addon->getName()} ({$addonId})...\n");
+            try {
+                // Buscar contenido nuevo usando el addon
+                // Los addons pueden buscar por tipo y filtros
+                $filters = [
+                    'type' => $type,
+                    'since_days' => $sinceDays,
+                    'limit' => $limit - count($items)
+                ];
+                
+                // Intentar usar hook especial para obtener contenido nuevo/trending
+                $hookResults = $addonManager->executeHook('get_new_content', [
+                    'type' => $type,
+                    'limit' => $limit - count($items),
+                    'since_days' => $sinceDays
+                ]);
+                
+                $addonNewContent = $hookResults[$addonId] ?? null;
+                
+                // Si el hook no devolvió nada, intentar búsqueda con términos especiales
+                if (!$addonNewContent && method_exists($addon, 'onSearch')) {
+                    scriptOutput("    → Intentando búsqueda con términos especiales (trending/popular/new)...\n");
+                    try {
+                        // Intentar buscar contenido trending/popular usando onSearch
+                        $searchResults = $addon->onSearch('trending', $filters);
+                        if (is_array($searchResults) && !empty($searchResults)) {
+                            $addonNewContent = $searchResults;
+                        } else {
+                            // Intentar con "popular"
+                            $searchResults = $addon->onSearch('popular', $filters);
+                            if (is_array($searchResults) && !empty($searchResults)) {
+                                $addonNewContent = $searchResults;
+                            } else {
+                                // Intentar con "new"
+                                $searchResults = $addon->onSearch('new', $filters);
+                                if (is_array($searchResults) && !empty($searchResults)) {
+                                    $addonNewContent = $searchResults;
+                                }
+                            }
+                        }
+                    } catch (Exception $e) {
+                        scriptOutput("    → Error en búsqueda especial: " . $e->getMessage() . "\n", true);
+                    }
+                }
+                
+                // Si aún no hay contenido, el addon se usará solo para streams
+                if (!$addonNewContent) {
+                    scriptOutput("    → Addon {$addonId} no tiene método para obtener contenido nuevo (se usará para actualizar streams)\n");
+                    continue;
+                }
+                    
+                    if (is_array($addonNewContent) && !empty($addonNewContent)) {
+                        // Normalizar formato
+                        $results = isset($addonNewContent['results']) ? $addonNewContent['results'] : $addonNewContent;
+                        
+                        if (!is_array($results)) {
+                            $results = [$results];
+                        }
+                        
+                        foreach ($results as $result) {
+                            if (count($items) >= $limit) {
+                                break 2; // Salir de ambos loops
+                            }
+                            
+                            // Verificar que el resultado tenga el formato correcto
+                            $itemTitle = $result['title'] ?? $result['name'] ?? '';
+                            $itemYear = $result['year'] ?? $result['release_year'] ?? null;
+                            
+                            if (empty($itemTitle)) {
+                                continue;
+                            }
+                            
+                            // Evitar duplicados
+                            $itemKey = strtolower(trim($itemTitle)) . '_' . ($itemYear ?? '');
+                            if (isset($seenIds['addon_' . $itemKey])) {
+                                continue;
+                            }
+                            
+                            $seenIds['addon_' . $itemKey] = true;
+                            
+                            // Normalizar formato del resultado del addon
+                            $normalizedItem = [
+                                'id' => $result['id'] ?? null,
+                                'name' => $itemTitle,
+                                'title' => $itemTitle,
+                                'premiered' => $result['premiered'] ?? ($itemYear ? $itemYear . '-01-01' : null),
+                                'release_year' => $itemYear,
+                                'year' => $itemYear,
+                                'type' => $result['type'] ?? $type,
+                                'image' => [
+                                    'original' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? '',
+                                    'medium' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? ''
+                                ],
+                                'poster' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? '',
+                                'backdrop' => $result['backdrop_url'] ?? $result['backdrop'] ?? '',
+                                'summary' => $result['description'] ?? $result['overview'] ?? $result['summary'] ?? '',
+                                'description' => $result['description'] ?? $result['overview'] ?? $result['summary'] ?? '',
+                                'rating' => [
+                                    'average' => $result['rating'] ?? null
+                                ],
+                                'genres' => $result['genres'] ?? [],
+                                'runtime' => $result['duration'] ?? $result['runtime'] ?? ($type === 'tv' ? 45 : 100),
+                                'addon_source' => $addonId,
+                                'addon_data' => $result // Guardar datos originales del addon
+                            ];
+                            
+                            $items[] = $normalizedItem;
+                            scriptOutput("    ✓ Encontrado: {$itemTitle}" . ($itemYear ? " ({$itemYear})" : "") . "\n");
+                        }
+                        
+                        scriptOutput("  → Addon {$addonId}: " . count($results) . " resultados\n");
+                    } else {
+                        scriptOutput("  → Addon {$addonId}: Sin contenido nuevo disponible\n");
+                    }
+                } catch (Exception $e) {
+                    scriptOutput("  ✗ Error en addon {$addonId}: " . $e->getMessage() . "\n", true);
+                }
+            }
+            
+            $addonItemsCount = count(array_filter($items, function($item) {
+                return isset($item['addon_source']);
+            }));
+            scriptOutput("Total de items desde addons: {$addonItemsCount}\n");
+        } else {
+            scriptOutput("No hay addons activos configurados.\n");
+            scriptOutput("Puedes instalar addons desde el panel de administración.\n");
+            scriptOutput("Nota: Los addons se usarán principalmente para obtener streams de contenido existente.\n");
+        }
+    } catch (Exception $e) {
+        scriptOutput("Error cargando addons: " . $e->getMessage() . "\n", true);
+    }
+}
+
+// Fuente 5: OMDb como último recurso (solo si tenemos API key y aún no hay resultados)
 if ((empty($items) || count($items) < $limit) && !empty($omdbKey) && $omdbKey !== 'demo') {
     scriptOutput("\n=== Buscando en OMDb (último recurso) ===\n");
     scriptOutput("OMDb tiene limitaciones pero puede ayudar a encontrar contenido adicional...\n");
@@ -1897,6 +2275,9 @@ if (empty($items)) {
     scriptOutput("  - Configura TMDB_API_KEY (gratis en https://www.themoviedb.org/settings/api)\n");
     scriptOutput("  - Configura TRAKT_CLIENT_ID (gratis en https://trakt.tv/oauth/applications)\n");
     scriptOutput("  - Aumenta el valor de 'Últimos días' (ej: 30 o 365)\n");
+    scriptOutput("  - Reduce el valor de 'Mínimo de seeds' (ej: 5 o 10)\n");
+    scriptOutput("  - Instala y activa addons desde el panel de administración\n");
+    scriptOutput("    Los addons pueden proporcionar streams adicionales para contenido existente\n");
     scriptOutput("  - Verifica tu conexión a internet\n");
     scriptOutput("Listo. Creados: 0, actualizados: 0, episodios nuevos: 0\n");
     if ($isCli) {
@@ -1912,11 +2293,31 @@ $updated = 0;
 $newEpisodes = 0;
 
 foreach ($items as $show) {
-    // Detectar si viene de Trakt.tv, TMDB o TVMaze
+    // Detectar si viene de Trakt.tv, TMDB, TVMaze o Addon
     $isTrakt = isset($show['trakt_data']);
     $isTMDB = isset($show['tmdb_data']);
+    $isFromAddon = isset($show['addon_source']);
     
-    if ($isTrakt) {
+    if ($isFromAddon) {
+        // Datos del addon (ya formateados)
+        $title = $show['name'] ?? $show['title'] ?? 'Sin título';
+        $premiered = $show['premiered'] ?? '';
+        $releaseYear = $show['release_year'] ?? $show['year'] ?? null;
+        $runtime = $show['runtime'] ?? ($type === 'tv' ? 45 : 100);
+        $poster = $show['poster'] ?? $show['poster_url'] ?? '';
+        $backdrop = $show['backdrop'] ?? $show['backdrop_url'] ?? '';
+        $rating = $show['rating'] ?? null;
+        $genres = $show['genres'] ?? [];
+        $description = $show['description'] ?? $show['overview'] ?? $show['summary'] ?? '';
+        $tvmazeId = null;
+        
+        // Si el contenido viene del addon y tiene ID, puede que ya exista en la BD
+        // En ese caso, solo necesitamos actualizar los streams
+        if (!empty($show['id']) && is_numeric($show['id'])) {
+            // El contenido ya existe, solo actualizar streams después
+            scriptOutput("  → Contenido del addon ya existe (ID: {$show['id']}), se actualizarán streams si es necesario\n");
+        }
+    } elseif ($isTrakt) {
         // Datos de Trakt.tv
         $traktData = $show['trakt_data'];
         $title = $show['name'] ?? $traktData['title'] ?? 'Sin título';
@@ -2097,6 +2498,40 @@ foreach ($items as $show) {
         } else {
             scriptOutput("  ✗ No se encontraron torrents válidos (con al menos {$minSeeds} seeds)\n");
         }
+        
+        // Si aún no hay torrent, intentar obtener desde addons
+        if (!$hasTorrent && empty($videoUrl)) {
+            scriptOutput("  → Intentando obtener streams desde addons...\n");
+            try {
+                $addonManager = AddonManager::getInstance();
+                $addonManager->loadAddons();
+                
+                // Buscar streams usando el título e IMDb ID
+                $addonStreams = [];
+                if (!empty($imdbId)) {
+                    // Si tenemos IMDb ID, podemos buscar directamente en addons
+                    // Nota: getStreams requiere contentId, pero podemos intentar buscar por título
+                    scriptOutput("    → Buscando streams con IMDb ID: {$imdbId}\n");
+                }
+                
+                // Buscar en addons activos
+                $activeAddons = $addonManager->getAddons();
+                foreach ($activeAddons as $addonId => $addon) {
+                    if ($addon->isEnabled() && method_exists($addon, 'onGetStreams')) {
+                        try {
+                            // Nota: onGetStreams requiere contentId que aún no tenemos
+                            // Pero algunos addons pueden tener métodos alternativos
+                            // Por ahora, intentamos después de crear el contenido
+                            scriptOutput("    → Addon {$addonId} disponible para streams (se usará después de crear el contenido)\n");
+                        } catch (Exception $e) {
+                            // Ignorar errores aquí
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                scriptOutput("    ✗ Error obteniendo streams de addons: " . $e->getMessage() . "\n", true);
+            }
+        }
     } else {
         scriptOutput("  ✓ Video URL encontrado: {$videoUrl}\n");
     }
@@ -2147,6 +2582,63 @@ foreach ($items as $show) {
 
     if (!empty($genreIds)) {
         setContentGenres($db, $contentId, array_values($genreIds));
+    }
+    
+    // Intentar obtener streams desde addons después de crear el contenido
+    // Esto es útil si no encontramos video URL ni torrent en las fuentes tradicionales
+    // O si el contenido viene de un addon y necesita streams
+    $needsAddonStreams = $isFromAddon && isset($show['needs_streams']) && $show['needs_streams'];
+    if ((empty($videoUrl) && !$hasTorrent && !empty($contentId)) || $needsAddonStreams) {
+        scriptOutput("  → Intentando obtener streams desde addons para el contenido creado...\n");
+        try {
+            $addonManager = AddonManager::getInstance();
+            $addonManager->loadAddons();
+            
+            $contentTypeForAddon = $type === 'tv' ? 'series' : 'movie';
+            $allStreams = $addonManager->getStreams($contentId, $contentTypeForAddon, null);
+            
+            if (!empty($allStreams)) {
+                $addonStreamFound = false;
+                foreach ($allStreams as $addonId => $streams) {
+                    if (is_array($streams) && !empty($streams)) {
+                        foreach ($streams as $stream) {
+                            if (!empty($stream['url'])) {
+                                scriptOutput("    ✓ Stream encontrado desde addon {$addonId}: " . substr($stream['url'], 0, 80) . "...\n");
+                                
+                                // Actualizar el contenido con el stream del addon
+                                if (!$addonStreamFound) {
+                                    $streamUrl = $stream['url'];
+                                    $streamType = $stream['type'] ?? 'direct';
+                                    
+                                    // Si es torrent, actualizar torrent_magnet
+                                    if ($streamType === 'torrent' || strpos($streamUrl, 'magnet:') === 0) {
+                                        $updateStmt = $db->prepare("UPDATE content SET torrent_magnet = ? WHERE id = ?");
+                                        $updateStmt->execute([$streamUrl, $contentId]);
+                                        scriptOutput("    → Torrent del addon guardado en la base de datos\n");
+                                    } else {
+                                        // Si es video directo, actualizar video_url
+                                        $updateStmt = $db->prepare("UPDATE content SET video_url = ? WHERE id = ?");
+                                        $updateStmt->execute([$streamUrl, $contentId]);
+                                        scriptOutput("    → Video URL del addon guardado en la base de datos\n");
+                                    }
+                                    
+                                    $addonStreamFound = true;
+                                    break 2; // Salir de ambos loops
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (!$addonStreamFound) {
+                    scriptOutput("    → No se encontraron streams válidos en los addons\n");
+                }
+            } else {
+                scriptOutput("    → Los addons no devolvieron streams para este contenido\n");
+            }
+        } catch (Exception $e) {
+            scriptOutput("    ✗ Error obteniendo streams de addons: " . $e->getMessage() . "\n", true);
+        }
     }
 
     // Series: crear/actualizar episodios (solo si tenemos ID de TVMaze)

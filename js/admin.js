@@ -592,6 +592,13 @@ async function loadSection() {
             }, 100);
             break;
 
+        case 'addons':
+            // Redirigir a la página de addons
+            // Usar ruta absoluta desde la raíz del admin
+            const adminBasePath = window.location.pathname.split('/admin/')[0] + '/admin/';
+            window.location.href = adminBasePath + 'addons.php';
+            return;
+
         default:
             content = '<h1>Sección no encontrada</h1><p>La página solicitada no existe.</p>';
     }
@@ -5577,14 +5584,26 @@ function initContentRefresh() {
                     }, 3000);
                 }
             } else {
-                statusDiv.className = 'netflix-refresh-status warning';
-                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Completado con advertencias';
-
                 const result = data.data || {};
                 const created = result.created || 0;
                 const updated = result.updated || 0;
                 const episodes = result.new_episodes || 0;
                 const execTime = result.execution_time || '0s';
+                
+                // Determinar el tipo de mensaje según los resultados
+                let statusClass = 'warning';
+                let statusIcon = 'fa-exclamation-triangle';
+                let statusText = 'Completado con advertencias';
+                
+                if (created === 0 && updated === 0 && episodes === 0) {
+                    // No se encontraron resultados, pero el script se ejecutó correctamente
+                    statusClass = 'info';
+                    statusIcon = 'fa-info-circle';
+                    statusText = 'Sin contenido nuevo';
+                }
+
+                statusDiv.className = `netflix-refresh-status ${statusClass}`;
+                statusDiv.innerHTML = `<i class="fas ${statusIcon}"></i> ${statusText}`;
 
                 // Actualizar estadísticas
                 if (statsDiv) {
@@ -5594,14 +5613,24 @@ function initContentRefresh() {
                     document.getElementById('stat-time').textContent = execTime;
                 }
 
-                // Mostrar output con error
-                let errorMsg = data.error || data.message || 'Error desconocido';
+                // Mostrar output con mensaje descriptivo
+                let message = data.message || data.error || 'Proceso completado';
                 if (outputContent) {
-                    outputContent.textContent = `⚠️ ${errorMsg}\n\n${result.output || ''}`;
+                    const outputText = result.output || '';
+                    if (outputText) {
+                        outputContent.textContent = `${message}\n\n${outputText}`;
+                    } else {
+                        outputContent.textContent = `${message}\n\nCreados: ${created}\nActualizados: ${updated}\nEpisodios nuevos: ${episodes}\nTiempo de ejecución: ${execTime}`;
+                    }
                 }
                 outputDiv.style.display = 'block';
 
-                showNotification('Actualización completada con advertencias. Revisa la salida para más detalles.', 'warning');
+                // Mostrar notificación apropiada
+                if (created === 0 && updated === 0 && episodes === 0) {
+                    showNotification('Actualización completada: No se encontró contenido nuevo con los criterios especificados. Intenta aumentar el rango de días o reducir el mínimo de seeds.', 'info');
+                } else {
+                    showNotification(message || 'Actualización completada con advertencias. Revisa la salida para más detalles.', 'warning');
+                }
             }
         } catch (error) {
             console.error('Error en actualización:', error);

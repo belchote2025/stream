@@ -1,10 +1,24 @@
 <?php
+// Asegurar que siempre se redirige, nunca se muestra contenido HTML
+// Esto previene el modo Quirks si se accede directamente
+// Limpiar cualquier output buffer previo
+if (ob_get_level()) {
+    ob_clean();
+}
+
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
 // Obtener la conexión a la base de datos
-$db = getDbConnection();
-$auth = new Auth($db);
+try {
+    $db = getDbConnection();
+    $auth = new Auth($db);
+} catch (Exception $e) {
+    // Si hay error de conexión, redirigir de todas formas
+    error_log("Error en logout: " . $e->getMessage());
+    header('Location: ' . rtrim(SITE_URL, '/') . '/index.php');
+    exit;
+}
 
 // Obtener el token de autenticación
 $token = $_COOKIE['auth_token'] ?? null;
@@ -40,24 +54,21 @@ $auth->logout();
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
           strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
+// Siempre redirigir, nunca mostrar contenido HTML directamente
+$redirectUrl = rtrim(SITE_URL, '/') . '/index.php';
+
 if ($isAjax) {
-    // Si es AJAX, devolver JSON
+    // Si es AJAX, devolver JSON con redirect
     header('Content-Type: application/json');
     echo json_encode([
+        'success' => true,
         'message' => 'Sesión cerrada correctamente',
-        'redirect' => '/'
+        'redirect' => $redirectUrl
     ]);
+    exit;
 } else {
     // Siempre redirigir a la página principal después del logout
-    // Si viene del panel de administración, asegurar que vaya a index.php
-    $redirectUrl = rtrim(SITE_URL, '/') . '/index.php';
-    
-    // Si viene del panel de admin, usar la URL completa para asegurar la redirección
-    if ($isFromAdmin || $isAdminPanel) {
-        header('Location: ' . $redirectUrl);
-        exit;
-    } else {
-        // Para otros casos, usar la función redirect
-        redirect('/index.php');
-    }
+    // Usar header Location para asegurar redirección inmediata
+    header('Location: ' . $redirectUrl);
+    exit;
 }

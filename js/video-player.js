@@ -903,8 +903,26 @@ class UnifiedVideoPlayer {
     }
     
     initWebTorrent() {
-        if (typeof WebTorrent !== 'undefined') {
+        if (typeof WebTorrent === 'undefined') {
+            console.warn('⚠️ WebTorrent no está disponible aún');
+            return;
+        }
+        
+        if (this.torrentClient) {
+            console.log('ℹ️ Cliente WebTorrent ya existe');
+            return;
+        }
+        
+        try {
+            console.log('🔧 Inicializando cliente WebTorrent...');
             this.torrentClient = new WebTorrent();
+            console.log('✅ Cliente WebTorrent creado:', this.torrentClient);
+            
+            // Hacer disponible globalmente para el debugger
+            window.webtorrentClient = this.torrentClient;
+            window.client = this.torrentClient;
+        } catch (error) {
+            console.error('❌ Error al crear cliente WebTorrent:', error);
         }
     }
     

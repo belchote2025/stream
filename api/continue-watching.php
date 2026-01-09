@@ -65,9 +65,14 @@ try {
             'poster_url' => getImageUrl($item['poster_url'] ?? '', '/assets/img/default-poster.svg'),
             'backdrop_url' => getImageUrl($item['backdrop_url'] ?? '', '/assets/img/default-backdrop.svg'),
             'progress' => $progressPercent,
+            'progress_percent' => $progressPercent,
             'progress_seconds' => (int)$item['progress'],
             'duration_seconds' => (int)$item['duration'],
+            'total_duration' => (int)$item['duration'],
             'episode_id' => $item['episode_id'] ? (int)$item['episode_id'] : null,
+            'episode_title' => $item['episode_title'] ?? null,
+            'season_number' => $item['season_number'] ?? null,
+            'episode_number' => $item['episode_number'] ?? null,
             'episode_info' => $item['episode_id'] 
                 ? "T{$item['season_number']}E{$item['episode_number']}: {$item['episode_title']}"
                 : null

@@ -504,7 +504,8 @@ class BalandroAddon extends BaseAddon {
                     'url' => $content['video_url'],
                     'provider' => 'local',
                     'format' => 'mp4',
-                    'name' => 'Local'
+                    'name' => 'Local',
+                    'language' => $this->detectLanguageFromUrl($content['video_url']) ?: 'es'
                 ];
             }
             
@@ -527,7 +528,8 @@ class BalandroAddon extends BaseAddon {
                             'url' => $episodeData['video_url'],
                             'provider' => 'local',
                             'format' => 'mp4',
-                            'name' => 'Local (Episodio)'
+                            'name' => 'Local (Episodio)',
+                            'language' => $this->detectLanguageFromUrl($episodeData['video_url']) ?: 'es'
                         ];
                     }
                 } catch (Exception $e) {
@@ -584,7 +586,8 @@ class BalandroAddon extends BaseAddon {
                                 'url' => $url,
                                 'provider' => 'vidsrc',
                                 'format' => 'iframe',
-                                'name' => 'Vidsrc' . ($index > 0 ? ' ' . ($index + 1) : '')
+                                'name' => 'Vidsrc' . ($index > 0 ? ' ' . ($index + 1) : ''),
+                                'language' => 'multi' // Vidsrc generalmente tiene múltiples idiomas
                             ];
                         }
                     } catch (Exception $e) {
@@ -620,31 +623,33 @@ class BalandroAddon extends BaseAddon {
                                 }
                             }
                             
-                            if (!empty($extractedStreams)) {
-                                foreach ($extractedStreams as $extracted) {
-                                    if (!empty($extracted['url'])) {
-                                        $streams[] = [
-                                            'quality' => $extracted['quality'] ?? $this->config['default_quality'],
-                                            'type' => $extracted['type'] ?? 'direct',
-                                            'url' => $extracted['url'],
-                                            'provider' => $extracted['provider'] ?? 'unknown',
-                                            'format' => 'mp4',
-                                            'name' => ucfirst($extracted['provider'] ?? 'Unknown')
-                                        ];
+                                if (!empty($extractedStreams)) {
+                                    foreach ($extractedStreams as $extracted) {
+                                        if (!empty($extracted['url'])) {
+                                            $streams[] = [
+                                                'quality' => $extracted['quality'] ?? $this->config['default_quality'],
+                                                'type' => $extracted['type'] ?? 'direct',
+                                                'url' => $extracted['url'],
+                                                'provider' => $extracted['provider'] ?? 'unknown',
+                                                'format' => 'mp4',
+                                                'name' => ucfirst($extracted['provider'] ?? 'Unknown'),
+                                                'language' => $extracted['language'] ?? $this->detectLanguageFromUrl($extracted['url']) ?: 'multi'
+                                            ];
+                                        }
                                     }
+                                } else {
+                                    // Si no se puede extraer, usar la URL directamente como embed
+                                    $provider = $this->detectProviderFromUrl($sourceUrl);
+                                    $streams[] = [
+                                        'quality' => $this->config['default_quality'],
+                                        'type' => 'embed',
+                                        'url' => $sourceUrl,
+                                        'provider' => $provider,
+                                        'format' => 'iframe',
+                                        'name' => ucfirst($provider),
+                                        'language' => 'multi' // Los embeds generalmente tienen múltiples idiomas
+                                    ];
                                 }
-                            } else {
-                                // Si no se puede extraer, usar la URL directamente como embed
-                                $provider = $this->detectProviderFromUrl($sourceUrl);
-                                $streams[] = [
-                                    'quality' => $this->config['default_quality'],
-                                    'type' => 'embed',
-                                    'url' => $sourceUrl,
-                                    'provider' => $provider,
-                                    'format' => 'iframe',
-                                    'name' => ucfirst($provider)
-                                ];
-                            }
                         }
                     }
                 } catch (Exception $e) {
@@ -662,7 +667,8 @@ class BalandroAddon extends BaseAddon {
                     'url' => $content['torrent_magnet'],
                     'provider' => 'torrent',
                     'format' => 'magnet',
-                    'name' => 'Torrent'
+                    'name' => 'Torrent',
+                    'language' => $this->detectLanguageFromTorrent($content['torrent_magnet']) ?: 'multi'
                 ];
             }
             
@@ -893,6 +899,72 @@ class BalandroAddon extends BaseAddon {
             }
         }
         return '';
+    }
+    
+    /**
+     * Detecta el idioma desde una URL
+     */
+    private function detectLanguageFromUrl($url) {
+        if (empty($url)) {
+            return null;
+        }
+        
+        $url = strtolower($url);
+        
+        // Detectar por patrones comunes en URLs
+        if (preg_match('/[\._-](es|spanish|castellano)[\._-]/', $url)) {
+            return 'es';
+        }
+        if (preg_match('/[\._-](en|english|eng)[\._-]/', $url)) {
+            return 'en';
+        }
+        if (preg_match('/[\._-](fr|french|francais)[\._-]/', $url)) {
+            return 'fr';
+        }
+        if (preg_match('/[\._-](de|german|deutsch)[\._-]/', $url)) {
+            return 'de';
+        }
+        if (preg_match('/[\._-](it|italian|italiano)[\._-]/', $url)) {
+            return 'it';
+        }
+        if (preg_match('/[\._-](pt|portuguese|portugues)[\._-]/', $url)) {
+            return 'pt';
+        }
+        if (preg_match('/[\._-](latino|lat)[\._-]/', $url)) {
+            return 'es'; // Latino se considera español
+        }
+        if (preg_match('/[\._-](sub|subtitulado|subtitled)[\._-]/', $url)) {
+            return 'sub';
+        }
+        if (preg_match('/[\._-](dub|doblado|dubbed)[\._-]/', $url)) {
+            return 'dub';
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Detecta el idioma desde un enlace magnet
+     */
+    private function detectLanguageFromTorrent($magnet) {
+        if (empty($magnet)) {
+            return null;
+        }
+        
+        $magnet = strtolower($magnet);
+        
+        // Detectar por patrones en el nombre del torrent
+        if (preg_match('/[\._-](es|spanish|castellano|latino|lat)[\._-]/', $magnet)) {
+            return 'es';
+        }
+        if (preg_match('/[\._-](en|english|eng)[\._-]/', $magnet)) {
+            return 'en';
+        }
+        if (preg_match('/[\._-](multi|multi-lang|multilanguage)[\._-]/', $magnet)) {
+            return 'multi';
+        }
+        
+        return null;
     }
     
     /**

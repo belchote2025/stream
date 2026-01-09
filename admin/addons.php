@@ -382,6 +382,29 @@ window.addEventListener('error', function(e) {
                 });
             }
             
+            // Función para obtener el nombre del idioma
+            function getLanguageName(code) {
+                const languages = {
+                    'es': 'Español',
+                    'en': 'Inglés',
+                    'fr': 'Francés',
+                    'de': 'Alemán',
+                    'it': 'Italiano',
+                    'pt': 'Portugués',
+                    'ru': 'Ruso',
+                    'ja': 'Japonés',
+                    'ko': 'Coreano',
+                    'zh': 'Chino',
+                    'ar': 'Árabe',
+                    'hi': 'Hindi',
+                    'multi': 'Multi-idioma',
+                    'sub': 'Subtitulado',
+                    'dub': 'Doblado',
+                    'original': 'Original'
+                };
+                return languages[code] || code.toUpperCase();
+            }
+            
             // Función para mostrar los enlaces encontrados
             function displayStreams(data) {
                 const $results = $('#streamsResults');
@@ -403,15 +426,16 @@ window.addEventListener('error', function(e) {
                     const qualityBadge = stream.quality ? `<span class="badge bg-primary">${stream.quality}</span>` : '';
                     const typeBadge = stream.type ? `<span class="badge bg-secondary">${stream.type}</span>` : '';
                     const providerBadge = stream.addon ? `<span class="badge bg-success">${stream.addon}</span>` : '';
+                    const languageBadge = stream.language ? `<span class="badge bg-info">${getLanguageName(stream.language)}</span>` : '';
                     const streamId = `stream-${contentId}-${index}`;
                     
                     html += `<div class="list-group-item" id="${streamId}">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
-                                <h6 class="mb-1">Enlace ${index + 1}</h6>
+                                <h6 class="mb-1">Enlace ${index + 1} ${stream.name ? `<small class="text-muted">(${stream.name})</small>` : ''}</h6>
                                 <p class="mb-1 text-break"><small>${stream.url || 'URL no disponible'}</small></p>
                                 <div class="mt-2">
-                                    ${qualityBadge} ${typeBadge} ${providerBadge}
+                                    ${qualityBadge} ${typeBadge} ${languageBadge} ${providerBadge}
                                 </div>
                                 <div class="mt-2 stream-status" id="status-${streamId}" style="display: none;">
                                     <span class="badge bg-info">Verificando...</span>

@@ -274,7 +274,7 @@ try {
     error_log('Error en recommendations/improved.php: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'DEBUG SQL: ' . $e->getMessage()
+        'error' => 'Error al obtener recomendaciones'
     ]);
     exit;
 } catch (Exception $e) {

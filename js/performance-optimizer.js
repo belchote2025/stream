@@ -180,39 +180,39 @@ class PerformanceOptimizer {
         // para evitar interferencias con el streaming y errores NS_BINDING_ABORTED
         const currentPath = window.location.pathname;
         const skipPrefetchPages = ['watch.php', 'content.php', 'content-detail.php'];
-        
+
         if (skipPrefetchPages.some(page => currentPath.includes(page))) {
             return; // No hacer prefetch en estas páginas
         }
-        
+
         // Solo hacer prefetch si el usuario está inactivo por al menos 5 segundos
         // y solo en la página principal (index.php) o en páginas de listado
         // Detectar página principal de forma dinámica (funciona en local y producción)
         const pathParts = currentPath.split('/').filter(p => p);
         const isRoot = currentPath === '/' || currentPath.endsWith('/');
-        const isIndexPage = currentPath.includes('index.php') || 
-                           (pathParts.length === 0) ||
-                           (pathParts.length === 1 && pathParts[0] === 'streaming-platform');
-        
+        const isIndexPage = currentPath.includes('index.php') ||
+            (pathParts.length === 0) ||
+            (pathParts.length === 1 && pathParts[0] === 'streaming-platform');
+
         const isMainPage = isRoot || isIndexPage;
-        
+
         if (!isMainPage) {
             return; // Solo prefetch desde la página principal
         }
-        
+
         // Verificar que los archivos existan antes de hacer prefetch
         // (esto se hace verificando que no estemos en una ruta que ya falló)
         if (sessionStorage.getItem('prefetch_disabled')) {
             return; // Prefetch deshabilitado por errores previos
         }
-        
+
         let idleTimer;
         let prefetchDone = false;
-        
+
         const handleUserActivity = () => {
             clearTimeout(idleTimer);
             if (prefetchDone) return; // Ya se hizo el prefetch
-            
+
             idleTimer = setTimeout(() => {
                 // Usuario inactivo por 5 segundos, hacer prefetch de forma inteligente
                 if ('requestIdleCallback' in window && !prefetchDone) {
@@ -247,7 +247,7 @@ class PerformanceOptimizer {
                                     basePath = '';
                                 }
                             }
-                            
+
                             // Usar rutas relativas simples para evitar problemas de 404
                             const importantPages = [
                                 'movies.php',
@@ -258,7 +258,7 @@ class PerformanceOptimizer {
                             importantPages.forEach(page => {
                                 // Construir ruta completa
                                 const fullPath = basePath ? `${basePath}/${page}` : page;
-                                
+
                                 // Verificar que no exista ya un prefetch para esta página
                                 const existingPrefetch = document.querySelector(`link[rel="prefetch"][href="${fullPath}"], link[rel="prefetch"][href="/${fullPath}"], link[rel="prefetch"][href="${page}"]`);
                                 if (!existingPrefetch) {
@@ -266,7 +266,7 @@ class PerformanceOptimizer {
                                         const link = document.createElement('link');
                                         link.rel = 'prefetch';
                                         // Usar ruta relativa para evitar problemas
-                                        link.href = fullPath.startsWith('/') ? fullPath : `/${fullPath}`;
+                                        link.href = (fullPath.startsWith('/') || fullPath.startsWith('http')) ? fullPath : `/${fullPath}`;
                                         // Agregar atributos para mejor manejo
                                         link.as = 'document';
                                         // No usar crossOrigin para rutas del mismo origen
@@ -289,19 +289,19 @@ class PerformanceOptimizer {
                                     }
                                 }
                             });
-                            
+
                             prefetchDone = true; // Marcar como hecho
                         }
                     }, { timeout: 3000 }); // Timeout más corto
                 }
             }, 5000); // Esperar 5 segundos de inactividad (aumentado)
         };
-        
+
         // Escuchar actividad del usuario
         ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
             document.addEventListener(event, handleUserActivity, { passive: true, once: false });
         });
-        
+
         // Iniciar el timer después de que la página se cargue completamente
         if (document.readyState === 'complete') {
             handleUserActivity();

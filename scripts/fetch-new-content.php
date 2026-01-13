@@ -52,9 +52,17 @@ function scriptOutput(string $message, bool $isError = false): void {
     } else {
         // En web, la salida se captura con ob_start()
         // Asegurar que siempre se muestre la salida
-        echo $message . "\n";
-        @ob_flush();
+        // Usar print en lugar de echo para mejor compatibilidad
+        print $message . "\n";
+        // Forzar flush múltiple para asegurar que se capture
+        if (ob_get_level() > 0) {
+            @ob_flush();
+        }
         @flush();
+        // También escribir a error_log para debugging si es necesario
+        if ($isError) {
+            @error_log("Script Error: " . trim($message));
+        }
     }
 }
 
@@ -952,7 +960,7 @@ function searchUpstream(string $title, string $type, ?int $year, ?string $imdbId
         ]
     ]);
     
-    $headers = @get_headers($url, 1, $context);
+    $headers = @get_headers($url, true, $context);
     if ($headers && strpos($headers[0], '200') !== false) {
         return $url;
     }
@@ -982,7 +990,7 @@ function searchPowVideo(string $title, string $type, ?int $year, ?string $imdbId
         ]
     ]);
     
-    $headers = @get_headers($url, 1, $context);
+    $headers = @get_headers($url, true, $context);
     if ($headers && strpos($headers[0], '200') !== false) {
         return $url;
     }
@@ -1012,7 +1020,7 @@ function searchFilemoon(string $title, string $type, ?int $year, ?string $imdbId
         ]
     ]);
     
-    $headers = @get_headers($url, 1, $context);
+    $headers = @get_headers($url, true, $context);
     if ($headers && strpos($headers[0], '200') !== false) {
         return $url;
     }
@@ -1042,7 +1050,7 @@ function searchStreamtape(string $title, string $type, ?int $year, ?string $imdb
         ]
     ]);
     
-    $headers = @get_headers($url, 1, $context);
+    $headers = @get_headers($url, true, $context);
     if ($headers && strpos($headers[0], '200') !== false) {
         return $url;
     }
@@ -1072,7 +1080,7 @@ function searchStreamwish(string $title, string $type, ?int $year, ?string $imdb
         ]
     ]);
     
-    $headers = @get_headers($url, 1, $context);
+    $headers = @get_headers($url, true, $context);
     if ($headers && strpos($headers[0], '200') !== false) {
         return $url;
     }
@@ -2192,87 +2200,86 @@ try {
                     scriptOutput("    → Addon {$addonId} no tiene método para obtener contenido nuevo (se usará para actualizar streams)\n");
                     continue;
                 }
+                
+                if (is_array($addonNewContent) && !empty($addonNewContent)) {
+                    // Normalizar formato
+                    $results = isset($addonNewContent['results']) ? $addonNewContent['results'] : $addonNewContent;
                     
-                    if (is_array($addonNewContent) && !empty($addonNewContent)) {
-                        // Normalizar formato
-                        $results = isset($addonNewContent['results']) ? $addonNewContent['results'] : $addonNewContent;
-                        
-                        if (!is_array($results)) {
-                            $results = [$results];
-                        }
-                        
-                        foreach ($results as $result) {
-                            if (count($items) >= $limit) {
-                                break 2; // Salir de ambos loops
-                            }
-                            
-                            // Verificar que el resultado tenga el formato correcto
-                            $itemTitle = $result['title'] ?? $result['name'] ?? '';
-                            $itemYear = $result['year'] ?? $result['release_year'] ?? null;
-                            
-                            if (empty($itemTitle)) {
-                                continue;
-                            }
-                            
-                            // Evitar duplicados
-                            $itemKey = strtolower(trim($itemTitle)) . '_' . ($itemYear ?? '');
-                            if (isset($seenIds['addon_' . $itemKey])) {
-                                continue;
-                            }
-                            
-                            $seenIds['addon_' . $itemKey] = true;
-                            
-                            // Normalizar formato del resultado del addon
-                            $normalizedItem = [
-                                'id' => $result['id'] ?? null,
-                                'name' => $itemTitle,
-                                'title' => $itemTitle,
-                                'premiered' => $result['premiered'] ?? ($itemYear ? $itemYear . '-01-01' : null),
-                                'release_year' => $itemYear,
-                                'year' => $itemYear,
-                                'type' => $result['type'] ?? $type,
-                                'image' => [
-                                    'original' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? '',
-                                    'medium' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? ''
-                                ],
-                                'poster' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? '',
-                                'backdrop' => $result['backdrop_url'] ?? $result['backdrop'] ?? '',
-                                'summary' => $result['description'] ?? $result['overview'] ?? $result['summary'] ?? '',
-                                'description' => $result['description'] ?? $result['overview'] ?? $result['summary'] ?? '',
-                                'rating' => [
-                                    'average' => $result['rating'] ?? null
-                                ],
-                                'genres' => $result['genres'] ?? [],
-                                'runtime' => $result['duration'] ?? $result['runtime'] ?? ($type === 'tv' ? 45 : 100),
-                                'addon_source' => $addonId,
-                                'addon_data' => $result // Guardar datos originales del addon
-                            ];
-                            
-                            $items[] = $normalizedItem;
-                            scriptOutput("    ✓ Encontrado: {$itemTitle}" . ($itemYear ? " ({$itemYear})" : "") . "\n");
-                        }
-                        
-                        scriptOutput("  → Addon {$addonId}: " . count($results) . " resultados\n");
-                    } else {
-                        scriptOutput("  → Addon {$addonId}: Sin contenido nuevo disponible\n");
+                    if (!is_array($results)) {
+                        $results = [$results];
                     }
-                } catch (Exception $e) {
-                    scriptOutput("  ✗ Error en addon {$addonId}: " . $e->getMessage() . "\n", true);
+                    
+                    foreach ($results as $result) {
+                        if (count($items) >= $limit) {
+                            break 2; // Salir de ambos loops
+                        }
+                        
+                        // Verificar que el resultado tenga el formato correcto
+                        $itemTitle = $result['title'] ?? $result['name'] ?? '';
+                        $itemYear = $result['year'] ?? $result['release_year'] ?? null;
+                        
+                        if (empty($itemTitle)) {
+                            continue;
+                        }
+                        
+                        // Evitar duplicados
+                        $itemKey = strtolower(trim($itemTitle)) . '_' . ($itemYear ?? '');
+                        if (isset($seenIds['addon_' . $itemKey])) {
+                            continue;
+                        }
+                        
+                        $seenIds['addon_' . $itemKey] = true;
+                        
+                        // Normalizar formato del resultado del addon
+                        $normalizedItem = [
+                            'id' => $result['id'] ?? null,
+                            'name' => $itemTitle,
+                            'title' => $itemTitle,
+                            'premiered' => $result['premiered'] ?? ($itemYear ? $itemYear . '-01-01' : null),
+                            'release_year' => $itemYear,
+                            'year' => $itemYear,
+                            'type' => $result['type'] ?? $type,
+                            'image' => [
+                                'original' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? '',
+                                'medium' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? ''
+                            ],
+                            'poster' => $result['poster_url'] ?? $result['poster'] ?? $result['image'] ?? '',
+                            'backdrop' => $result['backdrop_url'] ?? $result['backdrop'] ?? '',
+                            'summary' => $result['description'] ?? $result['overview'] ?? $result['summary'] ?? '',
+                            'description' => $result['description'] ?? $result['overview'] ?? $result['summary'] ?? '',
+                            'rating' => [
+                                'average' => $result['rating'] ?? null
+                            ],
+                            'genres' => $result['genres'] ?? [],
+                            'runtime' => $result['duration'] ?? $result['runtime'] ?? ($type === 'tv' ? 45 : 100),
+                            'addon_source' => $addonId,
+                            'addon_data' => $result // Guardar datos originales del addon
+                        ];
+                        
+                        $items[] = $normalizedItem;
+                        scriptOutput("    ✓ Encontrado: {$itemTitle}" . ($itemYear ? " ({$itemYear})" : "") . "\n");
+                    }
+                    
+                    scriptOutput("  → Addon {$addonId}: " . count($results) . " resultados\n");
+                } else {
+                    scriptOutput("  → Addon {$addonId}: Sin contenido nuevo disponible\n");
                 }
+            } catch (Exception $e) {
+                scriptOutput("  ✗ Error en addon {$addonId}: " . $e->getMessage() . "\n", true);
             }
-            
-            $addonItemsCount = count(array_filter($items, function($item) {
-                return isset($item['addon_source']);
-            }));
-            scriptOutput("Total de items desde addons: {$addonItemsCount}\n");
-        } else {
-            scriptOutput("No hay addons activos configurados.\n");
-            scriptOutput("Puedes instalar addons desde el panel de administración.\n");
-            scriptOutput("Nota: Los addons se usarán principalmente para obtener streams de contenido existente.\n");
         }
-    } catch (Exception $e) {
-        scriptOutput("Error cargando addons: " . $e->getMessage() . "\n", true);
+        
+        $addonItemsCount = count(array_filter($items, function($item) {
+            return isset($item['addon_source']);
+        }));
+        scriptOutput("Total de items desde addons: {$addonItemsCount}\n");
+    } else {
+        scriptOutput("No hay addons activos configurados.\n");
+        scriptOutput("Puedes instalar addons desde el panel de administración.\n");
+        scriptOutput("Nota: Los addons se usarán principalmente para obtener streams de contenido existente.\n");
     }
+} catch (Exception $e) {
+    scriptOutput("Error cargando addons: " . $e->getMessage() . "\n", true);
 }
 
 // Fuente 5: OMDb como último recurso (solo si tenemos API key y aún no hay resultados)
@@ -2578,12 +2585,30 @@ foreach ($items as $show) {
         }
     }
 
+    // Asegurar que release_year nunca sea null (requerido por la base de datos)
+    if (empty($releaseYear) || $releaseYear === null) {
+        // Intentar extraer el año del título o usar el año actual
+        if (preg_match('/\((\d{4})\)/', $title, $matches)) {
+            $releaseYear = (int)$matches[1];
+        } elseif (preg_match('/(\d{4})/', $title, $matches)) {
+            $year = (int)$matches[1];
+            if ($year >= 1900 && $year <= date('Y') + 1) {
+                $releaseYear = $year;
+            }
+        }
+        // Si aún no hay año, usar el año actual
+        if (empty($releaseYear) || $releaseYear === null) {
+            $releaseYear = (int)date('Y');
+        }
+        scriptOutput("  ⚠ Año no encontrado para '{$title}', usando {$releaseYear} como valor por defecto\n");
+    }
+    
     $contentData = [
         'title' => $title,
         'slug' => $slug,
         'type' => $type === 'tv' ? 'series' : 'movie',
         'description' => $description,
-        'release_year' => $releaseYear,
+        'release_year' => (int)$releaseYear, // Asegurar que sea un entero
         'duration' => $runtime,
         'rating' => $rating,
         'age_rating' => null,

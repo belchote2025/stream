@@ -26,7 +26,11 @@ if (!$contentId) {
 $db = getDbConnection();
 
 // Obtener información del contenido
-$query = "SELECT * FROM content WHERE id = :id";
+$query = "SELECT 
+    id, title, type, poster_url, backdrop_url, video_url, trailer_url,
+    description, duration, release_year, rating, 
+    is_premium, is_featured, torrent_magnet, created_at, updated_at
+FROM content WHERE id = :id";
 $stmt = $db->prepare($query);
 $stmt->bindValue(':id', $contentId, PDO::PARAM_INT);
 $stmt->execute();

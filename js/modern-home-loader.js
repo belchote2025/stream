@@ -3,13 +3,13 @@
  * Carga contenido de forma asíncrona para mejorar el rendimiento
  */
 
-(function() {
+(function () {
     'use strict';
-    
+
     const BASE_URL = window.__APP_BASE_URL || '';
     const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
     const cache = new Map();
-    
+
     // Configuración de secciones
     const sections = [
         {
@@ -53,39 +53,43 @@
             params: { limit: 12 }
         }
     ];
-    
+
     // Función para obtener datos con caché
     async function fetchWithCache(url, params = {}) {
         const cacheKey = url + JSON.stringify(params);
         const cached = cache.get(cacheKey);
-        
+
         if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
             return cached.data;
         }
-        
+
         try {
             const queryString = new URLSearchParams(params).toString();
             const fullUrl = BASE_URL + url + (queryString ? '?' + queryString : '');
-            
+
             const response = await fetch(fullUrl);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
+
             const data = await response.json();
             cache.set(cacheKey, { data, timestamp: Date.now() });
             return data;
         } catch (error) {
-            console.error(`Error cargando ${url}:`, error);
+            if (window.Logger) {
+                Logger.error(`Error cargando ${url}:`, error);
+            } else {
+                console.error(`Error cargando ${url}:`, error);
+            }
             return null;
         }
     }
-    
+
     // Función para crear una ficha moderna
     function createModernCard(item) {
         const card = document.createElement('div');
         card.className = 'content-card';
         card.setAttribute('data-id', item.id);
         card.setAttribute('data-type', item.type || 'movie');
-        
+
         // Obtener URL de imagen
         let posterUrl = item.poster_url || item.poster || '';
         if (posterUrl && !posterUrl.startsWith('http') && !posterUrl.startsWith('/')) {
@@ -93,13 +97,13 @@
         } else if (!posterUrl || posterUrl === 'null') {
             posterUrl = BASE_URL + '/assets/img/default-poster.svg';
         }
-        
-        const watchUrl = item.episode_id 
+
+        const watchUrl = item.episode_id
             ? `${BASE_URL}/watch.php?id=${item.id}&episode_id=${item.episode_id}`
             : `${BASE_URL}/watch.php?id=${item.id}`;
-        
+
         const detailUrl = `${BASE_URL}/content-detail.php?id=${item.id}`;
-        
+
         // Calcular progreso si existe
         let progressBar = '';
         if (item.progress_seconds && item.duration_seconds) {
@@ -115,7 +119,7 @@
         } else if (item.progress_percent) {
             progressBar = `<div class="progress-bar"><div class="progress" style="width: ${item.progress_percent}%"></div></div>`;
         }
-        
+
         // Badges
         const badges = [];
         if (item.is_premium) badges.push('<span class="content-badge premium">PREMIUM</span>');
@@ -123,7 +127,7 @@
         if (item.release_year && new Date().getFullYear() - item.release_year <= 1) {
             badges.push('<span class="content-badge new">NUEVO</span>');
         }
-        
+
         card.innerHTML = `
             ${progressBar}
             ${badges.join('')}
@@ -150,40 +154,40 @@
                 </div>
             </div>
         `;
-        
+
         // Event listeners
-        card.addEventListener('click', function(e) {
+        card.addEventListener('click', function (e) {
             if (!e.target.closest('.action-btn')) {
                 window.location.href = watchUrl;
             }
         });
-        
+
         // Botón play
         const playBtn = card.querySelector('[data-action="play"]');
         if (playBtn) {
-            playBtn.addEventListener('click', function(e) {
+            playBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 window.location.href = watchUrl;
             });
         }
-        
+
         // Botón info
         const infoBtn = card.querySelector('[data-action="info"]');
         if (infoBtn) {
-            infoBtn.addEventListener('click', function(e) {
+            infoBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 window.location.href = detailUrl;
             });
         }
-        
+
         return card;
     }
-    
+
     // Función para renderizar contenido en una sección
     function renderSection(sectionId, data) {
         const container = document.getElementById(sectionId);
         if (!container) return;
-        
+
         let rowItems = container.querySelector('.row-items');
         if (!rowItems) {
             // Crear contenedor de items si no existe
@@ -191,15 +195,15 @@
             rowItems.className = 'row-items';
             container.appendChild(rowItems);
         }
-        
+
         // Limpiar skeleton loaders
         rowItems.innerHTML = '';
-        
+
         if (!data) {
             rowItems.innerHTML = '<p class="loading-placeholder">Error al cargar contenido</p>';
             return;
         }
-        
+
         // Manejar diferentes formatos de respuesta
         let items = [];
         if (data.success && data.data) {
@@ -209,67 +213,75 @@
         } else if (data.data && Array.isArray(data.data)) {
             items = data.data;
         }
-        
+
         if (items.length === 0) {
             rowItems.innerHTML = '<p class="loading-placeholder">No hay contenido disponible</p>';
             return;
         }
-        
+
         // Crear y añadir tarjetas
         items.forEach(item => {
             try {
                 const card = createModernCard(item);
                 rowItems.appendChild(card);
             } catch (error) {
-                console.error('Error creando tarjeta:', error, item);
+                if (window.Logger) {
+                    Logger.error('Error creando tarjeta:', error, item);
+                } else {
+                    console.error('Error creando tarjeta:', error, item);
+                }
             }
         });
-        
+
         // Inicializar navegación del carrusel
         initCarousel(sectionId);
     }
-    
+
     // Función para inicializar navegación del carrusel
     function initCarousel(sectionId) {
         const container = document.querySelector(`#${sectionId}`).closest('.row-container');
         if (!container) return;
-        
+
         const rowItems = container.querySelector('.row-items');
         const prevBtn = container.querySelector('.row-nav.prev');
         const nextBtn = container.querySelector('.row-nav.next');
-        
+
         if (!rowItems || !prevBtn || !nextBtn) return;
-        
+
         let scrollPosition = 0;
         const scrollAmount = 800;
-        
+
         prevBtn.addEventListener('click', () => {
             scrollPosition = Math.max(0, scrollPosition - scrollAmount);
             rowItems.style.transform = `translateX(-${scrollPosition}px)`;
         });
-        
+
         nextBtn.addEventListener('click', () => {
             const maxScroll = rowItems.scrollWidth - rowItems.clientWidth;
             scrollPosition = Math.min(maxScroll, scrollPosition + scrollAmount);
             rowItems.style.transform = `translateX(-${scrollPosition}px)`;
         });
     }
-    
+
     // Función para cargar una sección
     async function loadSection(section) {
         const container = document.getElementById(section.id);
         if (!container || !container.hasAttribute('data-dynamic')) return;
-        
+
         try {
             const data = await fetchWithCache(section.endpoint, section.params || {});
             if (data) {
                 renderSection(section.id, data);
             }
         } catch (error) {
-            console.error(`Error cargando sección ${section.id}:`, error);
+            if (window.Logger) {
+                Logger.error(`Error cargando sección ${section.id}:`, error);
+            } else {
+                console.error(`Error cargando sección ${section.id}:`, error);
+            }
         }
     }
-    
+
     // Cargar secciones de forma progresiva
     function loadSectionsProgressive() {
         sections.forEach((section, index) => {
@@ -280,14 +292,14 @@
             }, index < 2 ? 0 : index * 200);
         });
     }
-    
+
     // Inicializar cuando el DOM esté listo
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', loadSectionsProgressive);
     } else {
         loadSectionsProgressive();
     }
-    
+
     // Cargar secciones visibles cuando entran en viewport (lazy loading)
     if ('IntersectionObserver' in window) {
         const observer = new IntersectionObserver((entries) => {
@@ -304,7 +316,7 @@
         }, {
             rootMargin: '200px'
         });
-        
+
         sections.forEach(section => {
             const container = document.getElementById(section.id);
             if (container) {

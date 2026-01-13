@@ -34,20 +34,26 @@ function getCachedContent($callback, $cacheKey, $params = [], $ttl = 3600) {
         
         // Validar que la decodificación fue exitosa y que el contenido es válido
         if ($decoded !== null && json_last_error() === JSON_ERROR_NONE) {
-            return $decoded;
+            // Validar que el contenido no esté vacío
+            if (!empty($decoded) && is_array($decoded)) {
+                return $decoded;
+            }
         }
-        // Si el cache está corrupto, eliminarlo
+        // Si el cache está corrupto o vacío, eliminarlo
         @unlink($cacheFile);
     }
     
     // If not, generate new content
     $content = call_user_func_array($callback, $params);
     
-    // Cache the result
-    if (!is_dir(__DIR__ . '/cache')) {
-        mkdir(__DIR__ . '/cache', 0755, true);
+    // Cache the result - solo si hay contenido válido
+    if (!empty($content)) {
+        if (!is_dir(__DIR__ . '/cache')) {
+            mkdir(__DIR__ . '/cache', 0755, true);
+        }
+        // Usar LOCK_EX para evitar race conditions
+        file_put_contents($cacheFile, json_encode($content), LOCK_EX);
     }
-    file_put_contents($cacheFile, json_encode($content));
     
     return $content;
 }
@@ -74,44 +80,52 @@ include __DIR__ . '/includes/header.php';
 <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/modern-home.css">
 
 <!-- Hero Section -->
-<section class="hero">
+<section class="hero" id="hero-slider">
     <?php if (!empty($featuredContent)): ?>
         <?php foreach ($featuredContent as $index => $content): 
-            // Procesar poster_url primero
             $posterUrl = getImageUrl($content['poster_url'] ?? '', '/assets/img/default-poster.svg');
-            
-            // Procesar backdrop_url: priorizar backdrop_url, luego poster_url, luego default
-            $backdropUrl = null;
-            
-            // Si hay backdrop_url y no es default, usarlo
-            if (!empty($content['backdrop_url']) && strpos($content['backdrop_url'], 'default-') === false) {
-                $backdropUrl = getImageUrl($content['backdrop_url'], '/assets/img/default-backdrop.svg');
-            }
-            // Si no hay backdrop válido pero hay poster válido, usar el poster como backdrop
-            elseif (!empty($posterUrl) && strpos($posterUrl, 'default-poster.svg') === false) {
-                $backdropUrl = $posterUrl;
-            }
-            // Si todo falla, usar el default backdrop
-            else {
-                $backdropUrl = getImageUrl('/assets/img/default-backdrop.svg', '/assets/img/default-backdrop.svg');
-            }
+            $backdropUrl = getImageUrl($content['backdrop_url'] ?? $posterUrl, '/assets/img/default-backdrop.svg');
             
             $title = htmlspecialchars($content['title'] ?? '');
             $description = $content['description'] ?? $content['overview'] ?? '';
             $overview = htmlspecialchars(substr($description, 0, 200) . (strlen($description) > 200 ? '...' : ''));
-            $trailerUrl = htmlspecialchars($content['trailer_url'] ?? '');
+            $trailerUrl = htmlspecialchars($content['trailer_url'] ?? $content['youtube_trailer_url'] ?? '');
             $contentId = $content['id'] ?? '';
+            $contentType = $content['type'] ?? 'movie';
         ?>
-            <div class="hero-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>" data-trailer="<?php echo $trailerUrl; ?>">
-                <div class="hero-backdrop" style="background-image: url('<?php echo htmlspecialchars($backdropUrl, ENT_QUOTES, 'UTF-8'); ?>'); background-size: cover; background-position: center center; background-repeat: no-repeat;"></div>
+            <div class="hero-slide <?php echo $index === 0 ? 'active' : ''; ?>" 
+                 data-index="<?php echo $index; ?>" 
+                 data-trailer="<?php echo $trailerUrl; ?>"
+                 data-poster="<?php echo htmlspecialchars($backdropUrl); ?>">
+                
+                <div class="hero-video-wrapper" id="hero-video-<?php echo $index; ?>"></div>
+                
+                <div class="hero-backdrop" style="background-image: url('<?php echo htmlspecialchars($backdropUrl, ENT_QUOTES, 'UTF-8'); ?>');"></div>
+                
+                <div class="hero-gradient-overlay"></div>
+                
                 <div class="hero-content">
                     <h1 class="hero-title"><?php echo $title; ?></h1>
+                    
+                    <div class="hero-meta">
+                        <?php if (isset($content['rating'])): ?>
+                            <span class="hero-rating"><i class="fas fa-star text-warning"></i> <?php echo number_format($content['rating'], 1); ?></span>
+                        <?php endif; ?>
+                        <?php if (isset($content['release_year'])): ?>
+                            <span class="hero-year"><?php echo $content['release_year']; ?></span>
+                        <?php endif; ?>
+                        <?php if (isset($content['duration'])): ?>
+                            <span class="hero-duration"><?php echo formatDuration($content['duration']); ?></span>
+                        <?php endif; ?>
+                    </div>
+                    
                     <p class="hero-description"><?php echo $overview; ?></p>
+                    
                     <div class="hero-actions">
-                        <a href="<?php echo $baseUrl; ?>/watch.php?id=<?php echo $contentId; ?>" class="btn btn-primary" aria-label="Reproducir <?php echo $title; ?>">
+                        <a href="<?php echo $baseUrl; ?>/watch.php?id=<?php echo $contentId; ?>" class="btn btn-primary btn-lg" aria-label="Reproducir <?php echo $title; ?>">
                             <i class="fas fa-play" aria-hidden="true"></i> Reproducir
                         </a>
-                        <button class="btn btn-outline" data-action="info" data-id="<?php echo $contentId; ?>" aria-label="Más información sobre <?php echo $title; ?>">
+                        <button class="btn btn-secondary btn-lg" onclick="showContentDetails(<?php echo $contentId; ?>, '<?php echo $contentType; ?>')" aria-label="Más información">
                             <i class="fas fa-info-circle" aria-hidden="true"></i> Más información
                         </button>
                     </div>
@@ -120,11 +134,77 @@ include __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
     <?php else: ?>
         <div class="hero-slide active">
-            <div class="hero-backdrop" style="background-image: url('<?php echo $baseUrl; ?>/assets/img/default-backdrop.svg'); background-size: cover;"></div>
+            <div class="hero-backdrop" style="background-image: url('<?php echo $baseUrl; ?>/assets/img/default-backdrop.svg');"></div>
+            <div class="hero-content">
+                <h1 class="hero-title">Bienvenido a <?php echo SITE_NAME; ?></h1>
+                <p class="hero-description">Explora miles de películas y series.</p>
+            </div>
         </div>
     <?php endif; ?>
     <div class="hero-overlay"></div>
 </section>
+
+<!-- Script para Hero Video Background -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const slides = document.querySelectorAll('.hero-slide');
+    let currentVideo = null;
+    let videoTimeout = null;
+
+    // Función para extraer ID de YouTube
+    function getYoutubeId(url) {
+        if (!url) return null;
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    // Cargar video del slide activo
+    function loadActiveSlideVideo() {
+        const activeSlide = document.querySelector('.hero-slide.active');
+        if (!activeSlide) return;
+
+        const index = activeSlide.dataset.index;
+        const trailerUrl = activeSlide.dataset.trailer;
+        const containerId = `hero-video-${index}`;
+        const container = document.getElementById(containerId);
+
+        // Limpiar video anterior
+        if (currentVideo) {
+            currentVideo.innerHTML = '';
+            currentVideo = null;
+        }
+
+        if (videoTimeout) clearTimeout(videoTimeout);
+
+        // Esperar 2 segundos antes de cargar video (para no bloquear carga inicial)
+        videoTimeout = setTimeout(() => {
+            if (!trailerUrl || !container) return;
+
+            const youtubeId = getYoutubeId(trailerUrl);
+            
+            if (youtubeId) {
+                // Iframe de YouTube optimizado
+                const iframe = document.createElement('iframe');
+                iframe.src = `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&loop=1&playlist=${youtubeId}&enablejsapi=1`;
+                iframe.allow = "autoplay; encrypted-media";
+                iframe.classList.add('hero-video-iframe');
+                iframe.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100vw; height: 56.25vw; min-height: 100vh; min-width: 177.77vh; pointer-events: none; opacity: 0; transition: opacity 1s ease;';
+                
+                iframe.onload = function() {
+                    iframe.style.opacity = '1';
+                };
+                
+                container.appendChild(iframe);
+                currentVideo = container;
+            }
+        }, 3000);
+    }
+
+    // Iniciar
+    loadActiveSlideVideo();
+});
+</script>
 
     <!-- Content Rows - Carga asíncrona optimizada -->
 <main class="content-rows fade-in">
@@ -432,7 +512,8 @@ include __DIR__ . '/includes/header.php';
     }
 </style>
 
-<script src="<?php echo $baseUrl; ?>/js/modern-home-loader.js?v=<?php echo time(); ?>"></script>
+<script src="<?php echo $baseUrl; ?>/js/logger.js?v=<?php echo @filemtime(__DIR__ . '/js/logger.js') ?: '1'; ?>" defer></script>
+<script src="<?php echo $baseUrl; ?>/js/modern-home-loader.js?v=<?php echo @filemtime(__DIR__ . '/js/modern-home-loader.js') ?: '1'; ?>" defer></script>
 <script>
 // Optimización: Precargar imágenes del hero de forma inteligente
 document.addEventListener('DOMContentLoaded', function() {

@@ -65,7 +65,11 @@ function getMovies() {
     global $db;
     
     try {
-        $query = "SELECT * FROM content WHERE type = 'movie' ORDER BY created_at DESC";
+        $query = "SELECT 
+            id, title, type, poster_url, backdrop_url, description,
+            release_year, rating, imdb_rating, duration, is_premium,
+            is_featured, created_at
+        FROM content WHERE type = 'movie' ORDER BY created_at DESC";
         $stmt = $db->query($query);
         $movies = $stmt->fetchAll(PDO::FETCH_ASSOC);
         

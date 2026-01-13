@@ -1,7 +1,9 @@
 // Service Worker para PWA - Streaming Platform
-const CACHE_NAME = 'streaming-platform-v1.0.1';
-const RUNTIME_CACHE = 'streaming-runtime-v1';
-const IMAGE_CACHE = 'streaming-images-v1';
+const CACHE_VERSION = '2.0.0';
+const CACHE_NAME = `streaming-platform-v${CACHE_VERSION}`;
+const RUNTIME_CACHE = `streaming-runtime-v${CACHE_VERSION}`;
+const IMAGE_CACHE = `streaming-images-v${CACHE_VERSION}`;
+const DEBUG_MODE = false; // Cambiar a false en producción
 
 // Archivos críticos para cachear durante la instalación
 const PRECACHE_URLS = [
@@ -65,12 +67,12 @@ self.addEventListener('fetch', (event) => {
     // Los videos grandes no deben ser cacheados por el Service Worker
     const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4v'];
     const isVideoFile = videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)) ||
-                       url.pathname.includes('/uploads/videos/') ||
-                       url.pathname.includes('/uploads/') && videoExtensions.some(ext => url.pathname.toLowerCase().includes(ext)) ||
-                       url.pathname.includes('/videos/') ||
-                       request.destination === 'video' ||
-                       (request.headers && request.headers.get('accept') && request.headers.get('accept').includes('video/'));
-    
+        url.pathname.includes('/uploads/videos/') ||
+        url.pathname.includes('/uploads/') && videoExtensions.some(ext => url.pathname.toLowerCase().includes(ext)) ||
+        url.pathname.includes('/videos/') ||
+        request.destination === 'video' ||
+        (request.headers && request.headers.get('accept') && request.headers.get('accept').includes('video/'));
+
     if (isVideoFile) {
         // Dejar pasar directamente sin interceptar - no usar event.respondWith
         // Esto permite que el navegador maneje la petición directamente
@@ -143,18 +145,18 @@ async function cacheFirstStrategy(request, cacheName) {
     try {
         const networkResponse = await fetch(request);
         // Solo cachear respuestas completas (200 OK), no parciales (206)
-        if (networkResponse.ok && 
-            networkResponse.status === 200 && 
+        if (networkResponse.ok &&
+            networkResponse.status === 200 &&
             request.method === 'GET') {
             // Verificar que no sea un video antes de cachear
             const contentType = networkResponse.headers.get('content-type') || '';
             const url = new URL(request.url);
             const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4v'];
             const isVideoFile = videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)) ||
-                               url.pathname.includes('/uploads/videos/') ||
-                               url.pathname.includes('/videos/') ||
-                               contentType.includes('video/');
-            
+                url.pathname.includes('/uploads/videos/') ||
+                url.pathname.includes('/videos/') ||
+                contentType.includes('video/');
+
             if (!isVideoFile) {
                 // Solo cachear si no es un video y es una respuesta completa
                 try {
@@ -195,18 +197,18 @@ async function networkFirstStrategy(request, cacheName) {
     try {
         const networkResponse = await fetch(request);
         // Solo cachear respuestas completas (200 OK), no parciales (206)
-        if (networkResponse.ok && 
-            networkResponse.status === 200 && 
+        if (networkResponse.ok &&
+            networkResponse.status === 200 &&
             request.method === 'GET') {
             // Verificar que no sea un video antes de cachear
             const contentType = networkResponse.headers.get('content-type') || '';
             const url = new URL(request.url);
             const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4v'];
             const isVideoFile = videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)) ||
-                               url.pathname.includes('/uploads/videos/') ||
-                               url.pathname.includes('/videos/') ||
-                               contentType.includes('video/');
-            
+                url.pathname.includes('/uploads/videos/') ||
+                url.pathname.includes('/videos/') ||
+                contentType.includes('video/');
+
             if (!isVideoFile) {
                 // Solo cachear si no es un video y es una respuesta completa
                 try {
@@ -248,19 +250,19 @@ async function fetchAndCache(request, cacheName) {
     if (request.method !== 'GET') {
         return;
     }
-    
+
     // No cachear videos
     const url = new URL(request.url);
     const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.m4v'];
     const isVideoFile = videoExtensions.some(ext => url.pathname.toLowerCase().endsWith(ext)) ||
-                       url.pathname.includes('/uploads/videos/') ||
-                       url.pathname.includes('/videos/') ||
-                       request.destination === 'video';
-    
+        url.pathname.includes('/uploads/videos/') ||
+        url.pathname.includes('/videos/') ||
+        request.destination === 'video';
+
     if (isVideoFile) {
         return; // No cachear videos
     }
-    
+
     try {
         const networkResponse = await fetch(request);
         // Solo cachear respuestas completas (200 OK), no parciales (206)
@@ -270,18 +272,18 @@ async function fetchAndCache(request, cacheName) {
             if (contentType.includes('video/')) {
                 return; // No cachear videos
             }
-            
+
             // Verificar tamaño antes de cachear
             const contentLength = networkResponse.headers.get('content-length');
             if (contentLength && parseInt(contentLength, 10) > 10 * 1024 * 1024) {
                 return; // No cachear archivos mayores a 10MB
             }
-            
+
             // Verificar que no sea una respuesta parcial (206)
             if (networkResponse.status === 206) {
                 return; // No cachear respuestas parciales
             }
-            
+
             try {
                 const cache = await caches.open(cacheName);
                 cache.put(request, networkResponse.clone());

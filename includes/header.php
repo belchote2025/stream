@@ -282,7 +282,7 @@
                         stackTrace.includes('spoofer.js') ||
                         /spoofer\.js:\d+/.test(fullMessage) ||
                         /spoofer\.js:\d+/.test(stackTrace) ||
-                        (source && source.includes && source.includes('spoofer.js'));
+                        /spoofer\.js:\d+/.test(stackTrace);
                     
                     const hasUnexpectedError = message.includes('An unexpected error occurred') ||
                         message.trim() === 'Error: An unexpected error occurred' ||
@@ -421,6 +421,7 @@
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/fix-visibility.css">
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/pwa-styles.css">
     <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/card-optimization.css">
+    <link rel="stylesheet" href="<?php echo $baseUrl; ?>/css/cards-enhanced.css">
     
     <script>
         // Marcar que los estilos están cargados - versión simplificada

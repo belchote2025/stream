@@ -148,7 +148,14 @@ class BalandroAddon extends BaseAddon {
     public function onHook($hookName, $params = []) {
         if ($hookName === 'get_new_content') {
             // Hook para obtener contenido nuevo/trending
-            return $this->getNewContent($params);
+            $result = $this->getNewContent($params);
+            // Asegurar que devuelve el formato correcto
+            if ($result && isset($result['results'])) {
+                return $result;
+            } elseif (is_array($result)) {
+                return ['results' => $result, 'total' => count($result), 'source' => 'external'];
+            }
+            return null;
         }
         return null;
     }
@@ -156,63 +163,339 @@ class BalandroAddon extends BaseAddon {
     /**
      * Obtener contenido nuevo/trending desde fuentes externas
      * Busca contenido reciente que pueda necesitar actualización de streams
+     * Prioriza fuentes externas (TMDB, Trakt, TVMaze) para contenido nuevo
      */
     private function getNewContent($params = []) {
         $type = $params['type'] ?? 'movie';
         $limit = $params['limit'] ?? 20;
         $sinceDays = $params['since_days'] ?? 7;
         
+        $results = [];
+        
         try {
-            require_once __DIR__ . '/../../includes/config.php';
-            $db = getDbConnection();
+            // PRIORIDAD 1: Buscar en fuentes externas primero (contenido nuevo)
+            $externalResults = $this->searchExternalSources($type, $limit, $sinceDays);
+            if (!empty($externalResults) && is_array($externalResults)) {
+                $results = array_merge($results, $externalResults);
+            }
             
-            // Buscar contenido reciente que:
-            // 1. Fue creado o actualizado recientemente
-            // 2. No tiene video_url ni torrent_magnet (necesita streams)
-            // 3. O tiene rating alto (contenido popular que puede necesitar actualización)
-            $contentType = $type === 'tv' ? 'series' : 'movie';
-            $sinceDate = date('Y-m-d', strtotime("-{$sinceDays} days"));
-            
-            // Priorizar contenido sin streams que necesita actualización
-            $sql = "SELECT * FROM content 
-                    WHERE type = :type 
-                    AND (
-                        (created_at >= :sinceDate OR updated_at >= :sinceDate)
-                        OR (rating >= 7.0 AND (video_url IS NULL OR video_url = '' OR torrent_magnet IS NULL OR torrent_magnet = ''))
-                    )
-                    ORDER BY 
-                        CASE 
-                            WHEN (video_url IS NULL OR video_url = '') AND (torrent_magnet IS NULL OR torrent_magnet = '') THEN 1
-                            ELSE 2
-                        END,
-                        created_at DESC, 
-                        rating DESC
-                    LIMIT :limit";
-            
-            $stmt = $db->prepare($sql);
-            $stmt->bindValue(':type', $contentType, PDO::PARAM_STR);
-            $stmt->bindValue(':sinceDate', $sinceDate, PDO::PARAM_STR);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->execute();
-            
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            $results = [];
-            
-            foreach ($items as $item) {
-                $formatted = $this->formatContentItem($item);
-                // Marcar que viene del addon para que se busquen streams
-                $formatted['needs_streams'] = empty($item['video_url']) && empty($item['torrent_magnet']);
-                $results[] = $formatted;
+            // PRIORIDAD 2: Si no hay suficiente contenido externo, buscar contenido local que necesita streams
+            if (count($results) < $limit) {
+                require_once __DIR__ . '/../../includes/config.php';
+                $db = getDbConnection();
+                
+                $contentType = $type === 'tv' ? 'series' : 'movie';
+                $sinceDate = date('Y-m-d', strtotime("-{$sinceDays} days"));
+                
+                // Buscar contenido local sin streams que necesita actualización
+                $sql = "SELECT * FROM content 
+                        WHERE type = :type 
+                        AND (video_url IS NULL OR video_url = '' OR torrent_magnet IS NULL OR torrent_magnet = '')
+                        AND (created_at >= :sinceDate OR updated_at >= :sinceDate)
+                        ORDER BY created_at DESC, rating DESC
+                        LIMIT :limit";
+                
+                $stmt = $db->prepare($sql);
+                $stmt->bindValue(':type', $contentType, PDO::PARAM_STR);
+                $stmt->bindValue(':sinceDate', $sinceDate, PDO::PARAM_STR);
+                $stmt->bindValue(':limit', $limit - count($results), PDO::PARAM_INT);
+                $stmt->execute();
+                
+                $localItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                foreach ($localItems as $item) {
+                    $formatted = $this->formatContentItem($item);
+                    $formatted['needs_streams'] = true;
+                    $results[] = $formatted;
+                }
             }
             
             return [
-                'results' => $results,
+                'results' => array_slice($results, 0, $limit),
                 'total' => count($results),
-                'source' => 'local_recent_needs_update'
+                'source' => !empty($externalResults) ? 'external' : 'local'
             ];
         } catch (Exception $e) {
             if ($this->config['debug_mode']) {
                 error_log("Error obteniendo contenido nuevo: " . $e->getMessage());
+            }
+            // Si falla, intentar solo fuentes externas
+            try {
+                $externalResults = $this->searchExternalSources($type, $limit, $sinceDays);
+                if (!empty($externalResults) && is_array($externalResults)) {
+                    return [
+                        'results' => $externalResults,
+                        'total' => count($externalResults),
+                        'source' => 'external'
+                    ];
+                }
+            } catch (Exception $e2) {
+                if ($this->config['debug_mode']) {
+                    error_log("Error buscando en fuentes externas: " . $e2->getMessage());
+                }
+            }
+            return null;
+        }
+    }
+    
+    /**
+     * Busca contenido nuevo en fuentes externas (TMDB, Trakt, TVMaze)
+     */
+    private function searchExternalSources($type, $limit, $sinceDays) {
+        $results = [];
+        
+        try {
+            require_once __DIR__ . '/../../includes/config.php';
+            
+            $tmdbApiKey = getenv('TMDB_API_KEY') ?: (defined('TMDB_API_KEY') ? TMDB_API_KEY : '');
+            $traktClientId = getenv('TRAKT_CLIENT_ID') ?: (defined('TRAKT_CLIENT_ID') ? TRAKT_CLIENT_ID : '');
+            
+            // PRIORIDAD 1: Buscar en TVMaze primero (no requiere API key y es más rápido)
+            if ($type === 'tv' && count($results) < $limit) {
+                try {
+                    $tvmazeItems = $this->searchTVMaze($limit, $sinceDays, $type);
+                    foreach ($tvmazeItems as $item) {
+                        $formatted = $this->formatExternalItem($item, 'tvmaze');
+                        if ($formatted) {
+                            $results[] = $formatted;
+                        }
+                    }
+                } catch (Exception $e) {
+                    if ($this->config['debug_mode']) {
+                        error_log("Error buscando en TVMaze: " . $e->getMessage());
+                    }
+                }
+            }
+            
+            // PRIORIDAD 2: Buscar en TMDB si está configurado
+            if (!empty($tmdbApiKey) && count($results) < $limit) {
+                try {
+                    $tmdbItems = $this->searchTMDB($type, $tmdbApiKey, $limit - count($results));
+                    foreach ($tmdbItems as $item) {
+                        $formatted = $this->formatExternalItem($item, 'tmdb');
+                        if ($formatted) {
+                            $results[] = $formatted;
+                        }
+                    }
+                } catch (Exception $e) {
+                    if ($this->config['debug_mode']) {
+                        error_log("Error buscando en TMDB: " . $e->getMessage());
+                    }
+                }
+            }
+            
+            // PRIORIDAD 3: Buscar en Trakt si está configurado
+            if (!empty($traktClientId) && count($results) < $limit) {
+                try {
+                    $traktItems = $this->searchTrakt($type, $traktClientId, $limit - count($results));
+                    foreach ($traktItems as $item) {
+                        $formatted = $this->formatExternalItem($item, 'trakt');
+                        if ($formatted) {
+                            $results[] = $formatted;
+                        }
+                    }
+                } catch (Exception $e) {
+                    if ($this->config['debug_mode']) {
+                        error_log("Error buscando en Trakt: " . $e->getMessage());
+                    }
+                }
+            }
+            
+        } catch (Exception $e) {
+            if ($this->config['debug_mode']) {
+                error_log("Error en searchExternalSources: " . $e->getMessage());
+            }
+        }
+        
+        return array_slice($results, 0, $limit);
+    }
+    
+    /**
+     * Busca contenido en TMDB
+     */
+    private function searchTMDB($type, $apiKey, $limit) {
+        $results = [];
+        $endpoint = $type === 'tv' ? 'tv/trending' : 'movie/trending';
+        $url = "https://api.themoviedb.org/3/{$endpoint}?api_key={$apiKey}";
+        
+        try {
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'header' => "Accept: application/json\r\n",
+                    'timeout' => $this->config['timeout']
+                ]
+            ]);
+            
+            $response = @file_get_contents($url, false, $context);
+            if ($response) {
+                $data = json_decode($response, true);
+                if (isset($data['results']) && is_array($data['results'])) {
+                    $count = 0;
+                    foreach ($data['results'] as $item) {
+                        if ($count >= $limit) break;
+                        $results[] = $item;
+                        $count++;
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            if ($this->config['debug_mode']) {
+                error_log("Error en searchTMDB: " . $e->getMessage());
+            }
+        }
+        
+        return $results;
+    }
+    
+    /**
+     * Busca contenido en Trakt
+     */
+    private function searchTrakt($type, $clientId, $limit) {
+        $results = [];
+        $endpoint = $type === 'tv' ? 'shows/trending' : 'movies/trending';
+        $url = "https://api.trakt.tv/{$endpoint}";
+        
+        try {
+            $headers = [
+                "Content-Type: application/json",
+                "trakt-api-version: 2",
+                "trakt-api-key: {$clientId}"
+            ];
+            
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'header' => implode("\r\n", $headers) . "\r\n",
+                    'timeout' => $this->config['timeout']
+                ]
+            ]);
+            
+            $response = @file_get_contents($url, false, $context);
+            if ($response) {
+                $data = json_decode($response, true);
+                if (is_array($data)) {
+                    $count = 0;
+                    foreach ($data as $item) {
+                        if ($count >= $limit) break;
+                        $show = $item[$type === 'tv' ? 'show' : 'movie'] ?? $item;
+                        if ($show) {
+                            $results[] = $show;
+                            $count++;
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            if ($this->config['debug_mode']) {
+                error_log("Error en searchTrakt: " . $e->getMessage());
+            }
+        }
+        
+        return $results;
+    }
+    
+    /**
+     * Busca contenido en TVMaze
+     */
+    private function searchTVMaze($limit, $sinceDays, $type) {
+        $results = [];
+        
+        try {
+            // Buscar en schedule reciente
+            $cutoff = $sinceDays > 0 ? date('Y-m-d', strtotime("-{$sinceDays} days")) : null;
+            $url = "https://api.tvmaze.com/schedule?country=US";
+            
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'header' => "Accept: application/json\r\n",
+                    'timeout' => $this->config['timeout']
+                ]
+            ]);
+            
+            $response = @file_get_contents($url, false, $context);
+            if ($response) {
+                $data = json_decode($response, true);
+                if (is_array($data)) {
+                    $seenIds = [];
+                    $count = 0;
+                    foreach ($data as $item) {
+                        if ($count >= $limit) break;
+                        $show = $item['show'] ?? null;
+                        if ($show && !isset($seenIds[$show['id']])) {
+                            $seenIds[$show['id']] = true;
+                            $results[] = $show;
+                            $count++;
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            if ($this->config['debug_mode']) {
+                error_log("Error en searchTVMaze: " . $e->getMessage());
+            }
+        }
+        
+        return $results;
+    }
+    
+    /**
+     * Formatea un item de fuente externa al formato del addon
+     */
+    private function formatExternalItem($item, $source) {
+        try {
+            $title = $item['title'] ?? $item['name'] ?? '';
+            if (empty($title)) {
+                return null;
+            }
+            
+            $year = $item['year'] ?? $item['release_year'] ?? null;
+            $poster = null;
+            $backdrop = null;
+            
+            // Extraer poster y backdrop según la fuente
+            if ($source === 'tmdb') {
+                $poster = !empty($item['poster_path']) ? 'https://image.tmdb.org/t/p/w500' . $item['poster_path'] : null;
+                $backdrop = !empty($item['backdrop_path']) ? 'https://image.tmdb.org/t/p/w1280' . $item['backdrop_path'] : null;
+            } elseif ($source === 'trakt') {
+                $poster = $item['poster'] ?? $item['image']['poster'] ?? null;
+                $backdrop = $item['backdrop'] ?? $item['image']['backdrop'] ?? null;
+            } elseif ($source === 'tvmaze') {
+                $poster = $item['image']['original'] ?? $item['image']['medium'] ?? null;
+                $backdrop = $item['image']['original'] ?? null;
+            }
+            
+            $itemType = ($item['type'] ?? 'movie') === 'tv' ? 'tv' : 'movie';
+            
+            return [
+                'id' => null, // No tiene ID local aún
+                'title' => $title,
+                'name' => $title,
+                'original_title' => $item['original_title'] ?? $title,
+                'type' => $itemType,
+                'year' => $year,
+                'release_year' => $year,
+                'poster' => $poster,
+                'poster_url' => $poster,
+                'backdrop' => $backdrop,
+                'backdrop_url' => $backdrop,
+                'overview' => $item['overview'] ?? $item['summary'] ?? $item['description'] ?? '',
+                'description' => $item['overview'] ?? $item['summary'] ?? $item['description'] ?? '',
+                'genres' => $item['genres'] ?? [],
+                'rating' => $item['rating'] ?? $item['vote_average'] ?? ($item['rating']['average'] ?? 0),
+                'vote_count' => $item['vote_count'] ?? ($item['votes'] ?? 0),
+                'release_date' => $item['release_date'] ?? $item['premiered'] ?? null,
+                'runtime' => $item['runtime'] ?? $item['duration'] ?? null,
+                'provider' => 'balandro',
+                'provider_id' => $item['id'] ?? null,
+                'imdb_id' => $item['imdb_id'] ?? null,
+                'external_source' => $source,
+                'external_data' => $item
+            ];
+        } catch (Exception $e) {
+            if ($this->config['debug_mode']) {
+                error_log("Error formateando item externo: " . $e->getMessage());
             }
             return null;
         }
@@ -229,8 +512,19 @@ class BalandroAddon extends BaseAddon {
         
         if (in_array($queryLower, $specialQueries)) {
             // Buscar contenido nuevo/trending
-            $params = array_merge($filters, ['limit' => $filters['limit'] ?? 20]);
-            return $this->getNewContent($params);
+            $params = array_merge($filters, [
+                'limit' => $filters['limit'] ?? 20,
+                'type' => $filters['type'] ?? 'movie',
+                'since_days' => $filters['since_days'] ?? 7
+            ]);
+            $result = $this->getNewContent($params);
+            // Asegurar formato correcto
+            if ($result && isset($result['results'])) {
+                return $result;
+            } elseif (is_array($result)) {
+                return ['results' => $result, 'total' => count($result), 'source' => 'external'];
+            }
+            return ['results' => [], 'total' => 0, 'source' => 'none'];
         }
         
         if (empty($query)) {

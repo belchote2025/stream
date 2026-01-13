@@ -7,11 +7,28 @@ RewriteCond %{HTTP_HOST} !^localhost [NC]
 RewriteCond %{HTTP_HOST} !^127\.0\.0\.1
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Headers CORS para API
+# Headers CORS y Seguridad
 <IfModule mod_headers.c>
-    Header set Access-Control-Allow-Origin "*"
-    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    # Configuración CORS segura
+    # Permitir localhost en desarrollo
+    SetEnvIf Origin "http(s)?://(localhost|127\.0\.0\.1)(:[0-9]+)?$" AccessControlAllowOrigin=$0
+    # Permitir dominio de producción
+    SetEnvIf Origin "https://goldenrod-finch-839887\.hostingersite\.com$" AccessControlAllowOrigin=$0
+    
+    Header set Access-Control-Allow-Origin "%{AccessControlAllowOrigin}e" env=AccessControlAllowOrigin
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS, DELETE, PUT"
     Header set Access-Control-Allow-Headers "Content-Type, X-Requested-With, Authorization"
+    Header set Access-Control-Allow-Credentials "true"
+    
+    # Headers de seguridad adicionales
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Eliminar información del servidor
+    Header unset Server
+    Header unset X-Powered-By
 </IfModule>
 
 # Definir SITE_URL solo para el dominio de producción

@@ -35,6 +35,9 @@ try {
 
     $userId = $_SESSION['user_id'];
     $db = getDbConnection();
+    // Desactivar ONLY_FULL_GROUP_BY para evitar errores en queries complejas de agrupación
+    $db->query("SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''))");
+    
     
     // Obtener parámetros
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
@@ -271,7 +274,7 @@ try {
     error_log('Error en recommendations/improved.php: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Error al obtener recomendaciones'
+        'error' => 'DEBUG SQL: ' . $e->getMessage()
     ]);
     exit;
 } catch (Exception $e) {
